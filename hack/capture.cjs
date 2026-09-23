@@ -77,6 +77,12 @@ app.whenReady().then(async () => {
     );
     await delay(500);
   }
+  if (process.env.MAIN_SCROLL) {
+    await win.webContents.executeJavaScript(
+      `document.getElementById('content').scrollTop = ${Number(process.env.MAIN_SCROLL)};`
+    );
+    await delay(400);
+  }
   win.webContents.invalidate();
   await delay(300);
   const image = await win.webContents.capturePage();

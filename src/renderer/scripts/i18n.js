@@ -33,6 +33,7 @@ window.ShipsI18n = (function createI18n() {
         clipboard: '剪贴板',
         encode: '编码转换',
         hash: '哈希计算',
+        nutrient: '营养成分',
       },
     },
     en: {
@@ -66,6 +67,7 @@ window.ShipsI18n = (function createI18n() {
         clipboard: 'Clipboard',
         encode: 'Encode',
         hash: 'Hash',
+        nutrient: 'Nutrition',
       },
     },
   };
