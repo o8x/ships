@@ -37,7 +37,12 @@ function parseEntries(content) {
 }
 
 function serializeEntries(entries) {
-  return entries.map((entry) => entry.lines.join('\n')).join('\n');
+  // Drop a leading empty raw block so the file never starts with a blank line.
+  const list =
+    entries.length && entries[0].kind === 'raw' && entries[0].lines.every((line) => line.trim() === '')
+      ? entries.slice(1)
+      : entries;
+  return list.map((entry) => entry.lines.join('\n')).join('\n');
 }
 
 function parseFields(entry) {

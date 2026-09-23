@@ -121,6 +121,11 @@ app.whenReady().then(async () => {
       );
       await delay(400);
     }
+    if (process.env.SETTINGS_EVAL) {
+      const result = await settingsWin.webContents.executeJavaScript(process.env.SETTINGS_EVAL);
+      console.log('[capture] settings eval:', result);
+      await delay(800);
+    }
     settingsWin.webContents.invalidate();
     await delay(300);
     const settingsImage = await settingsWin.webContents.capturePage();

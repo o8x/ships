@@ -20,7 +20,7 @@
         proxyJump: '跳板机',
         save: '保存',
         cancel: '取消',
-        requiredAlias: '别名为必填项',
+        requiredAlias: '请至少填写别名或主机地址',
         confirmDelete: '确认删除？',
         delete: '删除',
       },
@@ -40,7 +40,7 @@
         proxyJump: 'ProxyJump',
         save: 'Save',
         cancel: 'Cancel',
-        requiredAlias: 'Alias is required',
+        requiredAlias: 'Alias or host address is required',
         confirmDelete: 'Delete this host?',
         delete: 'Delete',
       },
@@ -196,7 +196,9 @@
       for (const input of root.querySelectorAll('input')) {
         value[input.dataset.key] = input.value.trim();
       }
-      const alias = value.alias;
+      const hostName = value.hostName;
+      // Defaults when adding: alias -> host address, user -> root, port -> 22.
+      const alias = value.alias || hostName;
       if (!alias) {
         state.error = i18n.t('sshSettings.requiredAlias');
         render();
@@ -205,8 +207,8 @@
       await window.ships.sshConfig.upsert({
         originalAlias: state.editing.originalAlias || alias,
         alias,
-        hostName: value.hostName,
-        user: value.user,
+        hostName,
+        user: value.user || 'root',
         port: Number(value.port) || 22,
         identityFile: value.identityFile,
         proxyJump: value.proxyJump,
