@@ -315,7 +315,6 @@ input[type='color'].swatch::-webkit-color-swatch {
   z-index: 200;
   pointer-events: none;
   opacity: 0;
-  transform: translateY(-2px);
   max-width: 240px;
   padding: 4px 8px;
   border-radius: 6px;
@@ -325,11 +324,10 @@ input[type='color'].swatch::-webkit-color-swatch {
   background: var(--color-surface-3);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-popover);
-  transition: opacity 0.12s ease, transform 0.12s ease;
+  transition: opacity 0.12s ease;
 }
 .ships-tip.visible {
   opacity: 1;
-  transform: translateY(0);
 }
 
 /* JSON editor + tree */

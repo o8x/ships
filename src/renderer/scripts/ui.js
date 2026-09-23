@@ -349,13 +349,10 @@ window.ShipsUI = (function createUI() {
     const tip = el('div', { class: 'ships-tip' }, '');
     document.body.appendChild(tip);
     let target = null;
+    let showTimer = null;
+    let hideTimer = null;
 
-    function show(node) {
-      const text = node.getAttribute('data-tip');
-      if (!text) return;
-      target = node;
-      tip.textContent = text;
-      tip.classList.add('visible');
+    function position(node) {
       const rect = node.getBoundingClientRect();
       const tipRect = tip.getBoundingClientRect();
       let left = rect.left + rect.width / 2 - tipRect.width / 2;
@@ -366,20 +363,50 @@ window.ShipsUI = (function createUI() {
       tip.style.top = `${top}px`;
     }
 
+    function show(node) {
+      const text = node.getAttribute('data-tip');
+      if (!text) return;
+      target = node;
+      tip.textContent = text;
+      position(node);
+      tip.classList.add('visible');
+    }
+
     function hide() {
       target = null;
       tip.classList.remove('visible');
     }
 
-    document.addEventListener('mouseover', (event) => {
+    // Delays avoid flicker when the pointer moves between adjacent icons.
+    function onOver(event) {
       const node = event.target.closest && event.target.closest('[data-tip]');
-      if (node && node !== target) show(node);
-      else if (!node && target) hide();
-    });
-    document.addEventListener('mouseout', (event) => {
-      if (target && (!event.relatedTarget || !target.contains(event.relatedTarget))) hide();
-    });
-    window.addEventListener('scroll', hide, true);
+      if (!node) return;
+      clearTimeout(hideTimer);
+      if (node === target) return;
+      clearTimeout(showTimer);
+      showTimer = setTimeout(() => show(node), 60);
+    }
+
+    function onOut(event) {
+      const node = event.target.closest && event.target.closest('[data-tip]');
+      if (!node) return;
+      if (event.relatedTarget && node.contains(event.relatedTarget)) return;
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(hide, 80);
+    }
+
+    document.addEventListener('pointerover', onOver);
+    document.addEventListener('pointerout', onOut);
+    window.addEventListener(
+      'scroll',
+      () => {
+        clearTimeout(showTimer);
+        clearTimeout(hideTimer);
+        hide();
+      },
+      true
+    );
   }
 
   initTooltips();
