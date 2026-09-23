@@ -129,6 +129,12 @@
   -webkit-app-region: drag;
   z-index: 10;
 }
+
+/* Brand becomes draggable when the popover is pinned. */
+.brand-drag {
+  -webkit-app-region: drag;
+}
+
 .settings-nav-item {
   display: flex;
   align-items: center;
@@ -229,8 +235,7 @@ input[type='color'].swatch::-webkit-color-swatch {
 }
 
 /* Custom select */
-.select-trigger {
-  display: inline-flex;
+.select-trigger {  display: inline-flex;
   align-items: center;
   justify-content: space-between;
   gap: 6px;

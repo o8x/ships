@@ -7,9 +7,11 @@
 
   const dom = {
     tablist: document.getElementById('tablist'),
+    brand: document.getElementById('brand'),
     brandName: document.getElementById('brand-name'),
     content: document.getElementById('content'),
     version: document.getElementById('footer-version'),
+    pin: document.getElementById('btn-pin'),
     settings: document.getElementById('btn-settings'),
   };
 
@@ -86,6 +88,17 @@
     dom.brandName.textContent = i18n.t('appName');
   }
 
+  function updatePin() {
+    const pinned = Boolean(state.settings.pinWindow);
+    dom.pin.innerHTML = Icons.pin(15);
+    dom.pin.setAttribute('data-tip', i18n.t(pinned ? 'common.unpin' : 'common.pin'));
+    dom.pin.style.color = pinned ? 'var(--color-accent)' : '';
+    dom.pin.style.background = pinned
+      ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)'
+      : '';
+    dom.brand.classList.toggle('brand-drag', pinned);
+  }
+
   function renderFooter() {
     dom.version.textContent = `v${state.version}`;
     dom.settings.innerHTML = Icons.gear(18);
@@ -111,16 +124,21 @@
     renderTabs();
     renderFooter();
     renderBrand();
+    updatePin();
 
     const tools = orderedTools();
     if (tools.length) setActive(tools[0].id);
     else dom.content.innerHTML = emptyState(i18n.t('emptyTools'));
 
     dom.settings.addEventListener('click', () => window.ships.openSettings());
+    dom.pin.addEventListener('click', () => {
+      window.ships.setSettings({ pinWindow: !state.settings.pinWindow });
+    });
 
     window.ships.onSettingsChanged((next) => {
       const localeChanged = next.locale !== state.settings.locale;
       applySettings(next);
+      updatePin();
       if (localeChanged) {
         renderTabs();
         renderFooter();

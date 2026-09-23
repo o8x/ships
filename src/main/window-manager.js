@@ -13,6 +13,7 @@ let mainWindow = null;
 let settingsWindow = null;
 let trayRef = null;
 let blurSuppressed = false;
+let pinnedPositioned = false;
 
 function setTray(tray) {
   trayRef = tray;
@@ -47,6 +48,7 @@ function createMainWindow() {
   });
 
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  if (mainWindow.setMovable) mainWindow.setMovable(Boolean(settings.get('pinWindow')));
   mainWindow.loadFile(path.join(RENDERER_DIR, 'index.html'));
 
   mainWindow.on('blur', () => {
@@ -94,9 +96,25 @@ function positionUnderTray() {
 
 function showMainWindow() {
   const win = getMainWindow() || createMainWindow();
-  positionUnderTray();
+  const pinned = Boolean(settings.get('pinWindow'));
+  if (!pinned || !pinnedPositioned) positionUnderTray();
   win.show();
   win.focus();
+  if (pinned) pinnedPositioned = true;
+}
+
+// Applies the pin (keep-on-top) behavior: when pinned the popover can be moved
+// and keeps its position; when unpinned it hides and resets to the tray anchor.
+function applyPin(pinned) {
+  const win = getMainWindow();
+  if (win && win.setMovable) win.setMovable(Boolean(pinned));
+  if (pinned) {
+    pinnedPositioned = true;
+  } else {
+    pinnedPositioned = false;
+    hideMainWindow();
+    positionUnderTray();
+  }
 }
 
 function hideMainWindow() {
@@ -186,4 +204,5 @@ module.exports = {
   getSettingsWindow,
   broadcast,
   setBlurSuppressed,
+  applyPin,
 };
