@@ -9,8 +9,8 @@
     zh: {
       settingsPage: {
         title: '设置',
-        ships: '⚙️ Ships 设置',
-        ssh: '🖥 SSH 管理',
+        ships: 'Ships 设置',
+        ssh: 'SSH 管理',
         language: '语言',
         languageHint: '界面显示语言',
         appearance: '外观',
@@ -32,8 +32,8 @@
     en: {
       settingsPage: {
         title: 'Settings',
-        ships: '⚙️ Ships',
-        ssh: '🖥 SSH',
+        ships: 'Ships',
+        ssh: 'SSH',
         language: 'Language',
         languageHint: 'Interface language',
         appearance: 'Appearance',
