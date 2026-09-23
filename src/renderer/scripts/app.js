@@ -56,9 +56,21 @@
     mountTool(id);
   }
 
+  function orderedTools() {
+    const all = registry.all();
+    const order = window.ShipsToolOrder;
+    if (!Array.isArray(order) || !order.length) return all;
+    const index = new Map(order.map((id, position) => [id, position]));
+    return all.slice().sort((a, b) => {
+      const ia = index.has(a.id) ? index.get(a.id) : Number.MAX_SAFE_INTEGER;
+      const ib = index.has(b.id) ? index.get(b.id) : Number.MAX_SAFE_INTEGER;
+      return ia - ib;
+    });
+  }
+
   function renderTabs() {
     dom.tablist.innerHTML = '';
-    for (const tool of registry.all()) {
+    for (const tool of orderedTools()) {
       const btn = el('button', {
         class: 'tab',
         'data-tip': i18n.t(`tools.${tool.id}`),
@@ -100,7 +112,7 @@
     renderFooter();
     renderBrand();
 
-    const tools = registry.all();
+    const tools = orderedTools();
     if (tools.length) setActive(tools[0].id);
     else dom.content.innerHTML = emptyState(i18n.t('emptyTools'));
 
