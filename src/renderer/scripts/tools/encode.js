@@ -1,36 +1,40 @@
 'use strict';
 
 (function registerEncodeTool() {
-  const { el, section, inputField, segmented, persistState } = window.ShipsUI;
+  const { el, section, inputField, persistState } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
     zh: {
       encode: {
-        hint: '在原文或编码结果任意一侧输入，实时互转（UTF-8）',
-        mode: '方式',
-        plain: '原文',
-        encoded: '编码结果',
-        plainPlaceholder: '输入原文…',
-        encodedPlaceholder: '输入编码结果…',
-        invalid: '无法解码',
+        hint: '任意一侧输入即可实时互转（UTF-8）',
+        text: '字符串',
         base64: 'Base64',
-        hex: 'Hex',
-        url: 'URL',
+        hex: '十六进制',
+        url: 'URL 编码',
+        ascii: 'ASCII 十进制',
+        invalid: '无法解码',
+        textPlaceholder: '输入文本…',
+        base64Placeholder: '如 aGVsbG8=',
+        hexPlaceholder: '如 68 65 6c 6c 6f',
+        urlPlaceholder: '如 hello%20world',
+        asciiPlaceholder: '如 104 101 108 108 111',
       },
     },
     en: {
       encode: {
         hint: 'Type on either side to convert live (UTF-8)',
-        mode: 'Mode',
-        plain: 'Plain',
-        encoded: 'Encoded',
-        plainPlaceholder: 'Type plain text…',
-        encodedPlaceholder: 'Type encoded text…',
-        invalid: 'Cannot decode',
+        text: 'Text',
         base64: 'Base64',
         hex: 'Hex',
         url: 'URL',
+        ascii: 'ASCII decimal',
+        invalid: 'Invalid input',
+        textPlaceholder: 'Type text…',
+        base64Placeholder: 'e.g. aGVsbG8=',
+        hexPlaceholder: 'e.g. 68 65 6c 6c 6f',
+        urlPlaceholder: 'e.g. hello%20world',
+        asciiPlaceholder: 'e.g. 104 101 108 108 111',
       },
     },
   });
@@ -47,138 +51,165 @@
     return btoa(binary);
   }
 
-  function base64ToText(text) {
+  function base64ToBytes(text) {
     const cleaned = text.trim().replace(/\s+/g, '');
-    if (!cleaned) return '';
+    if (!cleaned) return new Uint8Array(0);
     try {
       const binary = atob(cleaned);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      return decoder.decode(bytes);
+      return bytes;
     } catch (err) {
       return null;
     }
   }
 
-  function textToHex(text) {
-    return Array.from(encoder.encode(text))
+  function bytesToHex(bytes) {
+    return Array.from(bytes)
       .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
+      .join(' ');
   }
 
-  function hexToText(text) {
-    const cleaned = text.trim().replace(/0x/gi, '').replace(/[\s,:-]/g, '');
-    if (!cleaned) return '';
+  function hexToBytes(text) {
+    const cleaned = text.replace(/0x/gi, '').replace(/[\s,:;-]/g, '');
+    if (!cleaned) return new Uint8Array(0);
     if (cleaned.length % 2 !== 0 || !/^[0-9a-f]+$/i.test(cleaned)) return null;
     const bytes = new Uint8Array(cleaned.length / 2);
     for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(cleaned.slice(i * 2, i * 2 + 2), 16);
-    return decoder.decode(bytes);
+    return bytes;
   }
 
-  function encode(mode, text) {
-    if (mode === 'hex') return textToHex(text);
-    if (mode === 'url') return encodeURIComponent(text);
-    return bytesToBase64(encoder.encode(text));
+  function bytesToAscii(bytes) {
+    return Array.from(bytes).join(' ');
   }
 
-  function decode(mode, text) {
-    if (mode === 'hex') return hexToText(text);
-    if (mode === 'url') {
-      try {
-        return decodeURIComponent(text);
-      } catch (err) {
-        return null;
-      }
+  function asciiToBytes(text) {
+    const cleaned = text.trim();
+    if (!cleaned) return new Uint8Array(0);
+    const parts = cleaned.split(/[\s,]+/);
+    const bytes = new Uint8Array(parts.length);
+    for (let i = 0; i < parts.length; i++) {
+      if (!/^\d{1,3}$/.test(parts[i])) return null;
+      const value = Number(parts[i]);
+      if (value > 255) return null;
+      bytes[i] = value;
     }
-    return base64ToText(text);
+    return bytes;
   }
 
   function mount(container) {
     const hint = el('div', { class: 'mb-3 text-[11px] text-fg-muted' }, i18n.t('encode.hint'));
-
-    const modeSegment = segmented(
-      [
-        { value: 'base64', label: i18n.t('encode.base64') },
-        { value: 'hex', label: i18n.t('encode.hex') },
-        { value: 'url', label: i18n.t('encode.url') },
-      ],
-      'base64',
-      () => {
-        encodeFromPlain();
-        saveState();
-      }
-    );
-
-    const plain = el('textarea', {
-      class: 'field font-mono',
-      rows: 3,
-      spellcheck: 'false',
-      placeholder: i18n.t('encode.plainPlaceholder'),
-    });
-    const encoded = el('textarea', {
-      class: 'field font-mono',
-      rows: 3,
-      spellcheck: 'false',
-      placeholder: i18n.t('encode.encodedPlaceholder'),
-    });
-
-    const plainWrap = inputField(i18n.t('encode.plain'), plain);
-    const encodedWrap = inputField(i18n.t('encode.encoded'), encoded);
-
     const store = persistState('encode');
+
+    function area(label, placeholder) {
+      const input = el('textarea', {
+        class: 'field font-mono',
+        rows: 2,
+        spellcheck: 'false',
+        placeholder,
+      });
+      return { input, wrapper: inputField(label, input) };
+    }
+
+    const textField = area(i18n.t('encode.text'), i18n.t('encode.textPlaceholder'));
+    const base64Field = area(i18n.t('encode.base64'), i18n.t('encode.base64Placeholder'));
+    const hexField = area(i18n.t('encode.hex'), i18n.t('encode.hexPlaceholder'));
+    const urlField = area(i18n.t('encode.url'), i18n.t('encode.urlPlaceholder'));
+    const asciiField = area(i18n.t('encode.ascii'), i18n.t('encode.asciiPlaceholder'));
+
+    const fields = {
+      text: textField.input,
+      base64: base64Field.input,
+      hex: hexField.input,
+      url: urlField.input,
+      ascii: asciiField.input,
+    };
+
     let syncing = false;
 
-    function setError(invalid) {
-      encoded.style.borderColor = invalid ? 'var(--color-danger)' : '';
+    function setError(field, invalid) {
+      field.style.borderColor = invalid ? 'var(--color-danger)' : '';
     }
 
-    function encodeFromPlain() {
+    function renderFrom(field, bytes, text) {
       syncing = true;
-      encoded.value = encode(modeSegment ? currentMode() : 'base64', plain.value);
+      if (field !== fields.text) fields.text.value = text;
+      if (field !== fields.base64) fields.base64.value = bytesToBase64(bytes);
+      if (field !== fields.hex) fields.hex.value = bytesToHex(bytes);
+      if (field !== fields.url) fields.url.value = encodeURIComponent(text);
+      if (field !== fields.ascii) fields.ascii.value = bytesToAscii(bytes);
       syncing = false;
-      setError(false);
     }
 
-    function decodeFromEncoded() {
+    function handle(field) {
       if (syncing) return;
-      const result = decode(currentMode(), encoded.value);
-      if (result == null) {
-        setError(true);
+      const value = field.value;
+      if (!value.trim()) {
+        syncing = true;
+        for (const key of Object.keys(fields)) {
+          if (fields[key] !== field) fields[key].value = '';
+          setError(fields[key], false);
+        }
+        syncing = false;
         return;
       }
-      setError(false);
-      syncing = true;
-      plain.value = result;
-      syncing = false;
+
+      let bytes;
+      let text;
+      if (field === fields.text) {
+        text = value;
+        bytes = encoder.encode(value);
+      } else if (field === fields.base64) {
+        bytes = base64ToBytes(value);
+        text = bytes ? decoder.decode(bytes) : '';
+      } else if (field === fields.hex) {
+        bytes = hexToBytes(value);
+        text = bytes ? decoder.decode(bytes) : '';
+      } else if (field === fields.ascii) {
+        bytes = asciiToBytes(value);
+        text = bytes ? decoder.decode(bytes) : '';
+      } else {
+        try {
+          text = decodeURIComponent(value);
+          bytes = encoder.encode(text);
+        } catch (err) {
+          bytes = null;
+        }
+      }
+
+      if (bytes == null) {
+        setError(field, true);
+        return;
+      }
+      setError(field, false);
+      renderFrom(field, bytes, text);
+
+      const key = Object.keys(fields).find((name) => fields[name] === field);
+      if (key) store.save({ field: key, value: field.value });
     }
 
-    function currentMode() {
-      const active = modeSegment.root.querySelector('button.active');
-      return active ? active.dataset.value : 'base64';
+    for (const key of Object.keys(fields)) {
+      fields[key].addEventListener('input', () => handle(fields[key]));
+      fields[key].addEventListener('blur', () => handle(fields[key]));
     }
 
-    function saveState() {
-      store.save({ mode: currentMode(), plain: plain.value });
-    }
+    const body = section();
+    body.append(
+      textField.wrapper,
+      base64Field.wrapper,
+      hexField.wrapper,
+      urlField.wrapper,
+      asciiField.wrapper
+    );
 
-    plain.addEventListener('input', () => {
-      encodeFromPlain();
-      saveState();
-    });
-    encoded.addEventListener('input', decodeFromEncoded);
-    encoded.addEventListener('blur', decodeFromEncoded);
-
-    const sectionEl = section();
-    sectionEl.append(modeSegment.root, plainWrap, encodedWrap);
-
-    container.append(hint, sectionEl);
+    container.append(hint, body);
 
     store.load((saved) => {
-      if (saved && saved.mode) modeSegment.set(saved.mode);
-      if (saved && saved.plain != null) {
-        plain.value = saved.plain;
-        encodeFromPlain();
-      }
+      if (!saved || !saved.field || saved.value == null) return;
+      const target = fields[saved.field];
+      if (!target) return;
+      target.value = saved.value;
+      handle(target);
     });
   }
 

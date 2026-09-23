@@ -2,7 +2,6 @@
 
 window.ShipsToolOrder = [
   'ssh',
-  'stringCodec',
   'encode',
   'timestamp',
   'ipNumber',
