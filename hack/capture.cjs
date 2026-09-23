@@ -19,11 +19,13 @@ app.whenReady().then(async () => {
   const { registerAppIpc } = require('../src/main/ipc/app-ipc');
   const { registerWindowIpc } = require('../src/main/ipc/window-ipc');
   const { registerSettingsIpc } = require('../src/main/ipc/settings-ipc');
+  const { registerSshIpc } = require('../src/main/ipc/ssh-ipc');
   const wm = require('../src/main/window-manager');
 
   registerAppIpc(ipcMain);
   registerWindowIpc(ipcMain);
   registerSettingsIpc(ipcMain);
+  registerSshIpc(ipcMain);
 
   const win = wm.createMainWindow();
   win.webContents.setBackgroundThrottling(false);
