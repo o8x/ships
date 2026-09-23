@@ -16,7 +16,6 @@
         notDetected: '未探测',
         unknown: '未知',
         alias: '别名',
-        connected: '已在 iTerm 中连接 {host}',
         connectFailed: '连接失败：{error}',
         detectedAs: '系统：{os}',
         detectDone: '{host}：{os}',
@@ -34,7 +33,6 @@
         notDetected: 'Not detected',
         unknown: 'Unknown',
         alias: 'Alias',
-        connected: 'Connecting to {host} in iTerm',
         connectFailed: 'Connect failed: {error}',
         detectedAs: 'OS: {os}',
         detectDone: '{host}: {os}',
@@ -142,8 +140,9 @@
 
     async function connect(host) {
       const result = await window.ships.ssh.connect({ alias: host.alias });
-      if (result && result.ok) showStatus(i18n.t('ssh.connected', { host: host.alias }), false);
-      else showStatus(i18n.t('ssh.connectFailed', { error: (result && result.error) || 'error' }), true);
+      if (!result || !result.ok) {
+        showStatus(i18n.t('ssh.connectFailed', { error: (result && result.error) || 'error' }), true);
+      }
     }
 
     refreshBtn.addEventListener('click', load);
