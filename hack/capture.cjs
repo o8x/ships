@@ -69,8 +69,23 @@ app.whenReady().then(async () => {
 
   if (process.env.SETTINGS_OUT) {
     const settingsWin = wm.openSettingsWindow();
+    settingsWin.webContents.setBackgroundThrottling(false);
     await waitLoad(settingsWin);
-    await delay(1400);
+    await delay(1200);
+    if (process.env.SETTINGS_TAB) {
+      await settingsWin.webContents.executeJavaScript(
+        `document.querySelectorAll('.settings-nav-item')[${Number(process.env.SETTINGS_TAB)}]?.click();`
+      );
+      await delay(900);
+    }
+    if (process.env.SETTINGS_CLICK) {
+      await settingsWin.webContents.executeJavaScript(
+        `document.querySelector(${JSON.stringify(process.env.SETTINGS_CLICK)})?.click();`
+      );
+      await delay(700);
+    }
+    settingsWin.webContents.invalidate();
+    await delay(300);
     const settingsImage = await settingsWin.webContents.capturePage();
     fs.writeFileSync(process.env.SETTINGS_OUT, settingsImage.toPNG());
   }
