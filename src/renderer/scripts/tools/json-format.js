@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerJsonTool() {
-  const { el, section, debounce, copyText, escapeHtml, Icons, createSelect, persistState } = window.ShipsUI;
+  const { el, section, copyText, escapeHtml, Icons, persistState } = window.ShipsUI;
   const i18n = window.ShipsI18n;
   const MAX_HIGHLIGHT = (window.ShipsConstants && window.ShipsConstants.JSON_HIGHLIGHT_MAX_BYTES) || 1048576;
 
@@ -106,17 +106,7 @@
     const state = { view: 'text', tooLarge: false };
 
     // ---- toolbar ----
-    const toolbar = el('div', { class: 'mb-2.5 flex flex-col gap-2' });
-    const indentSelect = createSelect({
-      options: [
-        { value: '2', label: i18n.t('json.indent2') },
-        { value: '4', label: i18n.t('json.indent4') },
-        { value: 'tab', label: i18n.t('json.indentTab') },
-      ],
-      value: '4',
-      className: 'w-[104px] shrink-0',
-      onChange: () => scheduleFormat(),
-    });
+    const toolbar = el('div', { class: 'mb-2.5 flex items-center gap-2' });
     const sortLabel = el('label', { class: 'chip shrink-0 cursor-pointer select-none' });
     const sortCheckbox = el('input', { type: 'checkbox', class: 'accent-[var(--color-accent)]' });
     sortLabel.append(sortCheckbox, el('span', {}, i18n.t('json.sortKeys')));
@@ -142,11 +132,7 @@
     const clearBtn = el('button', { class: 'icon-btn h-7 w-7 shrink-0', type: 'button', 'data-tip': i18n.t('json.clear') });
     clearBtn.innerHTML = Icons.x(15);
 
-    const row1 = el('div', { class: 'flex items-center gap-2' });
-    row1.append(viewSegment, spacer, copyBtn, minifyBtn, clearBtn);
-    const row2 = el('div', { class: 'flex items-center gap-2' });
-    row2.append(indentSelect.el, sortLabel);
-    toolbar.append(row1, row2);
+    toolbar.append(viewSegment, sortLabel, spacer, copyBtn, minifyBtn, clearBtn);
 
     // ---- text editor (overlay highlight) ----
     const editor = el('div', { class: 'json-editor' });
@@ -269,12 +255,8 @@
         return;
       }
       const value = sortCheckbox.checked ? sortDeep(parsed.value) : parsed.value;
-      const indentValue = indentSelect.getValue();
-      const indent = indentValue === 'tab' ? '\t' : Number(indentValue);
-      applyText(JSON.stringify(value, null, indent), false);
+      applyText(JSON.stringify(value, null, 4), false);
     }
-
-    const scheduleFormat = debounce(formatNow, 150);
 
     function renderTree() {
       tree.innerHTML = '';

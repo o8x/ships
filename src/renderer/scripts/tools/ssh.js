@@ -62,15 +62,10 @@
       statusTimer: null,
     };
 
-    const header = el('div', { class: 'mb-2.5 flex items-center justify-end gap-2' });
-    const refreshBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', 'data-tip': i18n.t('ssh.refresh') });
-    refreshBtn.innerHTML = Icons.refresh(15);
-    header.appendChild(refreshBtn);
-
     const status = el('div', { class: 'mb-2.5 hidden text-[11px]' }, '');
     const list = el('div', { class: 'flex flex-col gap-2.5' }, '');
 
-    container.append(header, status, list);
+    container.append(status, list);
 
     function showStatus(text, isError) {
       status.textContent = text;
@@ -143,8 +138,6 @@
         showStatus(i18n.t('ssh.connectFailed', { error: (result && result.error) || 'error' }), true);
       }
     }
-
-    refreshBtn.addEventListener('click', load);
 
     // Refresh the list whenever the popover is opened (shown / focused).
     const onFocus = () => load();

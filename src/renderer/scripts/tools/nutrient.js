@@ -31,8 +31,7 @@
         walkRemark: '{minutes} 分钟（{steps}步）',
         km: '约 {value} 公里',
         clear: '清空',
-        copyInput: '复制输入',
-        copyResult: '复制结果',
+        copy: '复制输入与结果',
         copied: '已复制',
       },
     },
@@ -62,8 +61,7 @@
         walkRemark: '{minutes} min ({steps} steps)',
         km: 'about {value} km',
         clear: 'Clear',
-        copyInput: 'Copy input',
-        copyResult: 'Copy result',
+        copy: 'Copy input & result',
         copied: 'Copied',
       },
     },
@@ -102,12 +100,6 @@
     inputSection.appendChild(nameWrap);
     inputSection.appendChild(grid);
 
-    const inputActions = el('div', { class: 'mt-1 flex items-center gap-2' });
-    const clearBtn = el('button', { class: 'btn', type: 'button' }, i18n.t('nutrient.clear'));
-    const copyInputBtn = el('button', { class: 'btn', type: 'button' }, i18n.t('nutrient.copyInput'));
-    inputActions.append(clearBtn, copyInputBtn);
-    inputSection.appendChild(inputActions);
-
     // Results
     const resultSection = section(i18n.t('nutrient.results'));
     const resultRows = {
@@ -119,12 +111,13 @@
     };
     for (const key of Object.keys(resultRows)) resultSection.appendChild(resultRows[key].root);
 
-    const resultActions = el('div', { class: 'mt-1 flex items-center gap-2' });
-    const copyResultBtn = el('button', { class: 'btn', type: 'button' }, i18n.t('nutrient.copyResult'));
-    resultActions.appendChild(copyResultBtn);
-    resultSection.appendChild(resultActions);
+    const actions = el('div', { class: 'flex items-center gap-2' });
+    const clearBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', 'data-tip': i18n.t('nutrient.clear') });
+    clearBtn.innerHTML = Icons.trash(15);
+    const copyBtn = el('button', { class: 'btn', type: 'button' }, i18n.t('nutrient.copy'));
+    actions.append(clearBtn, copyBtn);
 
-    container.append(inputSection, resultSection);
+    container.append(inputSection, resultSection, actions);
 
     function makeResultRow(labelText) {
       const root = el('div', { class: 'mb-2.5 flex items-center justify-between gap-2 rounded-card border border-border bg-surface px-2.5 py-1.5' });
@@ -218,18 +211,15 @@
       compute();
     });
 
-    copyInputBtn.addEventListener('click', async () => {
+    copyBtn.addEventListener('click', async () => {
       const lines = [];
       if (nameInput.value.trim()) lines.push(`${i18n.t('nutrient.name')}: ${nameInput.value.trim()}`);
       for (const field of FIELDS) lines.push(`${i18n.t(field.label)}: ${inputs[field.key].value}`);
-      if (await copyText(lines.join('\n'))) flash(copyInputBtn);
-    });
-
-    copyResultBtn.addEventListener('click', async () => {
-      const lines = currentResults.map(
-        ([label, row]) => `${label}: ${row.root.querySelector('.result-value').textContent}`
-      );
-      if (await copyText(lines.join('\n'))) flash(copyResultBtn);
+      lines.push('');
+      for (const [label, row] of currentResults) {
+        lines.push(`${label}: ${row.root.querySelector('.result-value').textContent}`);
+      }
+      if (await copyText(lines.join('\n'))) flash(copyBtn);
     });
 
     nameInput.addEventListener('input', saveState);
