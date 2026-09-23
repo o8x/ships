@@ -80,8 +80,8 @@ Ships/
     │   ├── main.js              # 应用入口：单实例、Dock 隐藏、注册 IPC、创建托盘
     │   ├── tray.js              # 托盘图标与右键菜单
     │   ├── window-manager.js    # 主面板 / 设置窗口创建、定位、显隐、广播
-    │   ├── ipc/                 # IPC 处理器（app / settings / window / ssh / geo）
-    │   ├── services/            # settings / ssh-config / ssh / geo 服务
+    │   ├── ipc/                 # IPC 处理器（app / settings / window / ssh / geo / state / clipboard）
+    │   ├── services/            # settings / ssh-config / ssh / geo / tool-state / clipboard 服务
     │   └── utils/               # logger / json-store / paths
     ├── preload/                 # main-preload.js / settings-preload.js / icons.js（assets/icons/*.svg）/ flags.js（assets/flags/*.svg）
     └── renderer/
@@ -165,10 +165,11 @@ Ships/
 | 字符串编码转换 | 字符串 ↔ 十六进制 / ASCII 十进制 / Base64 双向实时同步（UTF-8） | 输入非法时标红不联动 |
 | JSON 格式化 | 粘贴/失焦后**原地格式化**（默认 4 空格）并语法高亮；键排序；压缩；清空；复制；错误定位（行列）；**结构查看**（可折叠树） | 超过 1MB 仅格式化不高亮；缩进 2/4/Tab；输入改变仅重高亮 |
 | SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示彩色系统图标、`user@host(:port)`（22 不显示端口）、别名、连接与探测按钮；探测识别到具体系统 / 发行版（Ubuntu、Fedora、Arch、CentOS、macOS、Windows…），完成后在面板给出提示，面板隐藏时发系统通知 | 忽略通配符主机（如 `Host *`）；未探测显示通用主机图标 |
+| 剪贴板 | 主进程每约 1.2s 轮询系统剪贴板，展示最近 5 条记录；文本显示预览，图片渲染为小缩略图；每条可复制，支持一键清空历史 | 历史仅存内存、退出即清空；文本超 10 万字截断；图片按内容哈希去重 |
 | 设置 · Ships | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、固定悬浮（置顶常驻、失焦不隐藏）、打开数据文件夹、关于、开发者（打开悬浮界面 / 设置界面 DevTools） | 见 §5.1 |
 | 设置 · SSH 管理 | `~/.ssh/config` 主机的增删改（别名/HostName/User/Port/IdentityFile/ProxyJump） | 别名必填；删除二次确认 |
 | 底部栏 | 左显示版本号，右为设置入口 | 版本取 `package.json` |
-| 通用交互 | 所有下拉框为 Tailwind 自绘（非系统 `<select>`）；TAB 与图标按钮悬浮显示提示；SSH 系统图标与国旗着色 | 见 §11 |
+| 通用交互 | 所有下拉框为 Tailwind 自绘（非系统 `<select>`）；TAB 与图标按钮悬浮显示提示；SSH 系统图标与国旗着色；各工具输入会本地持久化，未修改或清空则下次打开仍显示 | 见 §11 |
 
 ---
 
@@ -179,7 +180,9 @@ Ships/
 | 文件 | 位置 | 结构 | 生命周期 |
 | --- | --- | --- | --- |
 | `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/ships/settings.json`） | `{ locale, theme, accent, launchAtLogin, pinWindow }` | 持久；重启保留 |
+| `tool-state.json` | 同上目录 | `{ [toolKey]: any }`（如 `ipNumber.value`） | 持久；记录各工具最近输入，未修改或清空则下次恢复 |
 | `ssh-detected.json` | 同上目录 | `{ [alias]: { os, family, label, at } }` | 持久；缓存探测结果 |
+| 剪贴板历史 | 内存（不落盘） | 最近 5 条 `{ id, type, text?, thumb?, width?, height?, truncated?, at }` | 随进程退出丢失 |
 | `~/.ssh/config` | 用户主目录 | 标准 OpenSSH 配置 | 由设置内 SSH 管理读写；未加密（非机密） |
 
 - 机密数据：本应用不保存密码 / 令牌；SSH 私钥仍由用户自行管理与使用，不复制、不落盘到应用数据目录。
@@ -205,6 +208,12 @@ Ships/
 | `ssh-config:remove` | `alias` | 更新后的 `hosts` | |
 | `geo:lookup` | `ip`（IPv4 字符串） | `{ iso_3166, country, province, city, isp }` 或 `null` | 本地 `assets/geoip.json` 查询；内网返回 `{ isp: '保留地址' }` |
 | `devtools:open` | `'main' \| 'settings'` | `{ ok }` | 打开对应窗口的开发者工具（detach 模式；主面板会先显示） |
+| `state:get` | `key` | 任意值或 `undefined` | 读取工具输入持久化数据 |
+| `state:set` | `key, value` | `true` | 写入（`value == null` 时删除）；副作用：写 `tool-state.json` |
+| `state:clear` | `key` | `true` | 删除该键 |
+| `clipboard:list` | — | `item[]`（最多 5 条） | 内存历史，含文本 / 图片缩略图 |
+| `clipboard:copy` | `id` | `{ ok, error? }` | 文本用 `writeText`，图片用 `ClipboardItem` 写回 |
+| `clipboard:clear` | — | `{ ok }` | 清空历史（不清空系统剪贴板） |
 
 **send（渲染 → 主，单向）**
 
@@ -220,7 +229,8 @@ Ships/
 | --- | --- | --- |
 | `settings:changed` | `settings` | 设置变更后广播到两个窗口 |
 | `theme:changed` | `{ shouldUseDarkColors }` | 系统主题变化 |
-| `ssh:detected` | `{ alias, os, at }` | 探测完成 |
+| `ssh:detected` | `{ alias, os, family, label, at }` | 探测完成 |
+| `clipboard:changed` | `item[]` | 剪贴板历史变化（主进程每约 1.2s 轮询系统剪贴板） |
 
 ### 5.3 菜单与权限映射
 
