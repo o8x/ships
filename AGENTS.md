@@ -222,6 +222,16 @@
 - **`dist` 一键全新构建**：`dist`（如 `dist:mac`）必须**从当前源码重新构建全新版本**，先清理旧的构建产物 / 缓存（如删除 `dist/<arch>`、`build` 等目录），**不得复用旧产物**，避免缓存导致应用内版本号与 `package.json` 不一致。
 - **自动维护 GitHub Actions 打包配置**：`.github/workflows/*.yml` 是构建发布的组成部分，随构建脚本 / 命令、Node 与 pnpm 版本、产物路径与命名、发布流程的变更**同步更新**，不得只改其一；新增 / 调整平台产物时同步增改对应 job。
 
+## 打包加固
+
+客户端打包后默认做**基础加固**，提高逆向 / 解包成本（注意：asar 并非加密，加固只提高门槛），通过打包钩子（如 `electron-builder` 的 `afterPack`）自动执行：
+
+- **asar 保护**：用 `asarmor` 等对 `app.asar` 头做保护（对抗 `asar extract` 解包）。
+- **Electron Fuses**：翻转 Fuses——`RunAsNode=false`、`EnableNodeOptionsEnvironmentVariable=false`、`EnableNodeCliInspectArguments=false`、`EnableCookieEncryption=true`、`OnlyLoadAppFromAsar=true`；`EnableEmbeddedAsarIntegrityValidation` 因与 asar 改写冲突而关闭。
+- **签名兜底**：macOS 上 asar / 二进制改动会破坏签名，未配置正式签名时做 **ad-hoc 重签** 兜底；正式发布应配置稳定 **Developer ID**。
+- **顺序固定**：**先改 asar → 再改二进制 → 最后签名**，否则签名会被后续改动破坏。
+- 加固依赖（如 `asarmor`、`@electron/fuses`）放入 `devDependencies`。
+
 ## 版本更新规则
 
 当用户提到「更新版本」（或等价表述）时，必须按以下步骤执行：
