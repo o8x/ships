@@ -2,17 +2,41 @@
 
 const { clipboard, nativeImage, ClipboardItem } = require('electron');
 const { EventEmitter } = require('events');
+const settings = require('./settings-service');
 const logger = require('../utils/logger');
 
-const MAX_ITEMS = 5;
+const MAX_ITEMS_DEFAULT = 3;
+const MAX_ITEMS_LIMIT = 50;
+const POLL_INTERVAL_DEFAULT = 1200;
+const POLL_INTERVAL_MIN = 300;
 const MAX_TEXT_LENGTH = 100000;
-const POLL_INTERVAL_MS = 1200;
+const MAX_SVG_LENGTH = 200000;
 const THUMB_WIDTH = 120;
 
 function hashBuffer(buffer) {
   let hash = 5381;
   for (let i = 0; i < buffer.length; i++) hash = ((hash * 33) ^ buffer[i]) >>> 0;
   return hash;
+}
+
+function clamp(value, min, max, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(num)));
+}
+
+// Returns a data URL when the text is an inline SVG document (small enough).
+function svgThumbnail(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed || trimmed.length > MAX_SVG_LENGTH) return '';
+  if (!trimmed.startsWith('<')) return '';
+  if (!/<svg[\s>]/i.test(trimmed.slice(0, 600))) return '';
+  if (!/<\/svg>/i.test(trimmed)) return '';
+  try {
+    return `data:image/svg+xml;base64,${Buffer.from(trimmed, 'utf8').toString('base64')}`;
+  } catch (err) {
+    return '';
+  }
 }
 
 class ClipboardService extends EventEmitter {
@@ -25,11 +49,39 @@ class ClipboardService extends EventEmitter {
     this.nextId = 1;
     this.timer = null;
     this.polling = false;
+    this.maxItems = MAX_ITEMS_DEFAULT;
+    this.pollMs = POLL_INTERVAL_DEFAULT;
   }
 
   start() {
     if (this.timer) return;
-    this.timer = setInterval(() => this.poll(), POLL_INTERVAL_MS);
+    settings.on('changed', () => this.applySettings());
+    this.applySettings();
+    if (!this.timer) this.timer = setInterval(() => this.poll(), this.pollMs);
+  }
+
+  applySettings() {
+    const limit = clamp(settings.get('clipboardLimit'), 1, MAX_ITEMS_LIMIT, MAX_ITEMS_DEFAULT);
+    const poll = clamp(settings.get('clipboardPollMs'), POLL_INTERVAL_MIN, 60000, POLL_INTERVAL_DEFAULT);
+    if (limit !== this.maxItems) {
+      this.maxItems = limit;
+      if (this.items.length > limit) this.trim();
+    }
+    if (poll !== this.pollMs) {
+      this.pollMs = poll;
+      if (this.timer) {
+        clearInterval(this.timer);
+        this.timer = setInterval(() => this.poll(), this.pollMs);
+      }
+    }
+  }
+
+  trim() {
+    while (this.items.length > this.maxItems) {
+      const removed = this.items.pop();
+      if (removed) this.buffers.delete(removed.id);
+    }
+    this.emit('changed', this.list());
   }
 
   stop() {
@@ -53,11 +105,17 @@ class ClipboardService extends EventEmitter {
         this.lastText = text;
         this.lastImageSig = null;
         const truncated = text.length > MAX_TEXT_LENGTH;
-        this.push({
+        const entry = {
           type: 'text',
           text: truncated ? text.slice(0, MAX_TEXT_LENGTH) : text,
           truncated,
-        });
+        };
+        const thumb = svgThumbnail(text);
+        if (thumb) {
+          entry.type = 'svg';
+          entry.thumb = thumb;
+        }
+        this.push(entry);
         return;
       }
 
@@ -123,7 +181,7 @@ class ClipboardService extends EventEmitter {
       delete entry.buffer;
     }
     this.items.unshift(entry);
-    while (this.items.length > MAX_ITEMS) {
+    while (this.items.length > this.maxItems) {
       const removed = this.items.pop();
       if (removed) this.buffers.delete(removed.id);
     }
@@ -153,7 +211,7 @@ class ClipboardService extends EventEmitter {
           new ClipboardItem({ 'image/png': new Blob([buffer], { type: 'image/png' }) }),
         ]);
         this.lastImageSig = `${buffer.length}:${hashBuffer(buffer)}`;
-      } else if (item.type === 'text') {
+      } else if (item.type === 'text' || item.type === 'svg') {
         await clipboard.writeText(item.text);
         this.lastText = item.text;
       } else {

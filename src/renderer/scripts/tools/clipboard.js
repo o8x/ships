@@ -13,6 +13,7 @@
         copied: '已复制',
         clear: '清空',
         image: '图片',
+        svg: 'SVG',
         truncated: '已截断',
       },
     },
@@ -24,6 +25,7 @@
         copied: 'Copied',
         clear: 'Clear',
         image: 'Image',
+        svg: 'SVG',
         truncated: 'truncated',
       },
     },
@@ -61,31 +63,24 @@
     container.append(header, list);
 
     function buildRow(item) {
-      const row = el('div', { class: 'row-card items-start' });
+      const row = el('div', { class: 'row-card' });
       const body = el('div', { class: 'min-w-0 flex-1' });
 
-      if (item.type === 'image') {
+      if (item.type === 'image' || item.type === 'svg') {
         const image = el('img', {
           src: item.thumb,
-          alt: 'clipboard',
-          class: 'max-h-[64px] max-w-full rounded-control border border-border',
+          alt: item.type,
+          class: 'max-h-[64px] max-w-full rounded-control border border-border bg-surface-2',
         });
         body.appendChild(image);
-        body.appendChild(
-          el(
-            'div',
-            { class: 'mt-1 text-[10px] text-fg-muted' },
-            `${i18n.t('clipboard.image')} · ${item.width}×${item.height}`
-          )
-        );
+        const label = item.type === 'svg' ? i18n.t('clipboard.svg') : i18n.t('clipboard.image');
+        const dims = item.width ? ` · ${item.width}×${item.height}` : '';
+        body.appendChild(el('div', { class: 'mt-1 text-[10px] text-fg-muted' }, `${label}${dims}`));
       } else {
-        const preview = el('div', {
-          class: 'line-clamp-2 whitespace-pre-wrap break-all font-mono text-[12px] text-fg',
-        }, (item.text || '').slice(0, PREVIEW_LIMIT));
+        const preview = el('div', { class: 'clip-text' }, (item.text || '').replace(/^\s+/, '').slice(0, PREVIEW_LIMIT));
         body.appendChild(preview);
         const meta = [timeText(item.at)];
         if (item.truncated) meta.push(i18n.t('clipboard.truncated'));
-        if (item.text && item.text.length > PREVIEW_LIMIT) meta.push(`${item.text.length}`);
         body.appendChild(el('div', { class: 'mt-1 text-[10px] text-fg-muted' }, meta.filter(Boolean).join(' · ')));
       }
 

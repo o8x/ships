@@ -31,6 +31,10 @@ const IPC = {
   CLIPBOARD_CLEAR: 'clipboard:clear',
   CLIPBOARD_CHANGED: 'clipboard:changed',
 
+  HASH_TEXT: 'hash:text',
+  HASH_FILE: 'hash:file',
+  DIALOG_OPEN_FILE: 'dialog:open-file',
+
   SSH_LIST: 'ssh:list',
   SSH_CONNECT: 'ssh:connect',
   SSH_DETECT: 'ssh:detect',
@@ -64,6 +68,8 @@ const DEFAULT_SETTINGS = {
   accent: ships.defaultAccent || '#2e6bfc',
   launchAtLogin: false,
   pinWindow: false,
+  clipboardLimit: 3,
+  clipboardPollMs: 1200,
 };
 
 module.exports = {

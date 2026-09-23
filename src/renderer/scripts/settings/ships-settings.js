@@ -25,6 +25,10 @@
         launchAtLoginHint: '登录时自动启动 Ships',
         pin: '固定悬浮',
         pinHint: '主界面置顶常驻，失焦不自动隐藏',
+        clipboardLimit: '剪贴板条数',
+        clipboardLimitHint: '最多保留最近几条记录',
+        clipboardPoll: '剪贴板轮询间隔',
+        clipboardPollHint: '检测系统剪贴板变化的频率',
         dataFolder: '数据文件夹',
         open: '打开',
         about: '关于',
@@ -53,6 +57,10 @@
         launchAtLoginHint: 'Start Ships when you log in',
         pin: 'Keep on top',
         pinHint: 'Pin the popover and never auto-hide on blur',
+        clipboardLimit: 'Clipboard items',
+        clipboardLimitHint: 'How many recent items to keep',
+        clipboardPoll: 'Clipboard poll interval',
+        clipboardPollHint: 'How often to check the system clipboard',
         dataFolder: 'Data folder',
         open: 'Open',
         about: 'About',
@@ -163,6 +171,28 @@
 
     const pinSwitch = switchControl(settings.pinWindow, (value) => patch({ pinWindow: value }));
     generalSection.appendChild(row(i18n.t('settingsPage.pin'), i18n.t('settingsPage.pinHint'), pinSwitch.root));
+
+    const limitSelect = createSelect({
+      options: [3, 5, 10].map((value) => ({ value, label: String(value) })),
+      value: settings.clipboardLimit || 3,
+      align: 'right',
+      className: 'w-[100px] shrink-0',
+      onChange: (value) => patch({ clipboardLimit: Number(value) }),
+    });
+    generalSection.appendChild(
+      row(i18n.t('settingsPage.clipboardLimit'), i18n.t('settingsPage.clipboardLimitHint'), limitSelect.el)
+    );
+
+    const pollSelect = createSelect({
+      options: [500, 800, 1000, 1200, 1500, 2000, 3000].map((value) => ({ value, label: `${value} ms` })),
+      value: settings.clipboardPollMs || 1200,
+      align: 'right',
+      className: 'w-[110px] shrink-0',
+      onChange: (value) => patch({ clipboardPollMs: Number(value) }),
+    });
+    generalSection.appendChild(
+      row(i18n.t('settingsPage.clipboardPoll'), i18n.t('settingsPage.clipboardPollHint'), pollSelect.el)
+    );
 
     const folderBtn = el('button', { class: 'btn shrink-0', type: 'button' });
     folderBtn.append(
