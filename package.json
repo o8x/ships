@@ -64,6 +64,7 @@
       "zh_CN"
     ],
     "afterSign": "scripts/notarize.cjs",
+    "afterPack": "scripts/after-pack.cjs",
     "mac": {
       "target": [
         {

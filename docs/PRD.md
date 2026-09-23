@@ -74,7 +74,9 @@ Ships/
 ├── .github/workflows/build-mac.yml  # CI：构建 macOS arm64 DMG
 ├── scripts/                     # 构建 / 工具脚本（不打包进产物）
 │   ├── capture.cjs              # 开发用 UI 截图 / 操作脚本
-│   ├── dist-mac.sh              # dist:mac 包装脚本：自动选择签名身份
+│   ├── dist-mac.sh              # dist:mac 包装脚本：选择签名方式
+│   ├── after-pack.cjs           # electron-builder afterPack：调用 ad-hoc 签名
+│   ├── adhoc-sign.sh            # 未配置正式签名时对 .app 做 ad-hoc 签名
 │   ├── notarize.cjs             # electron-builder afterSign：按需公证
 │   └── gen-icons.mjs            # 零依赖 PNG / icns 图标生成脚本
 └── src/
@@ -341,7 +343,8 @@ stateDiagram-v2
   - `compression: 'maximum'`；`electronLanguages: ['en', 'zh_CN']`（仅保留中英文 Electron 语言包，剔除约 220 个语言包、解包体积减少约 48MB）。
   - `mac.target`：**仅 arm64 的 dmg**；`mac.icon = assets/imgs/icon.icns`；`hardenedRuntime = true`、`gatekeeperAssess = false`；`extendInfo` 含 `LSUIElement = true`（纯菜单栏 Agent，无 Dock）与 `NSLocalNetworkUsageDescription`（本地网络授权说明）。
 - **签名 / 公证（打包时自动）**：
-  - 由 `scripts/dist-mac.sh` 决定身份：设置了 `CSC_LINK`（CI 证书）则交给 electron-builder 导入使用；否则在钥匙串中查找 `Developer ID Application` 并设 `CSC_NAME`；都没有则设 `CSC_IDENTITY_AUTO_DISCOVERY=false` **构建未签名版本**（不会失败）。身份可用时对 `.app` 与 `dmg`（`dmg.sign = true`）自动签名。
+  - 由 `scripts/dist-mac.sh` 判断：设置了 `CSC_LINK` / `APPLE_ID` / `CSC_NAME` 之一 → 视为**正式签名**，交给 electron-builder 在打包阶段用 Developer ID 签名（`.app` 与 `dmg`，`dmg.sign = true`）；否则设 `CSC_IDENTITY_AUTO_DISCOVERY=false`（避免误用钥匙串里的无关证书而失败）。
+  - **ad-hoc 兜底**：`afterPack` 钩子 `scripts/after-pack.cjs` 调用 `scripts/adhoc-sign.sh`：仅当未配置正式签名（同上三个环境变量都为空）时执行 `codesign --force --deep --sign -` 并对 `.app` 校验，保证**未签名环境下应用仍可运行**；配置了正式签名时跳过，以免覆盖。
   - **公证**：`afterSign` 钩子 `scripts/notarize.cjs`，当设置 `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` 时自动公证（`SKIP_NOTARIZE=1` 可跳过）。
   - 产物命名：`Ships-v<version>-<arch>.dmg`（含 `.blockmap`）。
 - **图标生成**：`node scripts/gen-icons.mjs` 在 `assets/imgs/` 生成 `trayTemplate*.png`、`app.png`，在 macOS 上经 `iconutil` 额外生成 `icon.icns`。

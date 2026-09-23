@@ -1,27 +1,21 @@
 #!/usr/bin/env bash
-# Build the macOS arm64 DMG and sign it automatically:
-#   - If CSC_LINK is set (CI), let electron-builder import and use that cert.
-#   - Else if a "Developer ID Application" identity exists in the keychain, use it.
-#   - Else build unsigned (disable auto-discovery so a stray cert can't break the build).
+# Build the macOS arm64 DMG.
+#
+# Signing:
+#   - Formal signing (CSC_LINK / APPLE_ID / CSC_NAME) -> electron-builder signs
+#     during packaging (Developer ID).
+#   - Otherwise -> disable cert auto-discovery (so a stray keychain cert can't
+#     break the build); the afterPack hook then ad-hoc signs the .app.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 pnpm run build:css
 
-IDENTITY="${CSC_NAME:-}"
-if [ -z "$IDENTITY" ] && [ -z "${CSC_LINK:-}" ]; then
-  IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null \
-    | grep "Developer ID Application" \
-    | head -1 \
-    | sed -E 's/^[^"]*"([^"]+)".*$/\1/')" || true
-fi
-
-if [ -n "$IDENTITY" ]; then
-  echo "[sign] using identity: $IDENTITY"
-  export CSC_NAME="$IDENTITY"
+if [ -n "${CSC_LINK:-}${APPLE_ID:-}${CSC_NAME:-}" ]; then
+  echo "[sign] formal signing configured; electron-builder will sign"
 else
-  echo "[sign] no Developer ID found; building unsigned"
+  echo "[sign] no formal signing; ad-hoc signing after pack"
   export CSC_IDENTITY_AUTO_DISCOVERY=false
 fi
 
