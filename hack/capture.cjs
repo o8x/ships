@@ -21,6 +21,8 @@ app.whenReady().then(async () => {
   const { registerSettingsIpc } = require('../src/main/ipc/settings-ipc');
   const { registerSshIpc } = require('../src/main/ipc/ssh-ipc');
   const { registerGeoIpc } = require('../src/main/ipc/geo-ipc');
+  const { registerStateIpc } = require('../src/main/ipc/state-ipc');
+  const { registerClipboardIpc } = require('../src/main/ipc/clipboard-ipc');
   const wm = require('../src/main/window-manager');
 
   registerAppIpc(ipcMain);
@@ -28,6 +30,8 @@ app.whenReady().then(async () => {
   registerSettingsIpc(ipcMain);
   registerSshIpc(ipcMain);
   registerGeoIpc(ipcMain);
+  registerStateIpc(ipcMain);
+  registerClipboardIpc(ipcMain);
 
   const win = wm.createMainWindow();
   win.webContents.setBackgroundThrottling(false);
@@ -60,6 +64,10 @@ app.whenReady().then(async () => {
       `document.querySelector(${JSON.stringify(process.env.MAIN_CLICK)})?.click();`
     );
     await delay(700);
+  }
+  if (process.env.CLIP) {
+    require('electron').clipboard.writeText(process.env.CLIP);
+    await delay(1800);
   }
   if (process.env.PATCH) {
     await win.webContents.executeJavaScript(

@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerIpNumberTool() {
-  const { el, section, field, resultRow, createGeoRow } = window.ShipsUI;
+  const { el, section, field, resultRow, createGeoRow, persistState } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -143,6 +143,7 @@
       spellcheck: 'false',
     }).input;
     inputSection.appendChild(input);
+    const store = persistState('ipNumber');
 
     const hint = el('div', { class: 'mt-2 text-[11px] text-fg-muted' }, i18n.t('ipNumber.empty'));
     inputSection.appendChild(hint);
@@ -239,11 +240,21 @@
       rows.binary.set(value.toString(2).padStart(32, '0'));
     }
 
-    input.addEventListener('input', update);
+    input.addEventListener('input', () => {
+      update();
+      store.save({ value: input.value });
+    });
     input.addEventListener('blur', update);
 
     container.append(inputSection, outSection, geoSection);
     update();
+
+    store.load((saved) => {
+      if (saved && saved.value != null) {
+        input.value = saved.value;
+        update();
+      }
+    });
   }
 
   window.ShipsToolRegistry.register({ id: 'ipNumber', icon: 'globe', mount });

@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerRadixTool() {
-  const { el, section, inputField, createSelect } = window.ShipsUI;
+  const { el, section, inputField, createSelect, persistState } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -72,6 +72,7 @@
   function mount(container) {
     const hint = el('div', { class: 'mb-3 text-[11px] text-fg-muted' }, i18n.t('radix.hint'));
     const rows = [];
+    const store = persistState('radix');
 
     function makeRow(labelText, base, placeholder) {
       const input = el('input', {
@@ -132,6 +133,7 @@
         setError(row, false);
       }
       updateMeta(value);
+      store.save({ base: source.base, value: source.input.value });
     }
 
     function updateMeta(value) {
@@ -197,6 +199,14 @@
       rows.forEach((row) => setError(row, false));
     }
     resetErrors();
+
+    store.load((saved) => {
+      if (!saved || saved.value == null) return;
+      let row = rows.find((item) => String(item.base) === String(saved.base));
+      if (!row) row = customRow;
+      row.input.value = saved.value;
+      onInput(row);
+    });
   }
 
   window.ShipsToolRegistry.register({ id: 'radix', icon: 'hash', mount });

@@ -30,6 +30,7 @@ window.ShipsI18n = (function createI18n() {
         stringCodec: '字符串编码转换',
         json: 'JSON 格式化',
         ssh: 'SSH 管理',
+        clipboard: '剪贴板',
       },
     },
     en: {
@@ -60,6 +61,7 @@ window.ShipsI18n = (function createI18n() {
         stringCodec: 'String Codec',
         json: 'JSON',
         ssh: 'SSH',
+        clipboard: 'Clipboard',
       },
     },
   };

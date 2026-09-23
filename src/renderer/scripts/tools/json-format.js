@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerJsonTool() {
-  const { el, section, debounce, copyText, escapeHtml, Icons, createSelect } = window.ShipsUI;
+  const { el, section, debounce, copyText, escapeHtml, Icons, createSelect, persistState } = window.ShipsUI;
   const i18n = window.ShipsI18n;
   const MAX_HIGHLIGHT = (window.ShipsConstants && window.ShipsConstants.JSON_HIGHLIGHT_MAX_BYTES) || 1048576;
 
@@ -170,6 +170,12 @@
     container.append(hint, toolbar, editor, tree, status);
 
     let currentText = '';
+    const store = persistState('json');
+    const MAX_PERSIST = 300000;
+    function saveState() {
+      const value = textarea.value;
+      store.save({ text: value.length > MAX_PERSIST ? value.slice(0, MAX_PERSIST) : value });
+    }
 
     function setView(view) {
       state.view = view;
@@ -254,6 +260,7 @@
       syncScroll();
       refreshStatus();
       if (state.view === 'tree') renderTree();
+      saveState();
     }
 
     function formatNow() {
@@ -330,6 +337,7 @@
       editor.classList.toggle('no-highlight', state.tooLarge);
       highlight();
       refreshStatus();
+      saveState();
     });
     textarea.addEventListener('scroll', syncScroll);
     textarea.addEventListener('paste', () => setTimeout(formatNow, 0));
@@ -338,6 +346,7 @@
     sortCheckbox.addEventListener('change', formatNow);
     clearBtn.addEventListener('click', () => {
       applyText('', false);
+      store.clear();
       textarea.focus();
     });
     minifyBtn.addEventListener('click', () => {
@@ -361,6 +370,10 @@
 
     setView('text');
     refreshStatus();
+
+    store.load((saved) => {
+      if (saved && saved.text) applyText(saved.text, false);
+    });
   }
 
   window.ShipsToolRegistry.register({ id: 'json', icon: 'braces', mount });

@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerTimestampTool() {
-  const { el, section, field, resultRow, createSelect } = window.ShipsUI;
+  const { el, section, field, resultRow, createSelect, persistState } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -169,7 +169,10 @@
       value: 'auto',
       align: 'right',
       className: 'w-[116px] shrink-0',
-      onChange: updateFromTimestamp,
+      onChange: () => {
+        updateFromTimestamp();
+        saveState();
+      },
     });
     tsRow.append(tsField.wrapper, unitSelect.el);
     const detected = el('div', { class: 'mt-1 text-[11px] text-fg-muted' }, '');
@@ -229,9 +232,24 @@
       tsRows.ns.set((BigInt(date.getTime()) * NS_PER_MS).toString());
     }
 
-    tsField.input.addEventListener('input', updateFromTimestamp);
+    const store = persistState('timestamp');
+    function saveState() {
+      store.save({
+        ts: tsField.input.value,
+        date: dateField.input.value,
+        unit: unitSelect.getValue(),
+      });
+    }
+
+    tsField.input.addEventListener('input', () => {
+      updateFromTimestamp();
+      saveState();
+    });
     tsField.input.addEventListener('blur', updateFromTimestamp);
-    dateField.input.addEventListener('input', updateFromDate);
+    dateField.input.addEventListener('input', () => {
+      updateFromDate();
+      saveState();
+    });
     dateField.input.addEventListener('blur', updateFromDate);
 
     container.append(nowSection, toDateSection, toTsSection);
@@ -239,6 +257,14 @@
     updateNow();
     updateFromTimestamp();
     updateFromDate();
+
+    store.load((saved) => {
+      if (saved.ts != null) tsField.input.value = saved.ts;
+      if (saved.date != null) dateField.input.value = saved.date;
+      if (saved.unit) unitSelect.setValue(saved.unit);
+      updateFromTimestamp();
+      updateFromDate();
+    });
 
     const timer = setInterval(updateNow, 1000);
     return () => clearInterval(timer);

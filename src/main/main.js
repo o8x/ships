@@ -8,6 +8,8 @@ const { registerWindowIpc } = require('./ipc/window-ipc');
 const { registerSettingsIpc } = require('./ipc/settings-ipc');
 const { registerSshIpc } = require('./ipc/ssh-ipc');
 const { registerGeoIpc } = require('./ipc/geo-ipc');
+const { registerStateIpc } = require('./ipc/state-ipc');
+const { registerClipboardIpc } = require('./ipc/clipboard-ipc');
 const logger = require('./utils/logger');
 const { DATA_FILES } = require('./utils/paths');
 const { APP_NAME, VERSION, ships } = require('../shared/constants');
@@ -30,6 +32,8 @@ function onReady() {
   registerSettingsIpc(ipcMain);
   registerSshIpc(ipcMain);
   registerGeoIpc(ipcMain);
+  registerStateIpc(ipcMain);
+  registerClipboardIpc(ipcMain);
 
   wm.createMainWindow();
 
@@ -50,6 +54,10 @@ function printStartupInfo() {
 
 app.on('window-all-closed', () => {
   // Menu bar app: keep running without windows.
+});
+
+app.on('before-quit', () => {
+  require('./services/clipboard-service').stop();
 });
 
 app.on('activate', () => {

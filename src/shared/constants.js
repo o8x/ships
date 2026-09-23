@@ -22,6 +22,15 @@ const IPC = {
   GEO_LOOKUP: 'geo:lookup',
   DEVTOOLS_OPEN: 'devtools:open',
 
+  STATE_GET: 'state:get',
+  STATE_SET: 'state:set',
+  STATE_CLEAR: 'state:clear',
+
+  CLIPBOARD_LIST: 'clipboard:list',
+  CLIPBOARD_COPY: 'clipboard:copy',
+  CLIPBOARD_CLEAR: 'clipboard:clear',
+  CLIPBOARD_CHANGED: 'clipboard:changed',
+
   SSH_LIST: 'ssh:list',
   SSH_CONNECT: 'ssh:connect',
   SSH_DETECT: 'ssh:detect',

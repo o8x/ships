@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerStringCodecTool() {
-  const { el, section, inputField } = window.ShipsUI;
+  const { el, section, inputField, persistState } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -119,6 +119,7 @@
     };
 
     let syncing = false;
+    const store = persistState('stringCodec');
 
     function setError(field, invalid) {
       field.style.borderColor = invalid ? 'var(--color-danger)' : '';
@@ -159,6 +160,8 @@
       }
       setError(field, false);
       renderFrom(field, bytes);
+      const key = Object.keys(fields).find((name) => fields[name] === field);
+      if (key) store.save({ field: key, value: field.value });
     }
 
     for (const key of Object.keys(fields)) {
@@ -170,6 +173,14 @@
     inputSection.append(textField.wrapper, hexField.wrapper, asciiField.wrapper, base64Field.wrapper);
 
     container.append(hint, inputSection);
+
+    store.load((saved) => {
+      if (!saved || !saved.field || saved.value == null) return;
+      const target = fields[saved.field];
+      if (!target) return;
+      target.value = saved.value;
+      handle(target);
+    });
   }
 
   window.ShipsToolRegistry.register({ id: 'stringCodec', icon: 'code', mount });

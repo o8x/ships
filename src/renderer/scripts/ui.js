@@ -161,6 +161,28 @@ window.ShipsUI = (function createUI() {
     };
   }
 
+  /* Persist a tool's input to the main-process tool-state store. */
+  function persistState(key) {
+    const saveNow = debounce((value) => {
+      if (window.ships && window.ships.setState) window.ships.setState(key, value);
+    }, 300);
+    return {
+      load(apply) {
+        if (!window.ships || !window.ships.getState) return Promise.resolve();
+        return window.ships
+          .getState(key)
+          .then((value) => {
+            if (value != null) apply(value);
+          })
+          .catch(() => {});
+      },
+      save: saveNow,
+      clear() {
+        if (window.ships && window.ships.clearState) window.ships.clearState(key);
+      },
+    };
+  }
+
   /* Custom select (self-drawn, avoids native <select>). */
   function createSelect(config) {
     const options = { onChange: () => {}, className: '', align: 'left' };
@@ -309,6 +331,7 @@ window.ShipsUI = (function createUI() {
     flagHtml,
     createGeoRow,
     createSelect,
+    persistState,
     initTooltips,
   };
 })();

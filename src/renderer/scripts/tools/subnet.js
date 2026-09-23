@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerSubnetTool() {
-  const { el, section, field, resultRow, createGeoRow } = window.ShipsUI;
+  const { el, section, field, resultRow, createGeoRow, persistState } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -156,6 +156,7 @@
     const inputSection = section(i18n.t('subnet.input'));
     const input = field(null, { placeholder: i18n.t('subnet.placeholder'), spellcheck: 'false' }).input;
     inputSection.appendChild(input);
+    const store = persistState('subnet');
     const hint = el('div', { class: 'mt-2 text-[11px] text-fg-muted' }, i18n.t('subnet.empty'));
     inputSection.appendChild(hint);
 
@@ -243,11 +244,21 @@
       lookupGeo(intToIp(ip));
     }
 
-    input.addEventListener('input', update);
+    input.addEventListener('input', () => {
+      update();
+      store.save({ value: input.value });
+    });
     input.addEventListener('blur', update);
 
     container.append(inputSection, outSection, geoSection);
     update();
+
+    store.load((saved) => {
+      if (saved && saved.value != null) {
+        input.value = saved.value;
+        update();
+      }
+    });
   }
 
   window.ShipsToolRegistry.register({ id: 'subnet', icon: 'layers', mount });
