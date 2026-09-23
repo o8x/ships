@@ -104,3 +104,20 @@
     @apply inline-flex items-center gap-1 rounded-pill border border-border bg-surface-2 px-2 py-0.5 text-[11px] text-fg-muted;
   }
 }
+
+/* JSON syntax colors (class names built dynamically, so kept outside @layer). */
+.json-key {
+  color: var(--color-json-key);
+}
+.json-str {
+  color: var(--color-json-str);
+}
+.json-num {
+  color: var(--color-json-num);
+}
+.json-bool {
+  color: var(--color-json-bool);
+}
+.json-null {
+  color: var(--color-json-null);
+}
