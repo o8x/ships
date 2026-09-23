@@ -93,6 +93,12 @@ app.whenReady().then(async () => {
       );
       await delay(700);
     }
+    if (process.env.SETTINGS_SCROLL) {
+      await settingsWin.webContents.executeJavaScript(
+        `document.getElementById('settings-pane').scrollTop = ${Number(process.env.SETTINGS_SCROLL)};`
+      );
+      await delay(400);
+    }
     settingsWin.webContents.invalidate();
     await delay(300);
     const settingsImage = await settingsWin.webContents.capturePage();
