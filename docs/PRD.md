@@ -331,6 +331,7 @@ stateDiagram-v2
   - `appId = com.ships.app`，`productName = Ships`；产物目录 `release/`。
   - `files`：`src/**/*`、`assets/**/*`、`package.json`；依赖由 electron-builder 自动收集（`asar: true`）。
   - `npmRebuild: false`（`ssh2` 使用纯 JS 回退，无需重编原生模块）。
+  - `compression: 'maximum'`；`electronLanguages: ['en', 'zh_CN']`（仅保留中英文 Electron 语言包，剔除约 220 个语言包、解包体积减少约 48MB）。
   - `mac.target`：**仅 arm64 的 dmg**；`mac.icon = assets/imgs/icon.icns`；`mac.identity = null`（暂不签名）；`extendInfo.LSUIElement = true`（纯菜单栏 Agent，无 Dock）。
   - 产物命名：`Ships-v<version>-<arch>.dmg`（含 `.blockmap`）。
 - **图标生成**：`node scripts/gen-icons.mjs` 在 `assets/imgs/` 生成 `trayTemplate*.png`、`app.png`，在 macOS 上经 `iconutil` 额外生成 `icon.icns`。

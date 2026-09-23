@@ -57,6 +57,11 @@
     ],
     "asar": true,
     "npmRebuild": false,
+    "compression": "maximum",
+    "electronLanguages": [
+      "en",
+      "zh_CN"
+    ],
     "mac": {
       "target": [
         {
