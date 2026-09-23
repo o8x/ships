@@ -6,7 +6,10 @@
 
 - **原则**：优先**行业通用、生态成熟、高性能、可维护性高**的方案；避免冷门、停止维护或锁定过强的依赖；兼顾跨平台一致性与长期维护成本。
 - **桌面 GUI**：优先 **Electron**。
-- **界面 / 前端**：优先 **Tailwind CSS + Vue 3**。
+- **界面 / 前端**：统一使用 **Tailwind CSS** 控制样式。
+  - **新项目**：使用 **Vue 3 + Vite** 实现前端，采用组件化、声明式模板；**禁止用 JS 拼接字符串 / 生成 HTML 标签**来构建界面。
+  - **既有项目**：**保持当前项目技术栈**（如原生 JS + Tailwind），不因偏好迁移 / 重写。
+- **命名 / 标识**：包名及其它需要反向域名标识之处，统一以域名 **`stdout.com.cn`** 为参考（反转为 `cn.com.stdout.*`），如应用 ID / 包名 `cn.com.stdout.<app_name>`。
 - 新增或替换框架 / 依赖前先说明理由与替代方案；能用标准库或既有能力解决的不随意引入新依赖。
 - 当用标准库实现会**非常复杂或困难**时，应进行第三方 **lib 选型**（评估行业通用性、维护活跃度、包体 / 性能、许可与替代方案后择优选用），而不是勉强自造。
 
@@ -211,7 +214,10 @@
 ## 构建与发布
 
 - **包管理统一使用 `pnpm`**：禁止使用 `npm` / `yarn`；依赖锁文件为 `pnpm-lock.yaml`，CI 一律用 `pnpm install --frozen-lockfile` 安装，脚本命令以 `pnpm run <script>` 形式调用。
-- **macOS 产物包含 arm64**：打包必须产出 **macOS arm64**（`electron-builder` 的 mac target 指定 `arch: ["arm64"]`，本地默认只打 arm64）；产物命名遵循 `artifactName`。
+- **macOS 产物包含 arm64**：打包必须产出 **macOS arm64**（`electron-builder` 的 mac target 指定 `arch: ["arm64"]`，本地默认只打 arm64）。
+- **产物文件名规则**：统一为 `appname-vx.y.z-arch.subfix`（如 `dnak-desktop-v5.9.4-arm64.dmg`），即「应用名-版本号-架构.后缀」；通过 `electron-builder` 的 `artifactName` 配置实现。
+- **主动提供标准构建脚本**：新建 / 接入项目时必须主动补齐至少 `start`（本地一键启动）与 `dist:mac`（macOS 一键出包）等脚本，确保开箱即可启动、可出包；脚本变更同步更新文档与 CI。
+- **`dist` 一键全新构建**：`dist`（如 `dist:mac`）必须**从当前源码重新构建全新版本**，先清理旧的构建产物 / 缓存（如删除 `dist/<arch>`、`build` 等目录），**不得复用旧产物**，避免缓存导致应用内版本号与 `package.json` 不一致。
 - **自动维护 GitHub Actions 打包配置**：`.github/workflows/*.yml` 是构建发布的组成部分，随构建脚本 / 命令、Node 与 pnpm 版本、产物路径与命名、发布流程的变更**同步更新**，不得只改其一；新增 / 调整平台产物时同步增改对应 job。
 
 ## 版本更新规则
