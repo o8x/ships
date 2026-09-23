@@ -2,12 +2,16 @@
 
 const os = require('os');
 const path = require('path');
-const { app } = require('electron');
 
-const DATA_DIR = app.getPath('userData');
+let DATA_DIR;
+try {
+  DATA_DIR = require('electron').app.getPath('userData');
+} catch (err) {
+  DATA_DIR = process.env.SHIPS_DATA_DIR || path.join(os.homedir(), '.ships');
+}
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const SSH_DETECTED_FILE = path.join(DATA_DIR, 'ssh-detected.json');
-const SSH_CONFIG_FILE = path.join(os.homedir(), '.ssh', 'config');
+const SSH_CONFIG_FILE = process.env.SHIPS_SSH_CONFIG || path.join(os.homedir(), '.ssh', 'config');
 
 const DATA_FILES = [SETTINGS_FILE, SSH_DETECTED_FILE];
 
