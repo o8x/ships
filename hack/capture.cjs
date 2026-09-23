@@ -40,7 +40,7 @@ app.whenReady().then(async () => {
   if (process.env.INPUT) {
     const index = Number(process.env.INPUT_INDEX || 0);
     const result = await win.webContents.executeJavaScript(
-      `(() => { const list = document.querySelectorAll('#content input'); const i = list[${index}];` +
+      `(() => { const list = document.querySelectorAll('#content input, #content textarea'); const i = list[${index}];` +
         ` if (!i) return 'no input ' + list.length;` +
         ` i.value = ${JSON.stringify(process.env.INPUT)}; i.dispatchEvent(new Event('input', { bubbles: true }));` +
         ` return 'set ' + i.value; })();`
