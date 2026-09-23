@@ -423,8 +423,8 @@ stateDiagram-v2
 | --- | --- | --- |
 | `--color-bg` | `#ffffff` | `#1c1c1e` |
 | `--color-surface` | `#ffffff` | `#2a2a2c` |
-| `--color-surface-2` | `#f4f4f6` | `#333336` |
-| `--color-surface-3` | `#e9e9ec` | `#3d3d41` |
+| `--color-surface-2` | `#fafafb` | `#333336` |
+| `--color-surface-3` | `#f1f1f3` | `#3d3d41` |
 | `--color-border` | `rgba(0,0,0,.09)` | `rgba(255,255,255,.1)` |
 | `--color-fg` | `#1d1d1f` | `#f5f5f7` |
 | `--color-fg-muted` | `#8a8a8f` | `#98989f` |
