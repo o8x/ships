@@ -73,6 +73,8 @@ Ships/
 │   └── geoip.json               # IP 归属地数据库（单行大文件，由 geo-service `require`）
 ├── .github/workflows/build-mac.yml  # CI：构建 macOS arm64 DMG
 ├── hack/capture.cjs             # 开发用 UI 截图/操作脚本（不打包）
+├── hack/dist-mac.sh             # dist:mac 包装脚本：自动选择签名身份
+├── hack/notarize.cjs            # electron-builder afterSign：按需公证（不打包）
 ├── scripts/gen-icons.mjs        # 零依赖 PNG/icns 图标生成脚本（不打包）
 └── src/
     ├── shared/constants.js      # 主进程与预加载共享：IPC 通道、窗口配置、默认设置
@@ -325,17 +327,20 @@ stateDiagram-v2
   - `start`：先 `build:css` 再 `electron .`。
   - `dev`：直接 `electron .`（需已有构建产物）。
   - `postinstall`：安装后自动 `build:css`。
-  - `dist:mac`：`build:css` + `electron-builder --mac --arm64`，产出 **DMG**。
+  - `dist:mac`：执行 `hack/dist-mac.sh` —— 先 `build:css`，再自动选择签名身份并 `electron-builder --mac --arm64`（实际调用 `npx electron-builder`），产出 **DMG**。
   - `pack:mac`：同上但加 `--dir`，仅产出 `.app`（调试用）。
 - **打包配置**（`package.json` 的 `build` 段，electron-builder）：
   - `appId = com.ships.app`，`productName = Ships`；产物目录 `release/`。
   - `files`：`src/**/*`、`assets/**/*`、`package.json`；依赖由 electron-builder 自动收集（`asar: true`）。
   - `npmRebuild: false`（`ssh2` 使用纯 JS 回退，无需重编原生模块）。
   - `compression: 'maximum'`；`electronLanguages: ['en', 'zh_CN']`（仅保留中英文 Electron 语言包，剔除约 220 个语言包、解包体积减少约 48MB）。
-  - `mac.target`：**仅 arm64 的 dmg**；`mac.icon = assets/imgs/icon.icns`；`mac.identity = null`（暂不签名）；`extendInfo.LSUIElement = true`（纯菜单栏 Agent，无 Dock）。
+  - `mac.target`：**仅 arm64 的 dmg**；`mac.icon = assets/imgs/icon.icns`；`hardenedRuntime = true`、`gatekeeperAssess = false`；`extendInfo.LSUIElement = true`（纯菜单栏 Agent，无 Dock）。
+- **签名 / 公证（打包时自动）**：
+  - 由 `hack/dist-mac.sh` 决定身份：设置了 `CSC_LINK`（CI 证书）则交给 electron-builder 导入使用；否则在钥匙串中查找 `Developer ID Application` 并设 `CSC_NAME`；都没有则设 `CSC_IDENTITY_AUTO_DISCOVERY=false` **构建未签名版本**（不会失败）。身份可用时对 `.app` 与 `dmg`（`dmg.sign = true`）自动签名。
+  - **公证**：`afterSign` 钩子 `hack/notarize.cjs`，当设置 `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` 时自动公证（`SKIP_NOTARIZE=1` 可跳过）。
   - 产物命名：`Ships-v<version>-<arch>.dmg`（含 `.blockmap`）。
 - **图标生成**：`node scripts/gen-icons.mjs` 在 `assets/imgs/` 生成 `trayTemplate*.png`、`app.png`，在 macOS 上经 `iconutil` 额外生成 `icon.icns`。
-- **CI**（`.github/workflows/build-mac.yml`）：在 `macos-14` 上以 **pnpm 10 / Node 22** 安装并执行 `pnpm dist:mac`（设置 `CSC_IDENTITY_AUTO_DISCOVERY=false`），上传 DMG artifact；打 `v*` tag 时发布到 GitHub Release。
+- **CI**（`.github/workflows/build-mac.yml`）：在 `macos-14` 上以 **pnpm 10 / Node 22** 安装并执行 `pnpm dist:mac`；签名/公证由 secrets 提供（`CSC_LINK` / `CSC_KEY_PASSWORD` / `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID`，缺省则未签名构建）；上传 DMG artifact；打 `v*` tag 时发布到 GitHub Release。
 - **版本对齐**：`package.json` 版本、本文件“当前版本”与产物文件名中的版本号保持一致。
 
 ---

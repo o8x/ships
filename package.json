@@ -12,13 +12,14 @@
     "watch:css": "tailwindcss -i ./src/renderer/styles/tailwind.css -o ./src/renderer/styles/tailwind.build.css --watch",
     "start": "pnpm run build:css && electron .",
     "dev": "electron .",
-    "dist:mac": "pnpm run build:css && electron-builder --mac --arm64",
+    "dist:mac": "bash hack/dist-mac.sh",
     "pack:mac": "pnpm run build:css && electron-builder --mac --arm64 --dir"
   },
   "dependencies": {
     "ssh2": "^1.17.0"
   },
   "devDependencies": {
+    "@electron/notarize": "^3.1.1",
     "electron": "^44.0.0",
     "electron-builder": "^26.15.3",
     "tailwindcss": "^3.4.19"
@@ -62,6 +63,7 @@
       "en",
       "zh_CN"
     ],
+    "afterSign": "hack/notarize.cjs",
     "mac": {
       "target": [
         {
@@ -73,13 +75,15 @@
       ],
       "category": "public.app-category.developer-tools",
       "icon": "assets/imgs/icon.icns",
-      "identity": null,
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
       "extendInfo": {
         "LSUIElement": true
       },
       "artifactName": "${productName}-v${version}-${arch}.${ext}"
     },
     "dmg": {
+      "sign": true,
       "artifactName": "${productName}-v${version}-${arch}.${ext}",
       "title": "${productName} v${version}"
     }
