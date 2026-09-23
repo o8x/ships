@@ -7,6 +7,8 @@
 const fs = require('fs');
 const { app, ipcMain } = require('electron');
 
+app.setName('ships');
+
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function waitLoad(win) {
@@ -47,6 +49,12 @@ app.whenReady().then(async () => {
     );
     console.log('[capture] input:', result);
     await delay(400);
+  }
+  if (process.env.PATCH) {
+    await win.webContents.executeJavaScript(
+      `window.ships.setSettings(${process.env.PATCH}).then(() => true);`
+    );
+    await delay(500);
   }
   win.webContents.invalidate();
   await delay(300);

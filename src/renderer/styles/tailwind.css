@@ -121,3 +121,112 @@
 .json-null {
   color: var(--color-json-null);
 }
+
+/* Settings window */
+.drag-region {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 52px;
+  -webkit-app-region: drag;
+  z-index: 10;
+}
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  margin-bottom: 2px;
+  border-radius: var(--radius-control);
+  font-size: 13px;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  -webkit-app-region: no-drag;
+}
+.settings-nav-item:hover {
+  background: var(--color-surface-2);
+  color: var(--color-fg);
+}
+.settings-nav-item.active {
+  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  color: var(--color-accent);
+}
+.segment {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+}
+.segment button {
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+}
+.segment button.active {
+  background: var(--color-surface);
+  color: var(--color-fg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+.switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  border: none;
+  background: var(--color-surface-3);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s ease;
+}
+.switch.on {
+  background: var(--color-accent);
+}
+.switch.on::after {
+  transform: translateX(16px);
+}
+.swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.swatch.active {
+  border-color: var(--color-fg);
+}
+input[type='color'].swatch {
+  -webkit-appearance: none;
+  appearance: none;
+  overflow: hidden;
+  background: transparent;
+}
+input[type='color'].swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+input[type='color'].swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 999px;
+}
