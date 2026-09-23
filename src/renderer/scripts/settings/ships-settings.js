@@ -23,6 +23,8 @@
         accentCustom: '自定义',
         launchAtLogin: '开机自启',
         launchAtLoginHint: '登录时自动启动 Ships',
+        pin: '固定悬浮',
+        pinHint: '主界面置顶常驻，失焦不自动隐藏',
         dataFolder: '数据文件夹',
         open: '打开',
         about: '关于',
@@ -49,6 +51,8 @@
         accentCustom: 'Custom',
         launchAtLogin: 'Launch at login',
         launchAtLoginHint: 'Start Ships when you log in',
+        pin: 'Keep on top',
+        pinHint: 'Pin the popover and never auto-hide on blur',
         dataFolder: 'Data folder',
         open: 'Open',
         about: 'About',
@@ -156,6 +160,9 @@
     generalSection.appendChild(
       row(i18n.t('settingsPage.launchAtLogin'), i18n.t('settingsPage.launchAtLoginHint'), loginSwitch.root)
     );
+
+    const pinSwitch = switchControl(settings.pinWindow, (value) => patch({ pinWindow: value }));
+    generalSection.appendChild(row(i18n.t('settingsPage.pin'), i18n.t('settingsPage.pinHint'), pinSwitch.root));
 
     const folderBtn = el('button', { class: 'btn shrink-0', type: 'button' });
     folderBtn.append(

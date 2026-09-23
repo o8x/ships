@@ -54,6 +54,7 @@ const DEFAULT_SETTINGS = {
   theme: ships.defaultTheme || 'system',
   accent: ships.defaultAccent || '#2e6bfc',
   launchAtLogin: false,
+  pinWindow: false,
 };
 
 module.exports = {

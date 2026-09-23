@@ -3,6 +3,7 @@
 const path = require('path');
 const { BrowserWindow, screen } = require('electron');
 const { WINDOW, SETTINGS_WINDOW, IPC } = require('../shared/constants');
+const settings = require('./services/settings-service');
 const logger = require('./utils/logger');
 
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
@@ -50,6 +51,7 @@ function createMainWindow() {
 
   mainWindow.on('blur', () => {
     if (blurSuppressed) return;
+    if (settings.get('pinWindow')) return;
     if (settingsWindow && settingsWindow.isFocused()) return;
     hideMainWindow();
   });
