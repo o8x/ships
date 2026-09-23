@@ -9,7 +9,6 @@
       ipNumber: {
         input: 'IP 地址 / 数字',
         placeholder: '如 192.168.1.1 或 3232235777',
-        address: 'IP 地址',
         decimal: '十进制',
         hex: '十六进制',
         binary: '二进制',
@@ -27,7 +26,6 @@
       ipNumber: {
         input: 'IP address / number',
         placeholder: 'e.g. 192.168.1.1 or 3232235777',
-        address: 'IP address',
         decimal: 'Decimal',
         hex: 'Hex',
         binary: 'Binary',
@@ -150,7 +148,6 @@
     inputSection.appendChild(hint);
 
     const rows = {
-      address: resultRow(i18n.t('ipNumber.address')),
       decimal: resultRow(i18n.t('ipNumber.decimal')),
       hex: resultRow(i18n.t('ipNumber.hex')),
       binary: resultRow(i18n.t('ipNumber.binary')),
@@ -208,7 +205,6 @@
       if (kind === 'ipv4') {
         const value = parseIPv4(raw);
         hint.textContent = i18n.t('ipNumber.kindIpv4');
-        rows.address.set(ipv4ToString(value));
         rows.decimal.set(value.toString());
         rows.hex.set(toHex(value));
         rows.binary.set(binaryIPv4(value));
@@ -219,7 +215,6 @@
       if (kind === 'ipv6') {
         const value = parseIPv6(raw);
         hint.textContent = i18n.t('ipNumber.kindIpv6');
-        rows.address.set(ipv6ToString(value));
         rows.decimal.set(value.toString());
         rows.hex.set(toHex(value));
         rows.binary.set(value.toString(2).padStart(128, '0'));
@@ -234,11 +229,10 @@
         hint.style.color = 'var(--color-danger)';
         geoToken += 1;
         geoRow.set(null);
-        rows.address.set(null);
       } else {
-        hint.textContent = i18n.t(kind === 'hex' ? 'ipNumber.kindHex' : 'ipNumber.kindNumber');
-        rows.address.set(ipv4ToString(value));
-        lookupGeo(ipv4ToString(value));
+        const ipStr = ipv4ToString(value);
+        hint.textContent = `${i18n.t(kind === 'hex' ? 'ipNumber.kindHex' : 'ipNumber.kindNumber')} · ${ipStr}`;
+        lookupGeo(ipStr);
       }
       rows.decimal.set(value.toString());
       rows.hex.set(toHex(value));

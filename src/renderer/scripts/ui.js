@@ -135,13 +135,13 @@ window.ShipsUI = (function createUI() {
     );
   }
 
-  /* Geo info row: flag + country/province/city + ISP. */
+  /* Geo info row: flag + country/province/city + ISP. Fixed height. */
   function createGeoRow() {
-    const root = el('div', { class: 'row-card' });
-    const flag = el('span', { class: 'inline-flex shrink-0' });
+    const root = el('div', { class: 'row-card min-h-[56px]' });
+    const flag = el('span', { class: 'inline-flex w-[24px] shrink-0 justify-center' });
     const text = el('div', { class: 'min-w-0 flex-1' });
     const main = el('div', { class: 'truncate text-[13px] text-fg' }, '—');
-    const sub = el('div', { class: 'truncate text-[10px] text-fg-muted' }, '');
+    const sub = el('div', { class: 'truncate text-[10px] text-fg-muted' }, '-');
     text.append(main, sub);
     root.append(flag, text);
     return {
@@ -150,13 +150,13 @@ window.ShipsUI = (function createUI() {
         if (!info) {
           flag.innerHTML = '';
           main.textContent = '—';
-          sub.textContent = '';
+          sub.textContent = '-';
           return;
         }
         flag.innerHTML = flagHtml(info.iso_3166, { size: 18 });
         const place = [info.country, info.province, info.city].filter(Boolean).join(' · ');
         main.textContent = place || info.isp || '—';
-        sub.textContent = info.isp && place ? info.isp : '';
+        sub.textContent = place && info.isp ? info.isp : '-';
       },
     };
   }
