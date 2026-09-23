@@ -24,6 +24,75 @@ function expandHome(filePath) {
   return filePath.startsWith('~') ? filePath.replace(/^~/, os.homedir()) : filePath;
 }
 
+const OS_LABELS = {
+  ubuntu: 'Ubuntu',
+  debian: 'Debian',
+  fedora: 'Fedora',
+  arch: 'Arch Linux',
+  centos: 'CentOS',
+  rhel: 'Red Hat',
+  redhat: 'Red Hat',
+  'red-hat': 'Red Hat',
+  rocky: 'Rocky Linux',
+  almalinux: 'AlmaLinux',
+  alpine: 'Alpine',
+  manjaro: 'Manjaro',
+  opensuse: 'openSUSE',
+  'opensuse-leap': 'openSUSE',
+  'opensuse-tumbleweed': 'openSUSE',
+  kali: 'Kali Linux',
+  linuxmint: 'Linux Mint',
+  mint: 'Linux Mint',
+  gentoo: 'Gentoo',
+  slackware: 'Slackware',
+  oracle: 'Oracle Linux',
+  amzn: 'Amazon Linux',
+  elementary: 'elementary OS',
+  freebsd: 'FreeBSD',
+  openbsd: 'OpenBSD',
+  netbsd: 'NetBSD',
+  dragonfly: 'DragonFly BSD',
+  macos: 'macOS',
+  windows: 'Windows',
+  linux: 'Linux',
+  bsd: 'BSD',
+  unknown: 'Unknown',
+};
+
+const UNKNOWN_OS = { os: 'unknown', family: 'unknown', label: 'Unknown' };
+
+function capitalize(text) {
+  const value = String(text || '');
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+}
+
+function labelFor(id) {
+  return OS_LABELS[id] || capitalize(id);
+}
+
+// Parses combined `uname -s` + `/etc/os-release` output into an OS descriptor.
+function parseOsInfo(output) {
+  const text = String(output || '');
+  const separator = text.indexOf('|||');
+  const uname = (separator >= 0 ? text.slice(0, separator) : text).trim().toLowerCase();
+  const release = separator >= 0 ? text.slice(separator + 3) : '';
+
+  if (uname.includes('darwin')) return { os: 'macos', family: 'macos', label: 'macOS' };
+
+  if (uname.includes('linux')) {
+    const idMatch = /^ID="?([a-z0-9._-]+)"?/im.exec(release);
+    const id = idMatch ? idMatch[1].toLowerCase() : 'linux';
+    return { os: id, family: 'linux', label: labelFor(id) };
+  }
+
+  if (uname.includes('bsd')) {
+    const name = uname.split(/\s+/)[0];
+    return { os: name, family: 'bsd', label: labelFor(name) };
+  }
+
+  return null;
+}
+
 class SshService extends EventEmitter {
   constructor() {
     super();
@@ -39,10 +108,16 @@ class SshService extends EventEmitter {
     return this.pending.has(alias);
   }
 
-  setDetected(alias, osName) {
-    this.detected[alias] = { os: osName, at: Date.now() };
+  setDetected(alias, info) {
+    const result = info || UNKNOWN_OS;
+    this.detected[alias] = {
+      os: result.os,
+      family: result.family,
+      label: result.label,
+      at: Date.now(),
+    };
     writeJson(SSH_DETECTED_FILE, this.detected);
-    this.emit('detected', { alias, os: osName, at: Date.now() });
+    this.emit('detected', { alias, ...this.detected[alias] });
   }
 
   buildCommand(host) {
@@ -81,14 +156,14 @@ class SshService extends EventEmitter {
     if (!host || !host.alias || this.pending.has(host.alias)) return;
     this.pending.add(host.alias);
     this.runDetect(host)
-      .then((osName) => {
+      .then((info) => {
         this.pending.delete(host.alias);
-        this.setDetected(host.alias, osName);
+        this.setDetected(host.alias, info);
       })
       .catch((err) => {
         logger.warn('detect failed:', err.message);
         this.pending.delete(host.alias);
-        this.setDetected(host.alias, 'unknown');
+        this.setDetected(host.alias, UNKNOWN_OS);
       });
   }
 
@@ -112,7 +187,7 @@ class SshService extends EventEmitter {
       }
 
       let settled = false;
-      const finish = (osName) => {
+      const finish = (info) => {
         if (settled) return;
         settled = true;
         try {
@@ -120,50 +195,49 @@ class SshService extends EventEmitter {
         } catch (err) {
           /* ignore */
         }
-        resolve(osName);
-      };
-
-      const classify = (output) => {
-        const lower = String(output).trim().toLowerCase();
-        if (lower.includes('darwin') || lower.includes('mac')) return 'macos';
-        if (lower.includes('linux')) return 'linux';
-        if (lower.includes('bsd')) return 'bsd';
-        return null;
+        resolve(info || UNKNOWN_OS);
       };
 
       client.on('ready', () => {
-        client.exec('uname -s', (err, stream) => {
-          if (err) return finish('unknown');
+        const command = "uname -s 2>/dev/null; echo '|||'; (cat /etc/os-release 2>/dev/null || true)";
+        client.exec(command, (err, stream) => {
+          if (err) return finish(UNKNOWN_OS);
           let out = '';
           stream.on('data', (data) => {
             out += data.toString();
           });
           stream.stderr.on('data', () => {});
           stream.on('close', () => {
-            const osName = classify(out);
-            if (osName) return finish(osName);
+            const info = parseOsInfo(out);
+            if (info) return finish(info);
             client.exec('cmd /c ver', (winErr, winStream) => {
-              if (winErr) return finish('unknown');
+              if (winErr) return finish(UNKNOWN_OS);
               let winOut = '';
               winStream.on('data', (data) => {
                 winOut += data.toString();
               });
               winStream.on('close', () =>
-                finish(winOut.toLowerCase().includes('windows') ? 'windows' : 'unknown')
+                finish(
+                  winOut.toLowerCase().includes('windows')
+                    ? { os: 'windows', family: 'windows', label: 'Windows' }
+                    : UNKNOWN_OS
+                )
               );
             });
           });
         });
       });
 
-      client.on('error', () => finish('unknown'));
+      client.on('error', () => finish(UNKNOWN_OS));
       try {
         client.connect(options);
       } catch (err) {
-        finish('unknown');
+        finish(UNKNOWN_OS);
       }
     });
   }
 }
 
 module.exports = new SshService();
+module.exports.parseOsInfo = parseOsInfo;
+module.exports.OS_LABELS = OS_LABELS;

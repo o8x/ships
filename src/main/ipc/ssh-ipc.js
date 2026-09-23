@@ -6,8 +6,6 @@ const configService = require('../services/ssh-config-service');
 const sshService = require('../services/ssh-service');
 const { broadcast, getMainWindow } = require('../window-manager');
 
-const OS_LABEL = { macos: 'macOS', linux: 'Linux', windows: 'Windows', bsd: 'BSD' };
-
 function findHost(alias) {
   if (!alias) return null;
   return configService.list().find((host) => host.alias === alias) || null;
@@ -42,7 +40,7 @@ function registerSshIpc(ipcMain) {
     if ((!win || !win.isVisible()) && Notification.isSupported()) {
       new Notification({
         title: 'Ships',
-        body: `${payload.alias} · ${OS_LABEL[payload.os] || 'Unknown'}`,
+        body: `${payload.alias} · ${payload.label || 'Unknown'}`,
       }).show();
     }
   });

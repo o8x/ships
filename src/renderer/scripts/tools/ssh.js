@@ -54,15 +54,28 @@
     linux: '#e95420',
     windows: '#0a84ff',
     bsd: '#e5484d',
+    unknown: 'var(--color-fg-muted)',
   };
 
-  function osLabel(os) {
-    if (!os || os === 'unknown') return i18n.t('ssh.unknown');
-    if (os === 'macos') return 'macOS';
-    if (os === 'linux') return 'Linux';
-    if (os === 'windows') return 'Windows';
-    if (os === 'bsd') return 'BSD';
-    return os;
+  const LEGACY_FAMILY = { macos: 'macos', linux: 'linux', windows: 'windows', bsd: 'bsd' };
+
+  function familyOf(detected) {
+    if (!detected) return null;
+    if (detected.family) return detected.family;
+    return LEGACY_FAMILY[detected.os] || 'unknown';
+  }
+
+  function osLabel(detected) {
+    if (!detected) return i18n.t('ssh.unknown');
+    if (detected.label) return detected.label;
+    const fallback = {
+      macos: 'macOS',
+      linux: 'Linux',
+      windows: 'Windows',
+      bsd: 'BSD',
+      unknown: i18n.t('ssh.unknown'),
+    };
+    return fallback[detected.os] || detected.os || i18n.t('ssh.unknown');
   }
 
   function mount(container) {
@@ -95,17 +108,16 @@
 
     function buildRow(host) {
       const detected = state.detected[host.alias];
-      const osName = detected && detected.os;
+      const family = familyOf(detected);
       const pending = state.pending.has(host.alias);
 
       const row = el('div', { class: 'row-card' });
 
       const icon = el('span', { class: 'flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-surface-2' });
-      icon.innerHTML = Icons[OS_ICON[osName] || 'server'](17);
-      icon.style.color = osName && OS_COLOR[osName] ? OS_COLOR[osName] : 'var(--color-fg-muted)';
-      icon.title = osName ? i18n.t('ssh.detectedAs', { os: osLabel(osName) }) : i18n.t('ssh.detect');
-      icon.setAttribute('data-tip', icon.title);
-      icon.removeAttribute('title');
+      icon.innerHTML = Icons[OS_ICON[family] || 'server'](17);
+      icon.style.color = OS_COLOR[family] || 'var(--color-fg-muted)';
+      const tip = detected ? i18n.t('ssh.detectedAs', { os: osLabel(detected) }) : i18n.t('ssh.detect');
+      icon.setAttribute('data-tip', tip);
 
       const info = el('div', { class: 'min-w-0 flex-1' });
       const address = el('div', { class: 'truncate font-mono text-[13px] text-fg' }, '');
@@ -175,11 +187,17 @@
       window.ships.ssh.onDetected((payload) => {
         if (!payload) return;
         state.pending.delete(payload.alias);
-        state.detected[payload.alias] = { os: payload.os, at: payload.at };
+        state.detected[payload.alias] = {
+          os: payload.os,
+          family: payload.family,
+          label: payload.label,
+          at: payload.at,
+        };
         render();
+        const label = osLabel(payload);
         showStatus(
-          i18n.t('ssh.detectDone', { host: payload.alias, os: osLabel(payload.os) }),
-          payload.os === 'unknown'
+          i18n.t('ssh.detectDone', { host: payload.alias, os: label }),
+          !payload.os || payload.os === 'unknown'
         );
       })
     );
