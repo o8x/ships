@@ -140,7 +140,7 @@ Ships/
 ### 3.4 SSH 连接
 
 1. 工具列表点击某主机的连接图标 → `ssh:connect`（仅传 `alias`）。
-2. 主进程按 alias 查询 `~/.ssh/config`，拼装命令：`ssh [-p 端口] [-i 私钥] [-J 跳板机] [user@]host`（端口为 22 时省略 `-p`）。
+2. 主进程按 alias 查询 `~/.ssh/config`，拼装命令：`ssh [-p 端口] [-i 私钥] [-J 跳板机] [user@]host`（端口为 22 时省略 `-p`）；当私钥为默认的 `~/.ssh/id_ed25519` 或 `~/.ssh/id_rsa`（含展开后的绝对路径）时**省略 `-i`**（ssh 会自动使用默认密钥）。
 3. 通过 `osascript` 让 **iTerm** 新建窗口并执行该命令。
 4. 成功 / 失败在主面板顶部临时提示。
 

@@ -36,6 +36,17 @@ function getAgentSocket() {
   }
 }
 
+// ~/.ssh/id_ed25519 and ~/.ssh/id_rsa are used by ssh automatically, so we omit
+// -i for them (both the "~" form and the expanded absolute path).
+const DEFAULT_IDENTITIES = ['~/.ssh/id_ed25519', '~/.ssh/id_rsa'];
+
+function isDefaultIdentity(file) {
+  const value = String(file || '').trim();
+  if (!value) return false;
+  const expanded = expandHome(value);
+  return DEFAULT_IDENTITIES.some((def) => value === def || expanded === expandHome(def));
+}
+
 const OS_LABELS = {
   ubuntu: 'Ubuntu',
   debian: 'Debian',
@@ -135,7 +146,9 @@ class SshService extends EventEmitter {
   buildCommand(host) {
     const parts = ['ssh'];
     if (host.port && Number(host.port) !== 22) parts.push('-p', String(host.port));
-    if (host.identityFile) parts.push('-i', shellQuote(host.identityFile));
+    if (host.identityFile && !isDefaultIdentity(host.identityFile)) {
+      parts.push('-i', shellQuote(host.identityFile));
+    }
     if (host.proxyJump) parts.push('-J', host.proxyJump);
     parts.push(host.user ? `${host.user}@${host.hostName}` : host.hostName);
     return parts.join(' ');
