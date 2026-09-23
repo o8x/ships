@@ -30,7 +30,7 @@
 | 修改设置项 | §3 核心流程、§5.1 本地数据、§4 功能清单 |
 | 修改 SSH 相关行为 | §3 核心流程、§5.1 本地数据、§5.2、§6 流程图 |
 | 修改样式常量 | §11 GUI 与布局规范、`src/renderer/styles/constants.css` |
-| 新增 / 修改图标 | §8.3 图标与资源、`assets/icons/` |
+| 新增 / 修改图标 | §8.3 图标与资源、`assets/icons/`（SVG）与 `assets/imgs/`（位图） |
 | 修改构建 / 脚本 / 依赖 / CI | §7 构建与发布、`package.json`、`pnpm-lock.yaml`、`.github/workflows/*.yml` |
 
 ---
@@ -62,11 +62,12 @@ Ships/
 ├── AGENTS.md                    # 客户端设计与编码约定
 ├── README.md                    # 应用图标 + 一句话概述
 ├── docs/PRD.md                  # 本文件
-├── assets/icons/                # 图标资源（PNG + SVG）
-│   ├── *.svg                    # 界面 SVG 图标（kebab-case，统一由预加载读取）
-│   ├── trayTemplate.png         # 托盘模板图标（18/36/54 @1x/@2x/@3x）
-│   ├── app.png                  # 应用图标（512，README 引用）
-│   └── icon.icns                # 打包用 macOS 图标
+├── assets/
+│   ├── icons/                   # 应用内部使用的 SVG 图标（kebab-case，统一由预加载读取）
+│   └── imgs/                    # 位图资源：应用图标 / 托盘 / 打包
+│       ├── trayTemplate.png     # 托盘模板图标（18/36/54 @1x/@2x/@3x）
+│       ├── app.png              # 应用图标（512，README 引用）
+│       └── icon.icns            # 打包用 macOS 图标
 ├── .github/workflows/build-mac.yml  # CI：构建 macOS arm64 DMG
 ├── hack/capture.cjs             # 开发用 UI 截图/操作脚本（不打包）
 ├── scripts/gen-icons.mjs        # 零依赖 PNG/icns 图标生成脚本（不打包）
@@ -308,9 +309,9 @@ stateDiagram-v2
   - `appId = com.ships.app`，`productName = Ships`；产物目录 `release/`。
   - `files`：`src/**/*`、`assets/**/*`、`package.json`；依赖由 electron-builder 自动收集（`asar: true`）。
   - `npmRebuild: false`（`ssh2` 使用纯 JS 回退，无需重编原生模块）。
-  - `mac.target`：**仅 arm64 的 dmg**；`mac.icon = assets/icons/icon.icns`；`mac.identity = null`（暂不签名）；`extendInfo.LSUIElement = true`（纯菜单栏 Agent，无 Dock）。
+  - `mac.target`：**仅 arm64 的 dmg**；`mac.icon = assets/imgs/icon.icns`；`mac.identity = null`（暂不签名）；`extendInfo.LSUIElement = true`（纯菜单栏 Agent，无 Dock）。
   - 产物命名：`Ships-v<version>-<arch>.dmg`（含 `.blockmap`）。
-- **图标生成**：`node scripts/gen-icons.mjs` 生成 `trayTemplate*.png`、`app.png`，在 macOS 上经 `iconutil` 额外生成 `icon.icns`。
+- **图标生成**：`node scripts/gen-icons.mjs` 在 `assets/imgs/` 生成 `trayTemplate*.png`、`app.png`，在 macOS 上经 `iconutil` 额外生成 `icon.icns`。
 - **CI**（`.github/workflows/build-mac.yml`）：在 `macos-14` 上以 **pnpm 10 / Node 22** 安装并执行 `pnpm dist:mac`（设置 `CSC_IDENTITY_AUTO_DISCOVERY=false`），上传 DMG artifact；打 `v*` tag 时发布到 GitHub Release。
 - **版本对齐**：`package.json` 版本、本文件“当前版本”与产物文件名中的版本号保持一致。
 
@@ -335,8 +336,9 @@ stateDiagram-v2
 ### 8.3 图标与资源
 
 - **SVG 图标**：所有界面图标以独立 `.svg` 文件存放于 `assets/icons/`（kebab-case 命名，如 `clock.svg`、`arrow-left.svg`），**代码中不硬编码** SVG 标记；由 `src/preload/icons.js` 在启动时读取目录、转成 camelCase 键名并经 `contextBridge` 暴露为 `window.shipsIcons`，渲染层 `ShipsUI.Icons[name](size)` 注入尺寸后使用。新增 / 修改图标只需增删 / 编辑文件。
-- 托盘图标：`assets/icons/trayTemplate.png`（模板图，适配深浅菜单栏）。
-- 应用图标：`assets/icons/app.png`（README 引用）。
+- 位图资源（应用图标 / 托盘 / 打包）统一放在 `assets/imgs/`；`assets/icons/` 只保留 SVG 图标。
+- 托盘图标：`assets/imgs/trayTemplate.png`（模板图，适配深浅菜单栏）。
+- 应用图标：`assets/imgs/app.png`（README 引用）。
 - 图标由 `scripts/gen-icons.mjs` 零依赖生成；也可手工替换同名文件。
 
 ### 8.4 SSH 主列表行

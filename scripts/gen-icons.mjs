@@ -7,7 +7,7 @@ import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const OUT_DIR = path.join(__dirname, '..', 'assets', 'icons');
+const OUT_DIR = path.join(__dirname, '..', 'assets', 'imgs');
 
 /* ----------------------------- PNG encoder ----------------------------- */
 const CRC_TABLE = (() => {
