@@ -6,7 +6,8 @@
   const i18n = window.ShipsI18n;
 
   const dom = {
-    tabbar: document.getElementById('tabbar'),
+    tablist: document.getElementById('tablist'),
+    brandName: document.getElementById('brand-name'),
     content: document.getElementById('content'),
     version: document.getElementById('footer-version'),
     settings: document.getElementById('btn-settings'),
@@ -49,14 +50,14 @@
 
   function setActive(id) {
     state.activeId = id;
-    Array.from(dom.tabbar.children).forEach((btn) => {
+    Array.from(dom.tablist.children).forEach((btn) => {
       btn.classList.toggle('tab-active', btn.dataset.tool === id);
     });
     mountTool(id);
   }
 
   function renderTabs() {
-    dom.tabbar.innerHTML = '';
+    dom.tablist.innerHTML = '';
     for (const tool of registry.all()) {
       const btn = el('button', {
         class: 'tab',
@@ -65,8 +66,12 @@
       });
       btn.innerHTML = Icons[tool.icon](20);
       btn.addEventListener('click', () => setActive(tool.id));
-      dom.tabbar.appendChild(btn);
+      dom.tablist.appendChild(btn);
     }
+  }
+
+  function renderBrand() {
+    dom.brandName.textContent = i18n.t('appName');
   }
 
   function renderFooter() {
@@ -93,6 +98,7 @@
 
     renderTabs();
     renderFooter();
+    renderBrand();
 
     const tools = registry.all();
     if (tools.length) setActive(tools[0].id);
@@ -106,6 +112,7 @@
       if (localeChanged) {
         renderTabs();
         renderFooter();
+        renderBrand();
         mountTool(state.activeId);
       }
     });

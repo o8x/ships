@@ -22,9 +22,20 @@
     >
       <header
         id="tabbar"
-        class="flex shrink-0 items-center justify-start gap-1 px-4"
+        class="flex shrink-0 items-center justify-between gap-2 px-3"
         style="height: var(--tabbar-height); border-bottom: 1px solid var(--color-border)"
-      ></header>
+      >
+        <div class="flex min-w-0 items-center gap-2 pl-1">
+          <img
+            id="brand-icon"
+            src="../../assets/imgs/app.png"
+            alt="Ships"
+            class="h-5 w-5 shrink-0 rounded-[5px]"
+          />
+          <span id="brand-name" class="truncate text-[13px] font-semibold text-fg">Ships</span>
+        </div>
+        <nav id="tablist" class="flex min-w-0 items-center justify-end gap-1 overflow-x-auto"></nav>
+      </header>
 
       <main id="content" class="flex-1 overflow-y-auto px-4 py-3"></main>
 

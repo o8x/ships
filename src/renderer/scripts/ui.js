@@ -9,7 +9,12 @@ window.ShipsUI = (function createUI() {
   for (const name of Object.keys(sources)) {
     Icons[name] = (size) => {
       const s = size || 20;
-      return sources[name].replace('<svg', `<svg width="${s}" height="${s}"`);
+      const source = sources[name];
+      const rootTag = source.match(/<svg\b[^>]*>/i);
+      if (!rootTag) return source;
+      const cleaned = rootTag[0].replace(/\s(width|height)="[^"]*"/gi, '');
+      const sized = cleaned.replace('<svg', `<svg width="${s}" height="${s}"`);
+      return source.replace(rootTag[0], sized);
     };
   }
 
