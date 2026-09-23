@@ -357,7 +357,7 @@
     });
     input.addEventListener('blur', update);
 
-    container.append(inputSection, baseSection, calcSection, geoSection);
+    container.append(inputSection, geoSection, baseSection, calcSection);
     update();
 
     store.load((saved) => {
