@@ -1,15 +1,15 @@
 'use strict';
 
 window.ShipsToolOrder = [
+  'ssh',
+  'stringCodec',
+  'encode',
   'timestamp',
   'ipNumber',
   'subnet',
   'radix',
-  'stringCodec',
-  'json',
-  'ssh',
-  'clipboard',
-  'encode',
   'hash',
+  'json',
+  'clipboard',
   'nutrient',
 ];
