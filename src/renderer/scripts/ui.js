@@ -166,6 +166,24 @@ window.ShipsUI = (function createUI() {
     };
   }
 
+  /* Self-drawn segmented control. */
+  function segmented(options, value, onSelect) {
+    const root = el('div', { class: 'segment shrink-0' });
+    const buttons = (options || []).map((option) => {
+      const button = el('button', { type: 'button', dataset: { value: option.value } }, option.label);
+      button.addEventListener('click', () => onSelect(option.value));
+      root.appendChild(button);
+      return button;
+    });
+    function set(next) {
+      buttons.forEach((button) =>
+        button.classList.toggle('active', String(button.dataset.value) === String(next))
+      );
+    }
+    set(value);
+    return { root, set };
+  }
+
   /* Persist a tool's input to the main-process tool-state store. */
   function persistState(key) {
     const saveNow = debounce((value) => {
@@ -336,6 +354,7 @@ window.ShipsUI = (function createUI() {
     flagHtml,
     createGeoRow,
     createSelect,
+    segmented,
     persistState,
     initTooltips,
   };

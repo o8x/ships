@@ -31,6 +31,8 @@ window.ShipsI18n = (function createI18n() {
         json: 'JSON 格式化',
         ssh: 'SSH 管理',
         clipboard: '剪贴板',
+        encode: '编码转换',
+        hash: '哈希计算',
       },
     },
     en: {
@@ -62,6 +64,8 @@ window.ShipsI18n = (function createI18n() {
         json: 'JSON',
         ssh: 'SSH',
         clipboard: 'Clipboard',
+        encode: 'Encode',
+        hash: 'Hash',
       },
     },
   };

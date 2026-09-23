@@ -31,6 +31,9 @@ const api = {
     clear: () => ipcRenderer.invoke(IPC.CLIPBOARD_CLEAR),
     onChanged: (cb) => on(IPC.CLIPBOARD_CHANGED, cb),
   },
+  hashText: (text) => ipcRenderer.invoke(IPC.HASH_TEXT, text),
+  hashFile: (file) => ipcRenderer.invoke(IPC.HASH_FILE, file),
+  openFile: () => ipcRenderer.invoke(IPC.DIALOG_OPEN_FILE),
   ssh: {
     list: () => ipcRenderer.invoke(IPC.SSH_LIST),
     connect: (payload) => ipcRenderer.invoke(IPC.SSH_CONNECT, payload),

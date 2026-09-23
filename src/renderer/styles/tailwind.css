@@ -80,7 +80,7 @@
     @apply flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-2;
   }
   .tab {
-    @apply icon-btn h-9 w-9;
+    @apply icon-btn h-7 w-7;
   }
   .tab:focus,
   .tab:focus-visible {
@@ -414,6 +414,21 @@ input[type='color'].swatch::-webkit-color-swatch {
 }
 .json-preview {
   color: var(--color-fg-muted);
+}
+
+/* Clipboard text preview: fixed two lines, truncate the rest. */
+.clip-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+  height: calc(1.4em * 2);
+  color: var(--color-fg);
 }
 
 /* ------------------------------- Motion -------------------------------- */

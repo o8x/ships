@@ -23,6 +23,7 @@ app.whenReady().then(async () => {
   const { registerGeoIpc } = require('../src/main/ipc/geo-ipc');
   const { registerStateIpc } = require('../src/main/ipc/state-ipc');
   const { registerClipboardIpc } = require('../src/main/ipc/clipboard-ipc');
+  const { registerHashIpc } = require('../src/main/ipc/hash-ipc');
   const wm = require('../src/main/window-manager');
 
   registerAppIpc(ipcMain);
@@ -32,6 +33,7 @@ app.whenReady().then(async () => {
   registerGeoIpc(ipcMain);
   registerStateIpc(ipcMain);
   registerClipboardIpc(ipcMain);
+  registerHashIpc(ipcMain);
 
   const win = wm.createMainWindow();
   win.webContents.setBackgroundThrottling(false);
