@@ -62,8 +62,7 @@
       statusTimer: null,
     };
 
-    const header = el('div', { class: 'mb-2.5 flex items-center justify-between' });
-    header.appendChild(el('h2', { class: 'tool-title mb-0' }, i18n.t('ssh.title')));
+    const header = el('div', { class: 'mb-2.5 flex items-center justify-end gap-2' });
     const refreshBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', 'data-tip': i18n.t('ssh.refresh') });
     refreshBtn.innerHTML = Icons.refresh(15);
     header.appendChild(refreshBtn);

@@ -41,13 +41,24 @@
       dom.content.innerHTML = emptyState(i18n.t('emptyTools'));
       return;
     }
+
+    const header = el('div', { class: 'tool-head' });
+    header.appendChild(el('h1', { class: 'tool-head-title' }, i18n.t(`tools.${id}`)));
+    header.appendChild(el('div', { class: 'tool-head-desc' }, i18n.t(`toolDesc.${id}`)));
+    dom.content.appendChild(header);
+
+    const body = el('div', {});
+    dom.content.appendChild(body);
+
     try {
-      const dispose = tool.mount(dom.content);
+      const dispose = tool.mount(body);
       if (typeof dispose === 'function') state.cleanup = dispose;
     } catch (err) {
       console.error(err);
       dom.content.innerHTML = emptyState(String(err && err.message));
     }
+
+    dom.content.scrollTop = 0;
   }
 
   function setActive(id) {

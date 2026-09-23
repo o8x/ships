@@ -70,7 +70,6 @@
   }
 
   function mount(container) {
-    const hint = el('div', { class: 'mb-2.5 text-[11px] text-fg-muted' }, i18n.t('radix.hint'));
     const rows = [];
     const store = persistState('radix');
     const rowsSection = section();
@@ -183,7 +182,6 @@
     metaSection.append(metaBits.root, metaBytes.root);
 
     container.append(rowsSection, customSection, metaSection);
-    container.prepend(hint);
 
     function resultMeta(labelText) {
       const root = el('div', { class: 'flex items-center justify-between rounded-card border border-border bg-surface px-2.5 py-1.5' });

@@ -79,7 +79,6 @@
   ];
 
   function mount(container) {
-    const hint = el('div', { class: 'mb-2.5 text-[11px] text-fg-muted' }, i18n.t('nutrient.hint'));
     const store = persistState('nutrient');
 
     const nameInput = el('input', {
@@ -125,7 +124,7 @@
     resultActions.appendChild(copyResultBtn);
     resultSection.appendChild(resultActions);
 
-    container.append(hint, inputSection, resultSection);
+    container.append(inputSection, resultSection);
 
     function makeResultRow(labelText) {
       const root = el('div', { class: 'mb-2.5 flex items-center justify-between gap-2 rounded-card border border-border bg-surface px-2.5 py-1.5' });

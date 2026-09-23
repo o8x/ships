@@ -98,7 +98,6 @@
   }
 
   function mount(container) {
-    const hint = el('div', { class: 'mb-2.5 text-[11px] text-fg-muted' }, i18n.t('encode.hint'));
     const store = persistState('encode');
 
     function area(label, placeholder) {
@@ -202,7 +201,7 @@
       asciiField.wrapper
     );
 
-    container.append(hint, body);
+    container.append(body);
 
     store.load((saved) => {
       if (!saved || !saved.field || saved.value == null) return;

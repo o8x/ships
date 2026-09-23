@@ -26,7 +26,7 @@ window.ShipsI18n = (function createI18n() {
       },
       tools: {
         timestamp: '时间戳转换',
-        subnet: '网段与掩码计算',
+        subnet: 'IP / 网段',
         radix: '进制转换',
         json: 'JSON 格式化',
         ssh: 'SSH 管理',
@@ -34,6 +34,17 @@ window.ShipsI18n = (function createI18n() {
         encode: '编码转换',
         hash: '哈希计算',
         nutrient: '营养成分',
+      },
+      toolDesc: {
+        timestamp: '秒 / 毫秒 / 纳秒与日期互转',
+        subnet: 'IP 进制与网段 / 掩码计算，含归属地',
+        radix: '2–36 进制之间实时换算',
+        json: '粘贴 JSON 自动原地格式化与结构查看',
+        ssh: '读取 ~/.ssh/config，点击或双击在 iTerm 连接',
+        clipboard: '最近的剪贴板记录，支持复制与清空',
+        encode: '字符串与 Base64 / 十六进制 / URL / ASCII 互转',
+        hash: '计算文本或文件的 MD5 / SHA1 / SHA256',
+        nutrient: '营养成分换算为能量与运动消耗',
       },
     },
     en: {
@@ -60,7 +71,7 @@ window.ShipsI18n = (function createI18n() {
       },
       tools: {
         timestamp: 'Timestamp',
-        subnet: 'Subnet & Mask',
+        subnet: 'IP / Subnet',
         radix: 'Radix',
         json: 'JSON',
         ssh: 'SSH',
@@ -68,6 +79,17 @@ window.ShipsI18n = (function createI18n() {
         encode: 'Encode',
         hash: 'Hash',
         nutrient: 'Nutrition',
+      },
+      toolDesc: {
+        timestamp: 'Convert between s / ms / ns and dates',
+        subnet: 'IP bases and subnet / mask, with location',
+        radix: 'Live conversion across bases 2–36',
+        json: 'Paste JSON to format in place and view its structure',
+        ssh: 'Read ~/.ssh/config; click or double-click to open in iTerm',
+        clipboard: 'Recent clipboard items with copy and clear',
+        encode: 'Text ↔ Base64 / Hex / URL / ASCII',
+        hash: 'MD5 / SHA1 / SHA256 of text or a file',
+        nutrient: 'Convert nutrition into energy and exercise',
       },
     },
   };

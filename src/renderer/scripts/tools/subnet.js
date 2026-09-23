@@ -231,7 +231,7 @@
   }
 
   function mount(container) {
-    const inputSection = section(i18n.t('subnet.input'));
+    const inputSection = section();
     const input = field(null, { placeholder: i18n.t('subnet.placeholder'), spellcheck: 'false' }).input;
     inputSection.appendChild(input);
     const store = persistState('subnet');

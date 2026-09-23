@@ -42,8 +42,6 @@
   }
 
   function mount(container) {
-    const hint = el('div', { class: 'mb-2.5 text-[11px] text-fg-muted' }, i18n.t('hash.hint'));
-
     const modeSegment = segmented(
       [
         { value: 'string', label: i18n.t('hash.modeString') },
@@ -148,7 +146,7 @@
     const modeSection = section();
     modeSection.appendChild(modeSegment.root);
 
-    container.append(hint, modeSection, stringPanel, filePanel, outSection);
+    container.append(modeSection, stringPanel, filePanel, outSection);
 
     store.load((saved) => {
       if (saved && saved.mode) {

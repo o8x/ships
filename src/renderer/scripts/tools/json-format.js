@@ -103,8 +103,6 @@
   }
 
   function mount(container) {
-    const hint = el('div', { class: 'mb-2.5 text-[11px] text-fg-muted' }, i18n.t('json.hint'));
-
     const state = { view: 'text', tooLarge: false };
 
     // ---- toolbar ----
@@ -167,7 +165,7 @@
 
     const status = el('div', { class: 'mt-2.5 text-[11px] text-fg-muted' }, i18n.t('json.empty'));
 
-    container.append(hint, toolbar, editor, tree, status);
+    container.append(toolbar, editor, tree, status);
 
     let currentText = '';
     const store = persistState('json');

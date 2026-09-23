@@ -433,6 +433,21 @@ input[type='color'].swatch::-webkit-color-swatch {
   margin-bottom: 10px;
 }
 
+/* Shared tool header (title + description). */
+.tool-head {
+  margin-bottom: 10px;
+}
+.tool-head-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+.tool-head-desc {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
 /* Clipboard text preview: fixed two lines, truncate the rest. */
 .clip-text {
   display: -webkit-box;
