@@ -1,0 +1,7 @@
+node_modules/
+.idea/
+.DS_Store
+*.log
+src/renderer/styles/tailwind.build.css
+dist/
+release/

@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: transparent;
+    font-family: var(--font-sans);
+    color: var(--color-fg);
+    -webkit-font-smoothing: antialiased;
+    font-size: 13px;
+    user-select: none;
+    cursor: default;
+  }
+
+  input,
+  textarea,
+  select {
+    user-select: text;
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface-3);
+    border-radius: var(--radius-pill);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  .field {
+    @apply w-full rounded-control border border-border bg-surface-2 px-3 py-2 text-fg;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .field:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1 rounded-control border border-border
+      bg-surface-2 px-3 py-1.5 text-fg;
+    transition: background 0.15s ease, opacity 0.15s ease;
+  }
+  .btn:hover {
+    background: var(--color-surface-3);
+  }
+  .btn-accent {
+    background: var(--color-accent);
+    border-color: transparent;
+    color: var(--color-accent-fg);
+  }
+  .btn-accent:hover {
+    background: var(--color-accent);
+    opacity: 0.9;
+  }
+  .icon-btn {
+    @apply inline-flex items-center justify-center rounded-control text-fg-muted;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .icon-btn:hover {
+    background: var(--color-surface-2);
+    color: var(--color-fg);
+  }
+  .row-card {
+    @apply flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-2;
+  }
+}

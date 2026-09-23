@@ -1,0 +1,64 @@
+'use strict';
+
+const pkg = require('../../package.json');
+
+const APP_NAME = 'Ships';
+const ships = pkg.ships || {};
+
+const IPC = {
+  SETTINGS_GET: 'settings:get',
+  SETTINGS_SET: 'settings:set',
+  SETTINGS_CHANGED: 'settings:changed',
+
+  APP_INFO: 'app:info',
+  OPEN_DATA_FOLDER: 'app:open-data-folder',
+  OPEN_EXTERNAL: 'app:open-external',
+
+  WINDOW_HIDE: 'window:hide',
+  WINDOW_OPEN_SETTINGS: 'window:open-settings',
+  WINDOW_CLOSE_SETTINGS: 'window:close-settings',
+  THEME_CHANGED: 'theme:changed',
+
+  SSH_LIST: 'ssh:list',
+  SSH_CONNECT: 'ssh:connect',
+  SSH_DETECT: 'ssh:detect',
+  SSH_DETECTED: 'ssh:detected',
+  SSH_CONFIG_READ: 'ssh-config:read',
+  SSH_CONFIG_UPSERT: 'ssh-config:upsert',
+  SSH_CONFIG_REMOVE: 'ssh-config:remove',
+};
+
+const WINDOW = Object.assign(
+  {
+    width: 400,
+    height: 500,
+    gapBelowTray: 6,
+    cornerRadius: 12,
+  },
+  ships.window || {}
+);
+
+const SETTINGS_WINDOW = Object.assign(
+  {
+    width: 720,
+    height: 520,
+  },
+  ships.settingsWindow || {}
+);
+
+const DEFAULT_SETTINGS = {
+  locale: ships.defaultLocale || 'zh',
+  theme: ships.defaultTheme || 'system',
+  accent: ships.defaultAccent || '#2e6bfc',
+  launchAtLogin: false,
+};
+
+module.exports = {
+  APP_NAME,
+  VERSION: pkg.version,
+  ships,
+  IPC,
+  WINDOW,
+  SETTINGS_WINDOW,
+  DEFAULT_SETTINGS,
+};
