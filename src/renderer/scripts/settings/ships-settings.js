@@ -36,6 +36,8 @@
         developer: '开发者',
         devPopover: '悬浮界面开发者工具',
         devSettings: '设置界面开发者工具',
+        logFile: '日志文件',
+        logHint: 'SSH 探测等详细日志（ships.log）',
       },
     },
     en: {
@@ -68,6 +70,8 @@
         developer: 'Developer',
         devPopover: 'Popover DevTools',
         devSettings: 'Settings DevTools',
+        logFile: 'Log file',
+        logHint: 'Detailed logs e.g. SSH detection (ships.log)',
       },
     },
   });
@@ -217,6 +221,10 @@
     }
     devSection.appendChild(row(i18n.t('settingsPage.devPopover'), '', devButton('main')));
     devSection.appendChild(row(i18n.t('settingsPage.devSettings'), '', devButton('settings')));
+
+    const logBtn = el('button', { class: 'btn shrink-0', type: 'button' }, i18n.t('settingsPage.open'));
+    logBtn.addEventListener('click', () => window.ships.openLog());
+    devSection.appendChild(row(i18n.t('settingsPage.logFile'), i18n.t('settingsPage.logHint'), logBtn));
 
     pane.append(languageSection, appearanceSection, generalSection, aboutSection, devSection);
   }

@@ -144,10 +144,12 @@ Ships/
 ### 3.5 SSH 操作系统探测
 
 1. 点击探测图标 → `ssh:detect`（仅传 `alias`），主进程立即返回 `{ queued: true }`，在**后台**执行。
-2. 使用 `ssh2` 连接（优先 `SSH_AUTH_SOCK` 代理；有 `IdentityFile` 时读取私钥），执行 `uname -s; echo '|||'; cat /etc/os-release`；识别不到时回退 `cmd /c ver`。
+2. 使用 `ssh2` 连接：代理 socket 先取 `SSH_AUTH_SOCK`，无则回退 `launchctl getenv SSH_AUTH_SOCK`（GUI 从 Finder 启动时不继承 shell 环境）；有 `IdentityFile` 时读取私钥。执行 `uname -s; echo '|||'; cat /etc/os-release`；识别不到时回退 `cmd /c ver`。
 3. 归类到具体系统 / 发行版：Linux 读取 `/etc/os-release` 的 `ID`（如 `ubuntu` / `fedora` / `arch` / `centos` / `debian` / `rhel` / `alpine` …），macOS 为 `macos`，BSD 为 `freebsd` / `openbsd` 等，Windows 为 `windows`；同时给出 `family`（`macos`/`linux`/`windows`/`bsd`/`unknown`）与显示名 `label`。
 4. 结果（`{ os, family, label, at }`）写入 `ssh-detected.json` 并广播 `ssh:detected` 事件；渲染层据此更新左侧彩色系统图标与提示。
 5. 探测进行中该按钮显示旋转态并禁用；同一 alias 去重（`pending` 集合）。
+6. **日志**：探测的每一步（开始、目标、认证方式、执行命令、stdout/stderr、解析结果、连接报错）都会追加写入 `ships.log`（设置 → 开发者 → 日志文件可打开）；便于排查本地网络 / 权限问题。
+7. **macOS 本地网络权限**：Info.plist 含 `NSLocalNetworkUsageDescription`。macOS 15+ 首次访问局域网（如 192.168.x / 10.x）时会弹「本地网络」授权，需允许 Ships，否则连接会被系统拦截（表现即“没有本地 SSH 探测权限”）；可在「系统设置 → 隐私与安全性 → 本地网络」中开启。
 
 ### 3.6 修改设置
 
@@ -185,6 +187,7 @@ Ships/
 | 文件 | 位置 | 结构 | 生命周期 |
 | --- | --- | --- | --- |
 | `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/ships/settings.json`） | `{ locale, theme, accent, launchAtLogin, pinWindow, clipboardLimit, clipboardPollMs }` | 持久；重启保留 |
+| `ships.log` | 同上目录 | 追加写入的文本日志（启动信息、SSH 探测过程 / 命令 / 输出 / 报错等） | 持久；用于排查本地网络与权限问题 |
 | `tool-state.json` | 同上目录 | `{ [toolKey]: any }`（如 `ipNumber.value`） | 持久；记录各工具最近输入，未修改或清空则下次恢复 |
 | `ssh-detected.json` | 同上目录 | `{ [alias]: { os, family, label, at } }` | 持久；缓存探测结果 |
 | 剪贴板历史 | 内存（不落盘） | 最近 5 条 `{ id, type, text?, thumb?, width?, height?, truncated?, at }` | 随进程退出丢失 |
@@ -202,6 +205,7 @@ Ships/
 | --- | --- | --- | --- |
 | `app:info` | — | `{ version, platform, arch, systemLocale, dataDir, dataFiles }` | 版本取 `package.json` |
 | `app:open-data-folder` | — | `{ ok, error? }` | 打开数据目录 |
+| `app:open-log` | — | `{ ok, error? }` | 在 Finder 中定位并打开 `ships.log` |
 | `app:open-external` | `url` | `{ ok, error? }` | 仅允许 `http(s)` |
 | `settings:get` | — | `settings` | |
 | `settings:set` | `patch` | 合并后的 `settings` | 副作用：写盘 + 广播 + 可能修改登录项 |
@@ -334,7 +338,7 @@ stateDiagram-v2
   - `files`：`src/**/*`、`assets/**/*`、`package.json`；依赖由 electron-builder 自动收集（`asar: true`）。
   - `npmRebuild: false`（`ssh2` 使用纯 JS 回退，无需重编原生模块）。
   - `compression: 'maximum'`；`electronLanguages: ['en', 'zh_CN']`（仅保留中英文 Electron 语言包，剔除约 220 个语言包、解包体积减少约 48MB）。
-  - `mac.target`：**仅 arm64 的 dmg**；`mac.icon = assets/imgs/icon.icns`；`hardenedRuntime = true`、`gatekeeperAssess = false`；`extendInfo.LSUIElement = true`（纯菜单栏 Agent，无 Dock）。
+  - `mac.target`：**仅 arm64 的 dmg**；`mac.icon = assets/imgs/icon.icns`；`hardenedRuntime = true`、`gatekeeperAssess = false`；`extendInfo` 含 `LSUIElement = true`（纯菜单栏 Agent，无 Dock）与 `NSLocalNetworkUsageDescription`（本地网络授权说明）。
 - **签名 / 公证（打包时自动）**：
   - 由 `hack/dist-mac.sh` 决定身份：设置了 `CSC_LINK`（CI 证书）则交给 electron-builder 导入使用；否则在钥匙串中查找 `Developer ID Application` 并设 `CSC_NAME`；都没有则设 `CSC_IDENTITY_AUTO_DISCOVERY=false` **构建未签名版本**（不会失败）。身份可用时对 `.app` 与 `dmg`（`dmg.sign = true`）自动签名。
   - **公证**：`afterSign` 钩子 `hack/notarize.cjs`，当设置 `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` 时自动公证（`SKIP_NOTARIZE=1` 可跳过）。
@@ -454,7 +458,7 @@ stateDiagram-v2
 
 ## 12. 其余要点
 
-- **数据位置**：应用数据在 `app.getPath('userData')`；SSH 配置在 `~/.ssh/config`。
+- **数据位置**：应用数据在 `app.getPath('userData')`；日志 `ships.log` 同目录；SSH 配置在 `~/.ssh/config`。
 - **调试开关**：`SHIPS_DEBUG=1` 或 `--debug` 输出详细日志；`SHIPS_SSH_CONFIG` 可覆盖 SSH 配置文件路径（测试用）。
 - **开发辅助**：`hack/capture.cjs` 可在 Electron 中加载真实界面、执行点击/输入并截图（环境变量 `OUT` / `SETTINGS_OUT` / `TAB` / `INPUT` / `PATCH` 等），不参与打包。
 - **协议与端口提示**：应用不监听端口；SSH 默认端口 22。

@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const os = require('os');
-const { execFile } = require('child_process');
+const { execFile, execFileSync } = require('child_process');
 const { EventEmitter } = require('events');
 const { Client } = require('ssh2');
 const { SSH_DETECTED_FILE } = require('../utils/paths');
@@ -22,6 +22,18 @@ function appleScriptString(value) {
 function expandHome(filePath) {
   if (!filePath) return filePath;
   return filePath.startsWith('~') ? filePath.replace(/^~/, os.homedir()) : filePath;
+}
+
+// A GUI app launched from Finder does not inherit the shell's SSH_AUTH_SOCK;
+// fall back to the value exported into launchd by the login session.
+function getAgentSocket() {
+  if (process.env.SSH_AUTH_SOCK) return process.env.SSH_AUTH_SOCK;
+  try {
+    const out = execFileSync('launchctl', ['getenv', 'SSH_AUTH_SOCK'], { encoding: 'utf8' }).trim();
+    return out || '';
+  } catch (err) {
+    return '';
+  }
 }
 
 const OS_LABELS = {
@@ -131,6 +143,7 @@ class SshService extends EventEmitter {
 
   connect(host) {
     const command = this.buildCommand(host);
+    logger.file(`[ssh] connect(alias=${host.alias}) command: ${command}`);
     const script =
       'tell application "iTerm"\n' +
       '  activate\n' +
@@ -143,7 +156,7 @@ class SshService extends EventEmitter {
     return new Promise((resolve) => {
       execFile('osascript', ['-e', script], (err) => {
         if (err) {
-          logger.warn('iTerm launch failed:', err.message);
+          logger.error(`[ssh] connect(alias=${host.alias}) failed: ${err.message}`);
           resolve({ ok: false, error: err.message, command });
           return;
         }
@@ -154,6 +167,7 @@ class SshService extends EventEmitter {
 
   detect(host) {
     if (!host || !host.alias || this.pending.has(host.alias)) return;
+    logger.file(`[ssh] detect start alias=${host.alias} host=${host.hostName} port=${host.port} user=${host.user || '-'} identity=${host.identityFile || '-'}`);
     this.pending.add(host.alias);
     this.runDetect(host)
       .then((info) => {
@@ -161,7 +175,7 @@ class SshService extends EventEmitter {
         this.setDetected(host.alias, info);
       })
       .catch((err) => {
-        logger.warn('detect failed:', err.message);
+        logger.error(`[ssh] detect(alias=${host.alias}) failed: ${err.message}`);
         this.pending.delete(host.alias);
         this.setDetected(host.alias, UNKNOWN_OS);
       });
@@ -170,6 +184,7 @@ class SshService extends EventEmitter {
   runDetect(host) {
     return new Promise((resolve) => {
       const client = new Client();
+      const agentSocket = getAgentSocket();
       const options = {
         host: host.hostName,
         port: Number(host.port) || 22,
@@ -177,14 +192,20 @@ class SshService extends EventEmitter {
         readyTimeout: 8000,
         keepaliveInterval: 0,
       };
-      if (process.env.SSH_AUTH_SOCK) options.agent = process.env.SSH_AUTH_SOCK;
+      if (agentSocket) options.agent = agentSocket;
       if (host.identityFile) {
         try {
           options.privateKey = fs.readFileSync(expandHome(host.identityFile));
         } catch (err) {
-          logger.debug('read identity file failed:', err.message);
+          logger.error(`[ssh] read identity file failed (${host.identityFile}): ${err.message}`);
         }
       }
+
+      logger.file(
+        `[ssh] connecting ${host.alias} -> ${options.host}:${options.port} ` +
+          `user=${options.username || '-'} agent=${agentSocket || '-'} ` +
+          `privateKey=${options.privateKey ? 'yes' : 'no'}`
+      );
 
       let settled = false;
       const finish = (info) => {
@@ -200,38 +221,55 @@ class SshService extends EventEmitter {
 
       client.on('ready', () => {
         const command = "uname -s 2>/dev/null; echo '|||'; (cat /etc/os-release 2>/dev/null || true)";
+        logger.file(`[ssh] ready ${host.alias}; exec: ${command}`);
         client.exec(command, (err, stream) => {
-          if (err) return finish(UNKNOWN_OS);
+          if (err) {
+            logger.error(`[ssh] exec failed (${host.alias}): ${err.message}`);
+            return finish(UNKNOWN_OS);
+          }
           let out = '';
+          let errOut = '';
           stream.on('data', (data) => {
             out += data.toString();
           });
-          stream.stderr.on('data', () => {});
+          stream.stderr.on('data', (data) => {
+            errOut += data.toString();
+          });
           stream.on('close', () => {
+            logger.file(`[ssh] output ${host.alias}: ${JSON.stringify(out.trim())}`);
+            if (errOut.trim()) logger.file(`[ssh] stderr ${host.alias}: ${JSON.stringify(errOut.trim())}`);
             const info = parseOsInfo(out);
-            if (info) return finish(info);
+            if (info) {
+              logger.file(`[ssh] result ${host.alias}: ${JSON.stringify(info)}`);
+              return finish(info);
+            }
             client.exec('cmd /c ver', (winErr, winStream) => {
               if (winErr) return finish(UNKNOWN_OS);
               let winOut = '';
               winStream.on('data', (data) => {
                 winOut += data.toString();
               });
-              winStream.on('close', () =>
-                finish(
-                  winOut.toLowerCase().includes('windows')
-                    ? { os: 'windows', family: 'windows', label: 'Windows' }
-                    : UNKNOWN_OS
-                )
-              );
+              winStream.on('close', () => {
+                const isWindows = winOut.toLowerCase().includes('windows');
+                logger.file(`[ssh] windows fallback ${host.alias}: ${isWindows}`);
+                finish(isWindows ? { os: 'windows', family: 'windows', label: 'Windows' } : UNKNOWN_OS);
+              });
             });
           });
         });
       });
 
-      client.on('error', () => finish(UNKNOWN_OS));
+      client.on('error', (err) => {
+        logger.error(`[ssh] connection error (${host.alias} ${options.host}:${options.port}): ${err.message}`);
+        finish(UNKNOWN_OS);
+      });
+      client.on('close', (hadError) => {
+        if (hadError) logger.file(`[ssh] connection closed with error (${host.alias})`);
+      });
       try {
         client.connect(options);
       } catch (err) {
+        logger.error(`[ssh] connect throw (${host.alias}): ${err.message}`);
         finish(UNKNOWN_OS);
       }
     });

@@ -12,9 +12,10 @@ try {
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const SSH_DETECTED_FILE = path.join(DATA_DIR, 'ssh-detected.json');
 const TOOL_STATE_FILE = path.join(DATA_DIR, 'tool-state.json');
+const LOG_FILE = path.join(DATA_DIR, 'ships.log');
 const SSH_CONFIG_FILE = process.env.SHIPS_SSH_CONFIG || path.join(os.homedir(), '.ssh', 'config');
 
-const DATA_FILES = [SETTINGS_FILE, SSH_DETECTED_FILE, TOOL_STATE_FILE];
+const DATA_FILES = [SETTINGS_FILE, SSH_DETECTED_FILE, TOOL_STATE_FILE, LOG_FILE];
 
 function describeDataFiles() {
   return DATA_FILES.map((file) => ({ file, dir: path.dirname(file) }));
@@ -25,6 +26,7 @@ module.exports = {
   SETTINGS_FILE,
   SSH_DETECTED_FILE,
   TOOL_STATE_FILE,
+  LOG_FILE,
   SSH_CONFIG_FILE,
   DATA_FILES,
   describeDataFiles,

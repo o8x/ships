@@ -17,6 +17,7 @@ const api = {
   onSettingsChanged: (cb) => on(IPC.SETTINGS_CHANGED, cb),
   onThemeChanged: (cb) => on(IPC.THEME_CHANGED, cb),
   openDataFolder: () => ipcRenderer.invoke(IPC.OPEN_DATA_FOLDER),
+  openLog: () => ipcRenderer.invoke(IPC.OPEN_LOG),
   openExternal: (url) => ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url),
   closeSettings: () => ipcRenderer.send(IPC.WINDOW_CLOSE_SETTINGS),
   openDevTools: (target) => ipcRenderer.invoke(IPC.DEVTOOLS_OPEN, target),

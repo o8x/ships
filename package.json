@@ -78,7 +78,8 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "extendInfo": {
-        "LSUIElement": true
+        "LSUIElement": true,
+        "NSLocalNetworkUsageDescription": "Ships 需要访问本地网络以探测和连接你的 SSH 主机。"
       },
       "artifactName": "${productName}-v${version}-${arch}.${ext}"
     },

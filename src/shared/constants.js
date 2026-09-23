@@ -12,6 +12,7 @@ const IPC = {
 
   APP_INFO: 'app:info',
   OPEN_DATA_FOLDER: 'app:open-data-folder',
+  OPEN_LOG: 'app:open-log',
   OPEN_EXTERNAL: 'app:open-external',
 
   WINDOW_HIDE: 'window:hide',

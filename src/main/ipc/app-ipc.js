@@ -2,7 +2,7 @@
 
 const { app, shell } = require('electron');
 const { IPC, VERSION } = require('../../shared/constants');
-const { DATA_DIR, describeDataFiles } = require('../utils/paths');
+const { DATA_DIR, LOG_FILE, describeDataFiles } = require('../utils/paths');
 
 function registerAppIpc(ipcMain) {
   ipcMain.handle(IPC.APP_INFO, () => ({
@@ -18,6 +18,12 @@ function registerAppIpc(ipcMain) {
     const err = await shell.openPath(DATA_DIR);
     if (err) return { ok: false, error: err };
     return { ok: true };
+  });
+
+  ipcMain.handle(IPC.OPEN_LOG, async () => {
+    if (shell.showItemInFolder) shell.showItemInFolder(LOG_FILE);
+    const err = await shell.openPath(LOG_FILE);
+    return err ? { ok: false, error: err } : { ok: true };
   });
 
   ipcMain.handle(IPC.OPEN_EXTERNAL, async (_event, url) => {
