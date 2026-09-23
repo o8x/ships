@@ -415,3 +415,84 @@ input[type='color'].swatch::-webkit-color-swatch {
 .json-preview {
   color: var(--color-fg-muted);
 }
+
+/* ------------------------------- Motion -------------------------------- */
+@keyframes ships-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ships-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ships-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Tool / settings section content enters with a soft rise. */
+#content > * {
+  animation: ships-fade-up 0.18s ease both;
+}
+#settings-pane > * {
+  animation: ships-fade-up 0.18s ease both;
+}
+#settings-nav > * {
+  animation: ships-fade 0.18s ease both;
+}
+
+/* Tabs */
+.tab {
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+.tab:active {
+  transform: scale(0.9);
+}
+.tab-active {
+  animation: ships-pop 0.16s ease;
+}
+
+/* Segmented control */
+.segment button {
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease,
+    transform 0.1s ease;
+}
+.segment button:active {
+  transform: scale(0.95);
+}
+
+/* Settings navigation */
+.settings-nav-item {
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+/* Custom select menu / options */
+.select-menu {
+  animation: ships-pop 0.12s ease both;
+  transform-origin: top center;
+}
+.select-option {
+  transition: background 0.12s ease;
+}
+
+/* JSON view switching */
+.json-editor,
+.json-tree {
+  animation: ships-fade 0.16s ease both;
+}
