@@ -19,6 +19,7 @@ const api = {
   openDataFolder: () => ipcRenderer.invoke(IPC.OPEN_DATA_FOLDER),
   openExternal: (url) => ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url),
   closeSettings: () => ipcRenderer.send(IPC.WINDOW_CLOSE_SETTINGS),
+  openDevTools: (target) => ipcRenderer.invoke(IPC.DEVTOOLS_OPEN, target),
   sshConfig: {
     read: () => ipcRenderer.invoke(IPC.SSH_CONFIG_READ),
     upsert: (host) => ipcRenderer.invoke(IPC.SSH_CONFIG_UPSERT, host),

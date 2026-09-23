@@ -20,6 +20,7 @@ const IPC = {
   THEME_CHANGED: 'theme:changed',
 
   GEO_LOOKUP: 'geo:lookup',
+  DEVTOOLS_OPEN: 'devtools:open',
 
   SSH_LIST: 'ssh:list',
   SSH_CONNECT: 'ssh:connect',

@@ -7,7 +7,7 @@
   i18n.extend({
     zh: {
       subnet: {
-        input: '🧮 网段 / 掩码',
+        input: '网段 / 掩码',
         placeholder: '如 192.168.1.10/24 或 192.168.1.0 255.255.255.0',
         defaultMask: '未指定掩码，默认按 /24 计算',
         network: '网络地址',
@@ -19,7 +19,7 @@
         prefix: '网络前缀',
         binaryMask: '掩码二进制',
         scope: '地址类型',
-        geo: '📍 归属地',
+        geo: '归属地',
         cidr: 'CIDR',
         errorIp: 'IP 地址无效',
         errorMask: '掩码无效',
@@ -34,7 +34,7 @@
     },
     en: {
       subnet: {
-        input: '🧮 Subnet / mask',
+        input: 'Subnet / mask',
         placeholder: 'e.g. 192.168.1.10/24 or 192.168.1.0 255.255.255.0',
         defaultMask: 'No mask given, using /24',
         network: 'Network',
@@ -46,7 +46,7 @@
         prefix: 'Prefix',
         binaryMask: 'Netmask binary',
         scope: 'Scope',
-        geo: '📍 Location',
+        geo: 'Location',
         cidr: 'CIDR',
         errorIp: 'Invalid IP address',
         errorMask: 'Invalid mask',

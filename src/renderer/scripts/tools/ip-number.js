@@ -7,13 +7,13 @@
   i18n.extend({
     zh: {
       ipNumber: {
-        input: '🌐 IP 地址 / 数字',
+        input: 'IP 地址 / 数字',
         placeholder: '如 192.168.1.1 或 3232235777',
         address: 'IP 地址',
         decimal: '十进制',
         hex: '十六进制',
         binary: '二进制',
-        geo: '📍 归属地',
+        geo: '归属地',
         kindIpv4: '识别为 IPv4',
         kindIpv6: '识别为 IPv6',
         kindNumber: '识别为数字',
@@ -25,13 +25,13 @@
     },
     en: {
       ipNumber: {
-        input: '🌐 IP address / number',
+        input: 'IP address / number',
         placeholder: 'e.g. 192.168.1.1 or 3232235777',
         address: 'IP address',
         decimal: 'Decimal',
         hex: 'Hex',
         binary: 'Binary',
-        geo: '📍 Location',
+        geo: 'Location',
         kindIpv4: 'Detected IPv4',
         kindIpv6: 'Detected IPv6',
         kindNumber: 'Detected number',

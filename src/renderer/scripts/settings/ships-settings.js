@@ -27,6 +27,9 @@
         open: '打开',
         about: '关于',
         version: '版本',
+        developer: '开发者',
+        devPopover: '悬浮界面开发者工具',
+        devSettings: '设置界面开发者工具',
       },
     },
     en: {
@@ -50,6 +53,9 @@
         open: 'Open',
         about: 'About',
         version: 'Version',
+        developer: 'Developer',
+        devPopover: 'Popover DevTools',
+        devSettings: 'Settings DevTools',
       },
     },
   });
@@ -112,7 +118,10 @@
       { value: 'light', label: i18n.t('settingsPage.themeLight') },
       { value: 'dark', label: i18n.t('settingsPage.themeDark') },
     ];
-    const themeSegment = segmented(themeOptions, settings.theme || 'system', (value) => patch({ theme: value }));
+    const themeSegment = segmented(themeOptions, settings.theme || 'system', (value) => {
+      themeSegment.set(value);
+      patch({ theme: value });
+    });
     appearanceSection.appendChild(
       row(i18n.t('settingsPage.appearance'), i18n.t('settingsPage.appearanceHint'), themeSegment.root)
     );
@@ -163,7 +172,16 @@
       row(i18n.t('settingsPage.version'), '', el('span', { class: 'font-mono text-[12px] text-fg-muted' }, `v${(info && info.version) || ''}`))
     );
 
-    pane.append(languageSection, appearanceSection, generalSection, aboutSection);
+    const devSection = section(i18n.t('settingsPage.developer'));
+    function devButton(target) {
+      const button = el('button', { class: 'btn shrink-0', type: 'button' }, i18n.t('settingsPage.open'));
+      button.addEventListener('click', () => window.ships.openDevTools(target));
+      return button;
+    }
+    devSection.appendChild(row(i18n.t('settingsPage.devPopover'), '', devButton('main')));
+    devSection.appendChild(row(i18n.t('settingsPage.devSettings'), '', devButton('settings')));
+
+    pane.append(languageSection, appearanceSection, generalSection, aboutSection, devSection);
   }
 
   window.ShipsSettingsRegistry.register({

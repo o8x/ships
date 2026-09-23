@@ -8,7 +8,7 @@
   i18n.extend({
     zh: {
       json: {
-        hint: '📋 粘贴 JSON 自动原地格式化',
+        hint: '粘贴 JSON 自动原地格式化',
         indent: '缩进',
         indent2: '2 空格',
         indent4: '4 空格',
@@ -29,7 +29,7 @@
     },
     en: {
       json: {
-        hint: '📋 Paste JSON to format in place',
+        hint: 'Paste JSON to format in place',
         indent: 'Indent',
         indent2: '2 spaces',
         indent4: '4 spaces',

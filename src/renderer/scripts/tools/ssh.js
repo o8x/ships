@@ -7,7 +7,7 @@
   i18n.extend({
     zh: {
       ssh: {
-        title: '🖥 主机',
+        title: '主机',
         refresh: '刷新',
         empty: '未找到主机，请检查 ~/.ssh/config',
         connect: '连接',
@@ -24,7 +24,7 @@
     },
     en: {
       ssh: {
-        title: '🖥 Hosts',
+        title: 'Hosts',
         refresh: 'Refresh',
         empty: 'No hosts found. Check ~/.ssh/config',
         connect: 'Connect',

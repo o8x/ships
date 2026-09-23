@@ -165,10 +165,10 @@ Ships/
 | 字符串编码转换 | 字符串 ↔ 十六进制 / ASCII 十进制 / Base64 双向实时同步（UTF-8） | 输入非法时标红不联动 |
 | JSON 格式化 | 粘贴/失焦后**原地格式化**（默认 4 空格）并语法高亮；键排序；压缩；清空；复制；错误定位（行列）；**结构查看**（可折叠树） | 超过 1MB 仅格式化不高亮；缩进 2/4/Tab；输入改变仅重高亮 |
 | SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示彩色系统图标、`user@host(:port)`（22 不显示端口）、别名、连接与探测按钮；探测完成后在面板给出提示，面板隐藏时发系统通知 | 忽略通配符主机（如 `Host *`）；未探测显示通用主机图标 |
-| 设置 · Ships | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、打开数据文件夹、关于 | 见 §5.1 |
+| 设置 · Ships | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、打开数据文件夹、关于、开发者（打开悬浮界面 / 设置界面 DevTools） | 见 §5.1 |
 | 设置 · SSH 管理 | `~/.ssh/config` 主机的增删改（别名/HostName/User/Port/IdentityFile/ProxyJump） | 别名必填；删除二次确认 |
 | 底部栏 | 左显示版本号，右为设置入口 | 版本取 `package.json` |
-| 通用交互 | 所有下拉框为 Tailwind 自绘（非系统 `<select>`）；TAB 与图标按钮悬浮显示提示；关键区块用 emoji / 彩色图标点缀 | 见 §11 |
+| 通用交互 | 所有下拉框为 Tailwind 自绘（非系统 `<select>`）；TAB 与图标按钮悬浮显示提示；SSH 系统图标与国旗着色 | 见 §11 |
 
 ---
 
@@ -204,6 +204,7 @@ Ships/
 | `ssh-config:upsert` | `host` | 更新后的 `hosts` | 保留未管理指令与注释 |
 | `ssh-config:remove` | `alias` | 更新后的 `hosts` | |
 | `geo:lookup` | `ip`（IPv4 字符串） | `{ iso_3166, country, province, city, isp }` 或 `null` | 本地 `assets/geoip.json` 查询；内网返回 `{ isp: '保留地址' }` |
+| `devtools:open` | `'main' \| 'settings'` | `{ ok }` | 打开对应窗口的开发者工具（detach 模式；主面板会先显示） |
 
 **send（渲染 → 主，单向）**
 
@@ -381,10 +382,10 @@ stateDiagram-v2
 
 | 变量 | 浅色 | 深色 |
 | --- | --- | --- |
-| `--color-bg` | `#f3f4f6` | `#1c1c1e` |
+| `--color-bg` | `#ffffff` | `#1c1c1e` |
 | `--color-surface` | `#ffffff` | `#2a2a2c` |
-| `--color-surface-2` | `#f5f5f7` | `#333336` |
-| `--color-surface-3` | `#e9eaee` | `#3d3d41` |
+| `--color-surface-2` | `#f4f4f6` | `#333336` |
+| `--color-surface-3` | `#e9e9ec` | `#3d3d41` |
 | `--color-border` | `rgba(0,0,0,.09)` | `rgba(255,255,255,.1)` |
 | `--color-fg` | `#1d1d1f` | `#f5f5f7` |
 | `--color-fg-muted` | `#8a8a8f` | `#98989f` |
@@ -412,7 +413,7 @@ stateDiagram-v2
 
 - 输入 `field`、按钮 `btn` / `btn-accent`、图标按钮 `icon-btn`、结果行 `row-card`、TAB `tab` / `tab-active`、开关 `switch`、分段控件 `segment`、色块 `swatch`。
 - 自绘控件：下拉框 `select-trigger` / `select-menu` / `select-option`（`ShipsUI.createSelect`，替代系统 `<select>`）；悬浮提示 `ships-tip`（`ShipsUI.initTooltips`，元素加 `data-tip`）；JSON 覆盖式高亮编辑器 `json-editor` 与结构树 `json-tree`。
-- 视觉点缀：工具区块标题使用 emoji（如 ⏱️ / 🌐 / 🧮 / 🔢 / 📋 / 🖥）；SSH 操作系统图标按系统着色（macOS 灰 / Linux 橙 / Windows 蓝 / BSD 红）；IP 归属地展示彩色国旗。
+- 视觉点缀：不使用 emoji；SSH 操作系统图标按系统着色（macOS 灰 / Linux 橙 / Windows 蓝 / BSD 红）；IP 归属地展示彩色国旗。
 - 图标按钮与 TAB 一律通过 `data-tip` 提供悬浮说明。
 
 **平台差异**

@@ -5,6 +5,8 @@ const {
   hideMainWindow,
   openSettingsWindow,
   closeSettingsWindow,
+  getMainWindow,
+  getSettingsWindow,
 } = require('../window-manager');
 
 function registerWindowIpc(ipcMain) {
@@ -14,6 +16,14 @@ function registerWindowIpc(ipcMain) {
     openSettingsWindow();
   });
   ipcMain.on(IPC.WINDOW_CLOSE_SETTINGS, () => closeSettingsWindow());
+
+  ipcMain.handle(IPC.DEVTOOLS_OPEN, (_event, target) => {
+    const win = target === 'settings' ? getSettingsWindow() : getMainWindow();
+    if (!win) return { ok: false };
+    if (target !== 'settings') win.show();
+    win.webContents.openDevTools({ mode: 'detach' });
+    return { ok: true };
+  });
 }
 
 module.exports = { registerWindowIpc };

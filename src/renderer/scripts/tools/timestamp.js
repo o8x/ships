@@ -7,7 +7,7 @@
   i18n.extend({
     zh: {
       timestamp: {
-        now: '⏱️ 当前时间',
+        now: '当前时间',
         toDate: '时间戳 → 日期',
         toTs: '日期 → 时间戳',
         timestamp: '时间戳',
@@ -31,7 +31,7 @@
     },
     en: {
       timestamp: {
-        now: '⏱️ Current time',
+        now: 'Current time',
         toDate: 'Timestamp → Date',
         toTs: 'Date → Timestamp',
         timestamp: 'Timestamp',

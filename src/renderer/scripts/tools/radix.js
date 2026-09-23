@@ -7,7 +7,7 @@
   i18n.extend({
     zh: {
       radix: {
-        hint: '🔢 在任意一行输入，其余进制实时同步',
+        hint: '在任意一行输入，其余进制实时同步',
         bin: '二进制',
         oct: '八进制',
         dec: '十进制',
@@ -22,7 +22,7 @@
     },
     en: {
       radix: {
-        hint: '🔢 Type in any row to sync all bases',
+        hint: 'Type in any row to sync all bases',
         bin: 'Binary',
         oct: 'Octal',
         dec: 'Decimal',
