@@ -1,6 +1,6 @@
 {
   "name": "ships",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "A macOS menu bar toolbox for developers.",
   "author": "Ships",
   "license": "MIT",
@@ -29,7 +29,7 @@
   "ships": {
     "showDockIcon": false,
     "window": {
-      "width": 400,
+      "width": 380,
       "height": 500,
       "gapBelowTray": 6,
       "cornerRadius": 12
