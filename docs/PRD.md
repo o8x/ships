@@ -141,9 +141,9 @@ Ships/
 ### 3.5 SSH 操作系统探测
 
 1. 点击探测图标 → `ssh:detect`（仅传 `alias`），主进程立即返回 `{ queued: true }`，在**后台**执行。
-2. 使用 `ssh2` 连接（优先 `SSH_AUTH_SOCK` 代理；有 `IdentityFile` 时读取私钥），执行 `uname -s`；识别不到时回退 `cmd /c ver`。
-3. 归类为 `macos` / `linux` / `windows` / `bsd` / `unknown`。
-4. 结果写入 `ssh-detected.json` 并广播 `ssh:detected` 事件；渲染层据此更新左侧系统图标。
+2. 使用 `ssh2` 连接（优先 `SSH_AUTH_SOCK` 代理；有 `IdentityFile` 时读取私钥），执行 `uname -s; echo '|||'; cat /etc/os-release`；识别不到时回退 `cmd /c ver`。
+3. 归类到具体系统 / 发行版：Linux 读取 `/etc/os-release` 的 `ID`（如 `ubuntu` / `fedora` / `arch` / `centos` / `debian` / `rhel` / `alpine` …），macOS 为 `macos`，BSD 为 `freebsd` / `openbsd` 等，Windows 为 `windows`；同时给出 `family`（`macos`/`linux`/`windows`/`bsd`/`unknown`）与显示名 `label`。
+4. 结果（`{ os, family, label, at }`）写入 `ssh-detected.json` 并广播 `ssh:detected` 事件；渲染层据此更新左侧彩色系统图标与提示。
 5. 探测进行中该按钮显示旋转态并禁用；同一 alias 去重（`pending` 集合）。
 
 ### 3.6 修改设置
@@ -159,13 +159,13 @@ Ships/
 | 功能 | 说明 | 默认值 / 条件 |
 | --- | --- | --- |
 | 时间戳转换 | 秒 / 毫秒 / 纳秒与日期互转；顶部显示实时当前时间；时间戳行支持自动识别单位（≤11 位为秒、≤15 位为毫秒、否则纳秒），单位用自绘下拉选择 | 实时；不可识别的输入显示错误 |
-| IP 与数字转换 | IPv4/IPv6 与十进制、十六进制、二进制互转；自动识别输入类型；显示 IP 归属地（国旗 + 国家/省/市 + ISP，来自 `geo:lookup`） | 数字超过 `4294967295` 时 IP 行为空并提示；IPv6 不查归属地 |
+| IP 与数字转换 | IPv4/IPv6 与十进制、十六进制、二进制互转；自动识别输入类型；显示 IP 归属地（国旗 + 国家/省/市 + ISP，来自 `geo:lookup`）。输入为 IP 时不再重复展示 IP 卡片；输入为数字时在识别行内给出对应 IP | 数字超过 `4294967295` 时提示；IPv6 不查归属地；归属地卡片固定高度，无运营商显示 `-` |
 | 网段与掩码计算 | 支持 `IP/前缀`、`IP 掩码`；输出网络地址、广播地址、可用范围、主机数、掩码、反掩码、前缀、掩码二进制、地址类型；并显示输入 IP 的归属地 | 未给掩码时按 `/24` 计算并提示 |
 | 进制转换 | 2/8/10/16 进制四行双向实时同步；另有 2–36 自定义进制（自绘下拉）；“位宽/字节”统计 | 任一行输入即联动其余 |
 | 字符串编码转换 | 字符串 ↔ 十六进制 / ASCII 十进制 / Base64 双向实时同步（UTF-8） | 输入非法时标红不联动 |
 | JSON 格式化 | 粘贴/失焦后**原地格式化**（默认 4 空格）并语法高亮；键排序；压缩；清空；复制；错误定位（行列）；**结构查看**（可折叠树） | 超过 1MB 仅格式化不高亮；缩进 2/4/Tab；输入改变仅重高亮 |
-| SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示彩色系统图标、`user@host(:port)`（22 不显示端口）、别名、连接与探测按钮；探测完成后在面板给出提示，面板隐藏时发系统通知 | 忽略通配符主机（如 `Host *`）；未探测显示通用主机图标 |
-| 设置 · Ships | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、打开数据文件夹、关于、开发者（打开悬浮界面 / 设置界面 DevTools） | 见 §5.1 |
+| SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示彩色系统图标、`user@host(:port)`（22 不显示端口）、别名、连接与探测按钮；探测识别到具体系统 / 发行版（Ubuntu、Fedora、Arch、CentOS、macOS、Windows…），完成后在面板给出提示，面板隐藏时发系统通知 | 忽略通配符主机（如 `Host *`）；未探测显示通用主机图标 |
+| 设置 · Ships | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、固定悬浮（置顶常驻、失焦不隐藏）、打开数据文件夹、关于、开发者（打开悬浮界面 / 设置界面 DevTools） | 见 §5.1 |
 | 设置 · SSH 管理 | `~/.ssh/config` 主机的增删改（别名/HostName/User/Port/IdentityFile/ProxyJump） | 别名必填；删除二次确认 |
 | 底部栏 | 左显示版本号，右为设置入口 | 版本取 `package.json` |
 | 通用交互 | 所有下拉框为 Tailwind 自绘（非系统 `<select>`）；TAB 与图标按钮悬浮显示提示；SSH 系统图标与国旗着色 | 见 §11 |
@@ -178,8 +178,8 @@ Ships/
 
 | 文件 | 位置 | 结构 | 生命周期 |
 | --- | --- | --- | --- |
-| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/ships/settings.json`） | `{ locale, theme, accent, launchAtLogin }` | 持久；重启保留 |
-| `ssh-detected.json` | 同上目录 | `{ [alias]: { os, at } }` | 持久；缓存探测结果 |
+| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/ships/settings.json`） | `{ locale, theme, accent, launchAtLogin, pinWindow }` | 持久；重启保留 |
+| `ssh-detected.json` | 同上目录 | `{ [alias]: { os, family, label, at } }` | 持久；缓存探测结果 |
 | `~/.ssh/config` | 用户主目录 | 标准 OpenSSH 配置 | 由设置内 SSH 管理读写；未加密（非机密） |
 
 - 机密数据：本应用不保存密码 / 令牌；SSH 私钥仍由用户自行管理与使用，不复制、不落盘到应用数据目录。
@@ -278,7 +278,7 @@ sequenceDiagram
   R->>M: ssh:detect { alias }
   M-->>R: { queued: true }
   M->>M: 按 alias 查 ~/.ssh/config
-  M->>H: ssh2 连接并执行 uname -s
+  M->>H: ssh2 连接并读取 uname + /etc/os-release
   H-->>M: 输出
   M->>M: 归类 macos/linux/windows/bsd/unknown
   M->>M: 写入 ssh-detected.json
@@ -328,7 +328,7 @@ stateDiagram-v2
 ### 8.1 主面板（托盘弹出）
 
 - 尺寸：**400 × 500**（`ships.window.width/height`），无边框、透明、不可缩放、置顶、不占 Dock。
-- 结构：顶部 TAB 栏（高 46px）→ 内容区（可滚动）→ 底部栏（高 34px）。
+- 结构：顶部 TAB 栏（高 46px，**左对齐**，左右各 16px padding）→ 内容区（可滚动）→ 底部栏（高 34px）。
 - 圆角：外层面板 `--radius-window`（12px），透明窗口使圆角外露。
 - 底部栏：左侧版本号（`vX.Y.Z`），右侧设置按钮（齿轮）。
 - `Escape` 隐藏面板；失焦自动隐藏。
@@ -365,7 +365,7 @@ stateDiagram-v2
 ## 10. 连接测试
 
 - 面板本身无独立“连接测试”流程；SSH 的可用性通过 **SSH 管理 → 探测操作系统** 隐式验证：
-  - 步骤：点击探测 → 后台 `ssh2` 连接 → 执行 `uname -s`。
+  - 步骤：点击探测 → 后台 `ssh2` 连接 → 读取 `uname -s` 与 `/etc/os-release`，识别到具体发行版。
   - 成功判定：连接建立且命令返回可识别系统。
   - 超时：`readyTimeout = 8000ms`；失败归类为 `unknown`。
 
