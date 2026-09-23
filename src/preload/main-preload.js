@@ -2,6 +2,7 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 const { IPC } = require('../shared/constants');
+const { loadIcons } = require('./icons');
 
 function on(channel, cb) {
   const listener = (_event, payload) => cb(payload);
@@ -28,3 +29,4 @@ const api = {
 };
 
 contextBridge.exposeInMainWorld('ships', api);
+contextBridge.exposeInMainWorld('shipsIcons', loadIcons());

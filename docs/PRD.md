@@ -30,6 +30,7 @@
 | 修改设置项 | §3 核心流程、§5.1 本地数据、§4 功能清单 |
 | 修改 SSH 相关行为 | §3 核心流程、§5.1 本地数据、§5.2、§6 流程图 |
 | 修改样式常量 | §11 GUI 与布局规范、`src/renderer/styles/constants.css` |
+| 新增 / 修改图标 | §8.3 图标与资源、`assets/icons/` |
 | 修改构建 / 脚本 / 依赖 / CI | §7 构建与发布、`package.json`、`pnpm-lock.yaml`、`.github/workflows/*.yml` |
 
 ---
@@ -49,7 +50,7 @@
 
 - **主进程**（`src/main/`）：创建托盘与窗口、读写本地数据、解析 `~/.ssh/config`、执行 iTerm 连接与 SSH 探测、注册 IPC。
 - **预加载脚本**（`src/preload/`）：在 `contextIsolation: true`、`nodeIntegration: false`、`sandbox: false` 下运行，用 `contextBridge` 暴露白名单 API（主面板用 `main-preload.js`，设置窗口用 `settings-preload.js`）。
-- **渲染进程**（`src/renderer/`）：两个页面 —— 托盘主面板 `index.html` 与设置窗口 `settings.html`；不含 Node 能力，仅通过 `window.ships` 与主进程通信。
+- **渲染进程**（`src/renderer/`）：两个页面 —— 托盘主面板 `index.html` 与设置窗口 `settings.html`；不含 Node 能力，仅通过 `window.ships`（能力）与 `window.shipsIcons`（图标）与主进程 / 预加载通信。
 - **无 Webview**：不内嵌远程 Web，无 guest 进程。
 
 **项目结构**
@@ -61,7 +62,8 @@ Ships/
 ├── AGENTS.md                    # 客户端设计与编码约定
 ├── README.md                    # 应用图标 + 一句话概述
 ├── docs/PRD.md                  # 本文件
-├── assets/icons/                # 托盘与 App 图标（脚本生成）
+├── assets/icons/                # 图标资源（PNG + SVG）
+│   ├── *.svg                    # 界面 SVG 图标（kebab-case，统一由预加载读取）
 │   ├── trayTemplate.png         # 托盘模板图标（18/36/54 @1x/@2x/@3x）
 │   ├── app.png                  # 应用图标（512，README 引用）
 │   └── icon.icns                # 打包用 macOS 图标
@@ -77,7 +79,7 @@ Ships/
     │   ├── ipc/                 # IPC 处理器（app / settings / window / ssh）
     │   ├── services/            # settings / ssh-config / ssh 服务
     │   └── utils/               # logger / json-store / paths
-    ├── preload/                 # main-preload.js / settings-preload.js
+    ├── preload/                 # main-preload.js / settings-preload.js / icons.js（读取 assets/icons/*.svg）
     └── renderer/
         ├── index.html           # 托盘主面板
         ├── settings.html        # 设置窗口
@@ -332,6 +334,7 @@ stateDiagram-v2
 
 ### 8.3 图标与资源
 
+- **SVG 图标**：所有界面图标以独立 `.svg` 文件存放于 `assets/icons/`（kebab-case 命名，如 `clock.svg`、`arrow-left.svg`），**代码中不硬编码** SVG 标记；由 `src/preload/icons.js` 在启动时读取目录、转成 camelCase 键名并经 `contextBridge` 暴露为 `window.shipsIcons`，渲染层 `ShipsUI.Icons[name](size)` 注入尺寸后使用。新增 / 修改图标只需增删 / 编辑文件。
 - 托盘图标：`assets/icons/trayTemplate.png`（模板图，适配深浅菜单栏）。
 - 应用图标：`assets/icons/app.png`（README 引用）。
 - 图标由 `scripts/gen-icons.mjs` 零依赖生成；也可手工替换同名文件。
