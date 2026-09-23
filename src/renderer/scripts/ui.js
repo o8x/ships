@@ -171,7 +171,10 @@ window.ShipsUI = (function createUI() {
     const root = el('div', { class: 'segment shrink-0' });
     const buttons = (options || []).map((option) => {
       const button = el('button', { type: 'button', dataset: { value: option.value } }, option.label);
-      button.addEventListener('click', () => onSelect(option.value));
+      button.addEventListener('click', () => {
+        set(option.value);
+        onSelect(option.value);
+      });
       root.appendChild(button);
       return button;
     });
