@@ -1,13 +1,13 @@
 'use strict';
 
 (function registerTimestampTool() {
-  const { el, section, field, resultRow } = window.ShipsUI;
+  const { el, section, field, resultRow, createSelect } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
     zh: {
       timestamp: {
-        now: '当前时间',
+        now: '⏱️ 当前时间',
         toDate: '时间戳 → 日期',
         toTs: '日期 → 时间戳',
         timestamp: '时间戳',
@@ -31,7 +31,7 @@
     },
     en: {
       timestamp: {
-        now: 'Current time',
+        now: '⏱️ Current time',
         toDate: 'Timestamp → Date',
         toTs: 'Date → Timestamp',
         timestamp: 'Timestamp',
@@ -161,14 +161,17 @@
       placeholder: i18n.t('timestamp.placeholderTs'),
       inputmode: 'numeric',
     });
-    const unitSelect = el('select', { class: 'field' });
-    for (const unit of ['auto', 's', 'ms', 'ns']) {
-      unitSelect.appendChild(el('option', { value: unit }, unitLabel(unit)));
-    }
     const tsRow = el('div', { class: 'flex items-end gap-2' });
-    const unitWrap = el('div', { class: 'w-[112px] shrink-0' });
-    unitWrap.appendChild(unitSelect);
-    tsRow.append(tsField.wrapper, unitWrap);
+    tsField.wrapper.classList.add('min-w-0', 'flex-1');
+    tsField.wrapper.style.marginBottom = '0';
+    const unitSelect = createSelect({
+      options: ['auto', 's', 'ms', 'ns'].map((unit) => ({ value: unit, label: unitLabel(unit) })),
+      value: 'auto',
+      align: 'right',
+      className: 'w-[116px] shrink-0',
+      onChange: updateFromTimestamp,
+    });
+    tsRow.append(tsField.wrapper, unitSelect.el);
     const detected = el('div', { class: 'mt-1 text-[11px] text-fg-muted' }, '');
     toDateSection.append(tsRow, detected);
 
@@ -202,7 +205,7 @@
     }
 
     function updateFromTimestamp() {
-      const parsed = parseTimestamp(tsField.input.value, unitSelect.value);
+      const parsed = parseTimestamp(tsField.input.value, unitSelect.getValue());
       if (!parsed) {
         detected.textContent = tsField.input.value.trim() ? i18n.t('timestamp.detected', { unit: '—' }) : '';
         for (const key of Object.keys(dateRows)) dateRows[key].set(null);
@@ -228,7 +231,6 @@
 
     tsField.input.addEventListener('input', updateFromTimestamp);
     tsField.input.addEventListener('blur', updateFromTimestamp);
-    unitSelect.addEventListener('change', updateFromTimestamp);
     dateField.input.addEventListener('input', updateFromDate);
     dateField.input.addEventListener('blur', updateFromDate);
 

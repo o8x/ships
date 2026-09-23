@@ -1,13 +1,13 @@
 'use strict';
 
 (function registerRadixTool() {
-  const { el, section, inputField } = window.ShipsUI;
+  const { el, section, inputField, createSelect } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
     zh: {
       radix: {
-        hint: '在任意一行输入，其余进制实时同步',
+        hint: '🔢 在任意一行输入，其余进制实时同步',
         bin: '二进制',
         oct: '八进制',
         dec: '十进制',
@@ -22,7 +22,7 @@
     },
     en: {
       radix: {
-        hint: 'Type in any row to sync all bases',
+        hint: '🔢 Type in any row to sync all bases',
         bin: 'Binary',
         oct: 'Octal',
         dec: 'Decimal',
@@ -92,11 +92,20 @@
       return row;
     }
 
-    const customBaseSelect = el('select', { class: 'field mb-2' });
-    for (let base = 2; base <= 36; base++) {
-      customBaseSelect.appendChild(el('option', { value: base }, `${base}`));
-    }
-    customBaseSelect.value = '36';
+    let customBase = 36;
+    const baseSelect = createSelect({
+      options: Array.from({ length: 35 }, (_v, i) => ({ value: i + 2, label: String(i + 2) })),
+      value: 36,
+      align: 'right',
+      className: 'w-[88px]',
+      onChange: (value) => {
+        customBase = Number(value);
+        if (lastValue != null) {
+          customInput.value = formatInBase(lastValue, customBase);
+          setError(customRow, false);
+        }
+      },
+    });
 
     function setError(row, invalid) {
       row.input.style.borderColor = invalid ? 'var(--color-danger)' : '';
@@ -143,7 +152,7 @@
     const customSection = section(i18n.t('radix.custom'));
     const baseWrap = el('label', { class: 'mb-2 block' });
     baseWrap.appendChild(el('span', { class: 'tool-label' }, i18n.t('radix.base')));
-    baseWrap.appendChild(customBaseSelect);
+    baseWrap.appendChild(baseSelect.el);
     customSection.appendChild(baseWrap);
     const customInput = el('input', {
       class: 'field font-mono',
@@ -160,20 +169,13 @@
     container.appendChild(customSection);
 
     const customRow = {
-      base: Number(customBaseSelect.value),
+      base: customBase,
       input: customInput,
       meta: customMeta,
     };
     rows.push(customRow);
     customInput.addEventListener('input', () => onInput(customRow));
     customInput.addEventListener('blur', () => onInput(customRow));
-    customBaseSelect.addEventListener('change', () => {
-      customRow.base = Number(customBaseSelect.value);
-      if (lastValue != null) {
-        customInput.value = formatInBase(lastValue, customRow.base);
-        setError(customRow, false);
-      }
-    });
 
     const metaSection = section();
     const metaBits = resultMeta(i18n.t('radix.bits'));

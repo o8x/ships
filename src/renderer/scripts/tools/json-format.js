@@ -1,15 +1,14 @@
 'use strict';
 
 (function registerJsonTool() {
-  const { el, section, inputField, debounce, copyText, escapeHtml, Icons } = window.ShipsUI;
+  const { el, section, debounce, copyText, escapeHtml, Icons, createSelect } = window.ShipsUI;
   const i18n = window.ShipsI18n;
+  const MAX_HIGHLIGHT = (window.ShipsConstants && window.ShipsConstants.JSON_HIGHLIGHT_MAX_BYTES) || 1048576;
 
   i18n.extend({
     zh: {
       json: {
-        hint: '粘贴 JSON 自动格式化',
-        input: '输入',
-        output: '格式化结果',
+        hint: '📋 粘贴 JSON 自动原地格式化',
         indent: '缩进',
         indent2: '2 空格',
         indent4: '4 空格',
@@ -17,16 +16,20 @@
         sortKeys: '键排序',
         minify: '压缩',
         clear: '清空',
-        empty: '粘贴或输入 JSON，自动格式化',
+        copy: '复制',
+        viewText: '文本',
+        viewTree: '结构',
+        empty: '粘贴或输入 JSON，自动格式化并高亮',
+        emptyTree: '输入 JSON 后在此查看结构',
         invalid: 'JSON 无效',
-        stats: '{lines} 行 · {bytes} 字节',
+        tooLarge: '内容超过 1MB，仅格式化不高亮',
+        stats: '{lines} 行 · {bytes} 字节 · 深度 {depth}',
+        copied: '已复制',
       },
     },
     en: {
       json: {
-        hint: 'Paste JSON to format automatically',
-        input: 'Input',
-        output: 'Formatted',
+        hint: '📋 Paste JSON to format in place',
         indent: 'Indent',
         indent2: '2 spaces',
         indent4: '4 spaces',
@@ -34,15 +37,22 @@
         sortKeys: 'Sort keys',
         minify: 'Minify',
         clear: 'Clear',
-        empty: 'Paste or type JSON to format automatically',
+        copy: 'Copy',
+        viewText: 'Text',
+        viewTree: 'Tree',
+        empty: 'Paste or type JSON to format and highlight',
+        emptyTree: 'Type JSON to explore its structure',
         invalid: 'Invalid JSON',
-        stats: '{lines} lines · {bytes} bytes',
+        tooLarge: 'Over 1MB — formatted without highlighting',
+        stats: '{lines} lines · {bytes} bytes · depth {depth}',
+        copied: 'Copied',
       },
     },
   });
 
-  function highlight(json) {
-    const regex = /("(?:\\.|[^"\\])*")(\s*:)?|(\btrue\b|\bfalse\b|\bnull\b)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g;
+  function highlightJson(json) {
+    const regex =
+      /("(?:\\.|[^"\\])*")(\s*:)?|(\btrue\b|\bfalse\b|\bnull\b)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g;
     let result = '';
     let lastIndex = 0;
     let match;
@@ -78,136 +88,279 @@
     return match ? Number(match[1]) : null;
   }
 
+  function jsonDepth(value, depth) {
+    const d = depth || 0;
+    if (Array.isArray(value)) {
+      if (!value.length) return d + 1;
+      return Math.max(...value.map((item) => jsonDepth(item, d + 1)));
+    }
+    if (value && typeof value === 'object') {
+      const keys = Object.keys(value);
+      if (!keys.length) return d + 1;
+      return Math.max(...keys.map((key) => jsonDepth(value[key], d + 1)));
+    }
+    return d;
+  }
+
   function mount(container) {
     const hint = el('div', { class: 'mb-3 text-[11px] text-fg-muted' }, i18n.t('json.hint'));
 
-    const toolbar = el('div', { class: 'mb-2 flex flex-wrap items-center gap-2' });
-    const indentSelect = el('select', { class: 'field w-[104px] shrink-0 py-1 text-[12px]' });
-    indentSelect.append(
-      el('option', { value: '2' }, i18n.t('json.indent2')),
-      el('option', { value: '4' }, i18n.t('json.indent4')),
-      el('option', { value: 'tab' }, i18n.t('json.indentTab'))
-    );
-    indentSelect.value = '2';
+    const state = { view: 'text', tooLarge: false };
 
+    // ---- toolbar ----
+    const toolbar = el('div', { class: 'mb-2 flex flex-col gap-2' });
+    const indentSelect = createSelect({
+      options: [
+        { value: '2', label: i18n.t('json.indent2') },
+        { value: '4', label: i18n.t('json.indent4') },
+        { value: 'tab', label: i18n.t('json.indentTab') },
+      ],
+      value: '4',
+      className: 'w-[104px] shrink-0',
+      onChange: () => scheduleFormat(),
+    });
     const sortLabel = el('label', { class: 'chip shrink-0 cursor-pointer select-none' });
     const sortCheckbox = el('input', { type: 'checkbox', class: 'accent-[var(--color-accent)]' });
     sortLabel.append(sortCheckbox, el('span', {}, i18n.t('json.sortKeys')));
 
-    const minifyBtn = el(
-      'button',
-      { class: 'btn shrink-0 whitespace-nowrap py-1 text-[12px]', type: 'button' },
-      i18n.t('json.minify')
-    );
-    const clearBtn = el(
-      'button',
-      { class: 'btn shrink-0 whitespace-nowrap py-1 text-[12px]', type: 'button' },
-      i18n.t('json.clear')
-    );
-    toolbar.append(indentSelect, sortLabel, minifyBtn, clearBtn);
+    const viewSegment = el('div', { class: 'segment shrink-0' });
+    const viewButtons = {};
+    for (const view of ['text', 'tree']) {
+      const button = el(
+        'button',
+        { type: 'button', 'data-tip': view === 'text' ? i18n.t('json.viewText') : i18n.t('json.viewTree') },
+        view === 'text' ? i18n.t('json.viewText') : i18n.t('json.viewTree')
+      );
+      button.addEventListener('click', () => setView(view));
+      viewButtons[view] = button;
+      viewSegment.appendChild(button);
+    }
 
-    const input = el('textarea', {
-      class: 'field font-mono',
-      rows: 6,
+    const spacer = el('div', { class: 'flex-1' });
+    const copyBtn = el('button', { class: 'icon-btn h-7 w-7 shrink-0', type: 'button', 'data-tip': i18n.t('json.copy') });
+    copyBtn.innerHTML = Icons.copy(15);
+    const minifyBtn = el('button', { class: 'icon-btn h-7 w-7 shrink-0', type: 'button', 'data-tip': i18n.t('json.minify') });
+    minifyBtn.innerHTML = Icons.minimize(15);
+    const clearBtn = el('button', { class: 'icon-btn h-7 w-7 shrink-0', type: 'button', 'data-tip': i18n.t('json.clear') });
+    clearBtn.innerHTML = Icons.x(15);
+
+    const row1 = el('div', { class: 'flex items-center gap-2' });
+    row1.append(viewSegment, spacer, copyBtn, minifyBtn, clearBtn);
+    const row2 = el('div', { class: 'flex items-center gap-2' });
+    row2.append(indentSelect.el, sortLabel);
+    toolbar.append(row1, row2);
+
+    // ---- text editor (overlay highlight) ----
+    const editor = el('div', { class: 'json-editor' });
+    const pre = el('pre', { class: 'json-editor-highlight', 'aria-hidden': 'true' });
+    const code = el('code', {});
+    pre.appendChild(code);
+    const textarea = el('textarea', {
+      class: 'json-editor-input',
       spellcheck: 'false',
       placeholder: '{ "hello": "world" }',
     });
-    const inputWrapper = inputField(i18n.t('json.input'), input);
+    editor.append(pre, textarea);
 
-    const status = el('div', { class: 'mt-2 mb-3 text-[11px] text-fg-muted' }, i18n.t('json.empty'));
+    // ---- tree view ----
+    const tree = el('div', { class: 'json-tree select-text hidden' });
 
-    const outputSection = section(i18n.t('json.output'));
-    const outputHeader = el('div', { class: 'mb-1 flex items-center justify-between' });
-    const stats = el('span', { class: 'text-[11px] text-fg-muted' }, '');
-    const copyBtn = el('button', { class: 'icon-btn h-6 w-6', type: 'button' });
-    copyBtn.innerHTML = Icons.copy(14);
-    outputHeader.append(stats, copyBtn);
+    const status = el('div', { class: 'mt-2 text-[11px] text-fg-muted' }, i18n.t('json.empty'));
 
-    const output = el('pre', {
-      class:
-        'select-text max-h-[260px] overflow-auto rounded-card border border-border bg-surface p-3 font-mono text-[12px] leading-relaxed whitespace-pre-wrap break-all',
-    }, '');
-    outputSection.append(outputHeader, output);
+    container.append(hint, toolbar, editor, tree, status);
 
-    container.append(hint, toolbar, inputWrapper, status, outputSection);
+    let currentText = '';
 
-    let currentOutput = '';
-
-    function render(state) {
-      if (state.error) {
-        status.textContent = state.error;
-        status.style.color = 'var(--color-danger)';
-        output.innerHTML = '';
-        stats.textContent = '';
-        currentOutput = '';
-        return;
-      }
-      status.textContent = state.empty ? i18n.t('json.empty') : '';
-      status.style.color = '';
-      output.innerHTML = state.empty ? '' : highlight(state.text);
-      currentOutput = state.text;
-      if (!state.empty) {
-        const bytes = new TextEncoder().encode(state.text).length;
-        stats.textContent = i18n.t('json.stats', { lines: state.text.split('\n').length, bytes });
-      } else {
-        stats.textContent = '';
-      }
+    function setView(view) {
+      state.view = view;
+      viewButtons.text.classList.toggle('active', view === 'text');
+      viewButtons.tree.classList.toggle('active', view === 'tree');
+      editor.classList.toggle('hidden', view !== 'text');
+      tree.classList.toggle('hidden', view !== 'tree');
+      if (view === 'tree') renderTree();
     }
 
-    function process() {
-      const raw = input.value.trim();
-      if (!raw) {
-        render({ empty: true });
+    function highlight() {
+      const value = textarea.value;
+      if (!value) {
+        code.innerHTML = '';
         return;
       }
-      let parsed;
+      if (state.tooLarge) {
+        code.innerHTML = '';
+        return;
+      }
+      code.innerHTML = highlightJson(value);
+    }
+
+    function syncScroll() {
+      pre.scrollTop = textarea.scrollTop;
+      pre.scrollLeft = textarea.scrollLeft;
+    }
+
+    function parse() {
+      const raw = textarea.value.trim();
+      if (!raw) return { empty: true };
       try {
-        parsed = JSON.parse(raw);
+        return { value: JSON.parse(raw), raw };
       } catch (err) {
         const pos = errorPosition(err.message);
         let suffix = '';
         if (pos != null) {
-          const before = input.value.slice(0, pos);
-          const line = before.split('\n').length;
-          const col = pos - before.lastIndexOf('\n');
-          suffix = ` (${line}:${col})`;
+          const before = textarea.value.slice(0, pos);
+          suffix = ` (${before.split('\n').length}:${pos - before.lastIndexOf('\n')})`;
         }
-        const clean = err.message.replace(/ in JSON at position \d+/, '');
-        render({ error: `${i18n.t('json.invalid')}: ${clean}${suffix}` });
-        return;
+        return { error: `${i18n.t('json.invalid')}: ${err.message.replace(/ in JSON at position \d+/, '')}${suffix}` };
       }
-      const value = sortCheckbox.checked ? sortDeep(parsed) : parsed;
-      const indent = indentSelect.value === 'tab' ? '\t' : Number(indentSelect.value);
-      render({ text: JSON.stringify(value, null, indent) });
     }
 
-    const debounced = debounce(process, 150);
-    input.addEventListener('input', debounced);
-    input.addEventListener('blur', process);
-    indentSelect.addEventListener('change', process);
-    sortCheckbox.addEventListener('change', process);
+    function statsText(value) {
+      const bytes = new TextEncoder().encode(textarea.value).length;
+      return i18n.t('json.stats', {
+        lines: textarea.value.split('\n').length,
+        bytes,
+        depth: jsonDepth(value),
+      });
+    }
+
+    function refreshStatus() {
+      const parsed = parse();
+      if (parsed.empty) {
+        status.textContent = i18n.t('json.empty');
+        status.style.color = '';
+        return;
+      }
+      if (parsed.error) {
+        status.textContent = parsed.error;
+        status.style.color = 'var(--color-danger)';
+        return;
+      }
+      status.style.color = '';
+      status.textContent = state.tooLarge
+        ? `${statsText(parsed.value)} · ${i18n.t('json.tooLarge')}`
+        : statsText(parsed.value);
+    }
+
+    function applyText(text, keepCursor) {
+      const selectionStart = textarea.selectionStart;
+      textarea.value = text;
+      currentText = text;
+      state.tooLarge = new TextEncoder().encode(text).length > MAX_HIGHLIGHT;
+      editor.classList.toggle('no-highlight', state.tooLarge);
+      if (keepCursor && text.length > selectionStart) {
+        textarea.selectionStart = textarea.selectionEnd = Math.min(selectionStart, text.length);
+      }
+      highlight();
+      syncScroll();
+      refreshStatus();
+      if (state.view === 'tree') renderTree();
+    }
+
+    function formatNow() {
+      const parsed = parse();
+      if (parsed.empty || parsed.error) {
+        highlight();
+        refreshStatus();
+        return;
+      }
+      const value = sortCheckbox.checked ? sortDeep(parsed.value) : parsed.value;
+      const indentValue = indentSelect.getValue();
+      const indent = indentValue === 'tab' ? '\t' : Number(indentValue);
+      applyText(JSON.stringify(value, null, indent), false);
+    }
+
+    const scheduleFormat = debounce(formatNow, 150);
+
+    function renderTree() {
+      tree.innerHTML = '';
+      const parsed = parse();
+      if (parsed.empty || parsed.error) {
+        tree.appendChild(el('div', { class: 'p-4 text-[12px] text-fg-muted' }, i18n.t('json.emptyTree')));
+        return;
+      }
+      tree.appendChild(buildNode('', parsed.value, 0, true));
+    }
+
+    function preview(value) {
+      if (Array.isArray(value)) return `[…] ${value.length}`;
+      if (value && typeof value === 'object') return `{…} ${Object.keys(value).length}`;
+      return '';
+    }
+
+    function leafValue(value) {
+      if (value === null) return { cls: 'json-null', text: 'null' };
+      if (typeof value === 'string') return { cls: 'json-str', text: JSON.stringify(value) };
+      if (typeof value === 'number') return { cls: 'json-num', text: String(value) };
+      if (typeof value === 'boolean') return { cls: 'json-bool', text: String(value) };
+      return { cls: '', text: String(value) };
+    }
+
+    function buildNode(key, value, depth, open) {
+      const isContainer = value && typeof value === 'object';
+      if (!isContainer) {
+        const leaf = leafValue(value);
+        const row = el('div', { class: 'json-tree-leaf' });
+        if (key !== '') row.appendChild(el('span', { class: 'json-key' }, `${key}: `));
+        row.appendChild(el('span', { class: leaf.cls }, leaf.text));
+        return row;
+      }
+
+      const details = el('details', { class: 'json-tree-node' });
+      if (open) details.open = true;
+      const summary = el('summary', {});
+      if (key !== '') summary.appendChild(el('span', { class: 'json-key' }, key));
+      summary.appendChild(el('span', { class: 'json-preview' }, ` ${preview(value)}`));
+      details.appendChild(summary);
+
+      const children = el('div', { class: 'json-tree-children' });
+      if (Array.isArray(value)) {
+        value.forEach((item, index) => children.appendChild(buildNode(String(index), item, depth + 1, depth < 1)));
+      } else {
+        Object.keys(value).forEach((childKey) =>
+          children.appendChild(buildNode(childKey, value[childKey], depth + 1, depth < 1))
+        );
+      }
+      details.appendChild(children);
+      return details;
+    }
+
+    textarea.addEventListener('input', () => {
+      currentText = textarea.value;
+      state.tooLarge = new TextEncoder().encode(textarea.value).length > MAX_HIGHLIGHT;
+      editor.classList.toggle('no-highlight', state.tooLarge);
+      highlight();
+      refreshStatus();
+    });
+    textarea.addEventListener('scroll', syncScroll);
+    textarea.addEventListener('paste', () => setTimeout(formatNow, 0));
+    textarea.addEventListener('blur', formatNow);
+
+    sortCheckbox.addEventListener('change', formatNow);
     clearBtn.addEventListener('click', () => {
-      input.value = '';
-      process();
+      applyText('', false);
+      textarea.focus();
     });
     minifyBtn.addEventListener('click', () => {
-      if (!currentOutput) return;
-      input.value = JSON.stringify(JSON.parse(currentOutput));
-      process();
+      const parsed = parse();
+      if (parsed.empty || parsed.error) return;
+      const value = sortCheckbox.checked ? sortDeep(parsed.value) : parsed.value;
+      applyText(JSON.stringify(value), true);
     });
     copyBtn.addEventListener('click', async () => {
-      if (!currentOutput) return;
-      const ok = await copyText(currentOutput);
+      const text = textarea.value || currentText;
+      if (!text) return;
+      const ok = await copyText(text);
       if (!ok) return;
-      copyBtn.innerHTML = Icons.check(14);
+      copyBtn.innerHTML = Icons.check(15);
       copyBtn.style.color = 'var(--color-success)';
       setTimeout(() => {
-        copyBtn.innerHTML = Icons.copy(14);
+        copyBtn.innerHTML = Icons.copy(15);
         copyBtn.style.color = '';
       }, 1200);
     });
 
-    process();
+    setView('text');
+    refreshStatus();
   }
 
   window.ShipsToolRegistry.register({ id: 'json', icon: 'braces', mount });

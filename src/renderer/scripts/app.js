@@ -60,7 +60,7 @@
     for (const tool of registry.all()) {
       const btn = el('button', {
         class: 'tab',
-        title: i18n.t(`tools.${tool.id}`),
+        'data-tip': i18n.t(`tools.${tool.id}`),
         dataset: { tool: tool.id },
       });
       btn.innerHTML = Icons[tool.icon](20);
@@ -72,7 +72,7 @@
   function renderFooter() {
     dom.version.textContent = `v${state.version}`;
     dom.settings.innerHTML = Icons.gear(18);
-    dom.settings.title = i18n.t('settings');
+    dom.settings.setAttribute('data-tip', i18n.t('settings'));
   }
 
   function applySettings(settings) {

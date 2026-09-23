@@ -230,3 +230,188 @@ input[type='color'].swatch::-webkit-color-swatch {
   border: none;
   border-radius: 999px;
 }
+
+/* Custom select */
+.select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-fg);
+  font-size: 13px;
+  cursor: pointer;
+  min-width: 0;
+}
+.select-trigger:hover {
+  background: var(--color-surface-3);
+}
+.select-trigger.open {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+}
+.select-trigger .select-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.select-chevron {
+  color: var(--color-fg-muted);
+  transition: transform 0.15s ease;
+}
+.select-trigger.open .select-chevron {
+  transform: rotate(180deg);
+}
+.select-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 120px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+}
+.select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--color-fg);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.select-option:hover {
+  background: var(--color-surface-2);
+}
+.select-option.active {
+  color: var(--color-accent);
+}
+
+/* Tooltip */
+.ships-tip {
+  position: fixed;
+  z-index: 200;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-2px);
+  max-width: 240px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-fg);
+  background: var(--color-surface-3);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-popover);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.ships-tip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* JSON editor + tree */
+.json-editor {
+  position: relative;
+  height: 300px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+.json-editor-highlight {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  overflow: auto;
+  padding: 10px 12px;
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  tab-size: 4;
+}
+.json-editor-highlight code {
+  font-family: inherit;
+}
+.json-editor-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--color-fg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  tab-size: 4;
+  overflow: auto;
+}
+.json-editor.no-highlight .json-editor-input {
+  color: var(--color-fg);
+}
+.json-editor.no-highlight .json-editor-highlight {
+  display: none;
+}
+.json-tree {
+  height: 300px;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.json-tree-node > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.json-tree-node > summary::-webkit-details-marker {
+  display: none;
+}
+.json-tree-node > summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 12px;
+  color: var(--color-fg-muted);
+  transition: transform 0.12s ease;
+}
+.json-tree-node[open] > summary::before {
+  transform: rotate(90deg);
+}
+.json-tree-children {
+  margin-left: 14px;
+  border-left: 1px dashed var(--color-border);
+  padding-left: 8px;
+}
+.json-tree-leaf {
+  padding-left: 12px;
+}
+.json-preview {
+  color: var(--color-fg-muted);
+}

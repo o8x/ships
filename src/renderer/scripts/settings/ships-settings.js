@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerShipsSettings() {
-  const { Icons, el, section } = window.ShipsUI;
+  const { Icons, el, section, createSelect } = window.ShipsUI;
   const i18n = window.ShipsI18n;
   const { ACCENT_PRESETS, LANGUAGES } = window.ShipsConstants;
 
@@ -9,8 +9,8 @@
     zh: {
       settingsPage: {
         title: '设置',
-        ships: 'Ships 设置',
-        ssh: 'SSH 管理',
+        ships: '⚙️ Ships 设置',
+        ssh: '🖥 SSH 管理',
         language: '语言',
         languageHint: '界面显示语言',
         appearance: '外观',
@@ -32,8 +32,8 @@
     en: {
       settingsPage: {
         title: 'Settings',
-        ships: 'Ships',
-        ssh: 'SSH',
+        ships: '⚙️ Ships',
+        ssh: '🖥 SSH',
         language: 'Language',
         languageHint: 'Interface language',
         appearance: 'Appearance',
@@ -95,12 +95,15 @@
     const { settings, patch, info } = ctx;
 
     const languageSection = section();
-    const languageSelect = el('select', { class: 'field w-[140px] shrink-0' });
-    for (const lang of LANGUAGES) languageSelect.appendChild(el('option', { value: lang.value }, lang.label));
-    languageSelect.value = settings.locale || 'zh';
-    languageSelect.addEventListener('change', () => patch({ locale: languageSelect.value }));
+    const languageSelect = createSelect({
+      options: LANGUAGES.map((lang) => ({ value: lang.value, label: lang.label })),
+      value: settings.locale || 'zh',
+      align: 'right',
+      className: 'w-[140px] shrink-0',
+      onChange: (value) => patch({ locale: value }),
+    });
     languageSection.appendChild(
-      row(i18n.t('settingsPage.language'), i18n.t('settingsPage.languageHint'), languageSelect)
+      row(i18n.t('settingsPage.language'), i18n.t('settingsPage.languageHint'), languageSelect.el)
     );
 
     const appearanceSection = section();

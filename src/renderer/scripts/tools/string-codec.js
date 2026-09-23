@@ -7,7 +7,7 @@
   i18n.extend({
     zh: {
       stringCodec: {
-        hint: '任意一侧输入即可实时转换（UTF-8）',
+        hint: '🔤 任意一侧输入即可实时转换（UTF-8）',
         text: '字符串',
         hex: '十六进制',
         ascii: 'ASCII 十进制',
@@ -21,7 +21,7 @@
     },
     en: {
       stringCodec: {
-        hint: 'Type on either side to convert live (UTF-8)',
+        hint: '🔤 Type on either side to convert live (UTF-8)',
         text: 'Text',
         hex: 'Hex',
         ascii: 'ASCII decimal',
