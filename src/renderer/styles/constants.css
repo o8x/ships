@@ -33,15 +33,15 @@
   --color-accent-fg: #ffffff;
 }
 
-/* 白天模式 */
+/* 白天模式（基础色） */
 :root,
 [data-theme='light'] {
   color-scheme: light;
   --color-bg: #ffffff;
-  --color-surface: #ffffff;
-  --color-surface-2: #fafafb;
-  --color-surface-3: #f1f1f3;
-  --color-border: rgba(0, 0, 0, 0.09);
+  --color-border-base: rgba(0, 0, 0, 0.1);
+  --color-surface-base: #ffffff;
+  --color-surface-2-base: #fafafb;
+  --color-surface-3-base: #f1f1f3;
   --color-fg: #1d1d1f;
   --color-fg-muted: #8a8a8f;
   --color-danger: #e5484d;
@@ -54,14 +54,14 @@
   --shadow-popover: 0 10px 34px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
-/* 黑暗模式 */
+/* 黑暗模式（基础色） */
 [data-theme='dark'] {
   color-scheme: dark;
   --color-bg: #1c1c1e;
-  --color-surface: #2a2a2c;
-  --color-surface-2: #333336;
-  --color-surface-3: #3d3d41;
-  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-base: rgba(255, 255, 255, 0.1);
+  --color-surface-base: #2a2a2c;
+  --color-surface-2-base: #333336;
+  --color-surface-3-base: #3d3d41;
   --color-fg: #f5f5f7;
   --color-fg-muted: #98989f;
   --color-danger: #ff6369;
@@ -72,4 +72,15 @@
   --color-json-bool: #d2a8ff;
   --color-json-null: #98989f;
   --shadow-popover: 0 12px 40px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/*
+ * 表面 / 边框由强调色派生：边框带明显强调色，卡片与输入背景带轻微强调色调，
+ * 使「主题色」体现在输入框与卡片的边框和背景上（跟随设置变化）。
+ */
+:root {
+  --color-border: color-mix(in srgb, var(--color-accent) 24%, var(--color-border-base));
+  --color-surface: color-mix(in srgb, var(--color-accent) 4%, var(--color-surface-base));
+  --color-surface-2: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface-2-base));
+  --color-surface-3: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface-3-base));
 }
