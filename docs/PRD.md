@@ -87,7 +87,7 @@ Ships/
     └── renderer/
         ├── index.html           # 托盘主面板
         ├── settings.html        # 设置窗口
-        ├── scripts/             # theme / i18n / ui / registry / app / settings
+        ├── scripts/             # theme / i18n / ui / registry / tool-order / app / settings
         │   ├── tools/           # 每个工具一个文件，注册进 ShipsToolRegistry
         │   └── settings/        # 设置分区，注册进 ShipsSettingsRegistry
         └── styles/              # constants.css（设计变量）+ tailwind.css（入口）
@@ -345,6 +345,7 @@ stateDiagram-v2
 
 - 尺寸：**400 × 500**（`ships.window.width/height`），无边框、透明、不可缩放、置顶、不占 Dock。
 - 结构：顶部栏（高 46px）：**左侧**为 App 彩色图标 + 名称，**右侧**为 TAB 图标区（右对齐、可横向滚动；图标 20×20px、按钮 32×32px）→ 内容区（可滚动）→ 底部栏（高 34px）。
+- TAB 工具顺序由单一文件 `src/renderer/scripts/tool-order.js` 的 `window.ShipsToolOrder` 数组决定（改数组即改顺序；未列出的工具按注册顺序追加到末尾）。
 - 圆角：外层面板 `--radius-window`（12px），透明窗口使圆角外露。
 - 底部栏：左侧版本号（`vX.Y.Z`），右侧设置按钮（齿轮）。
 - `Escape` 隐藏面板；失焦自动隐藏。
