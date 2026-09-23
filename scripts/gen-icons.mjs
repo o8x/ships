@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -165,4 +166,34 @@ const outputs = [
 for (const [name, buf] of outputs) {
   fs.writeFileSync(path.join(OUT_DIR, name), buf);
   console.log('written', path.relative(process.cwd(), path.join(OUT_DIR, name)));
+}
+
+// macOS .icns (requires iconutil, available on macOS only)
+if (process.platform === 'darwin') {
+  const iconset = path.join(OUT_DIR, 'app.iconset');
+  fs.rmSync(iconset, { recursive: true, force: true });
+  fs.mkdirSync(iconset, { recursive: true });
+
+  const entries = [
+    [16, 'icon_16x16.png'],
+    [32, 'icon_16x16@2x.png'],
+    [32, 'icon_32x32.png'],
+    [64, 'icon_32x32@2x.png'],
+    [128, 'icon_128x128.png'],
+    [256, 'icon_128x128@2x.png'],
+    [256, 'icon_256x256.png'],
+    [512, 'icon_256x256@2x.png'],
+    [512, 'icon_512x512.png'],
+    [1024, 'icon_512x512@2x.png'],
+  ];
+  for (const [size, name] of entries) {
+    fs.writeFileSync(path.join(iconset, name), encodePng(size, size, renderAppIcon(size)));
+  }
+
+  const icnsPath = path.join(OUT_DIR, 'icon.icns');
+  execSync(`iconutil -c icns ${JSON.stringify(iconset)} -o ${JSON.stringify(icnsPath)}`);
+  fs.rmSync(iconset, { recursive: true, force: true });
+  console.log('written', path.relative(process.cwd(), icnsPath));
+} else {
+  console.warn('skip .icns generation (requires macOS iconutil)');
 }

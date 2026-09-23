@@ -11,13 +11,16 @@
     "build:css": "tailwindcss -i ./src/renderer/styles/tailwind.css -o ./src/renderer/styles/tailwind.build.css --minify",
     "watch:css": "tailwindcss -i ./src/renderer/styles/tailwind.css -o ./src/renderer/styles/tailwind.build.css --watch",
     "start": "pnpm run build:css && electron .",
-    "dev": "electron ."
+    "dev": "electron .",
+    "dist:mac": "pnpm run build:css && electron-builder --mac --arm64",
+    "pack:mac": "pnpm run build:css && electron-builder --mac --arm64 --dir"
   },
   "dependencies": {
     "ssh2": "^1.17.0"
   },
   "devDependencies": {
     "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
     "tailwindcss": "^3.4.19"
   },
   "ships": {
@@ -40,5 +43,40 @@
     "onlyBuiltDependencies": [
       "electron"
     ]
+  },
+  "build": {
+    "appId": "com.ships.app",
+    "productName": "Ships",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "assets/icons/icon.icns",
+      "identity": null,
+      "extendInfo": {
+        "LSUIElement": true
+      },
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "dmg": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "title": "${productName} ${version}"
+    }
   }
 }

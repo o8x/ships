@@ -7,7 +7,7 @@
 | 技术栈 | Electron 44（主进程）+ Tailwind CSS 3（界面样式）+ 原生 JavaScript（渲染层，无打包器）+ ssh2（SSH 探测） |
 | 支持平台 | macOS（arm64 / x64；当前主要面向 arm64） |
 | 当前版本 | 0.1.0 |
-| 发布方式 | 暂无正式打包发布流程，当前以开发模式运行（`pnpm start`） |
+| 发布方式 | 本地/CI 通过 `electron-builder` 打包 macOS arm64 DMG（`pnpm dist:mac`）；暂未签名 / 公证 |
 
 **核心设计**：应用常驻系统托盘、不占用 Dock；点击托盘图标在图标正下方弹出 400×500 的圆角面板，面板内以顶部 TAB 切换工具、底部显示版本与设置入口；所有输入实时反馈，无需点击“计算”按钮。
 
@@ -24,13 +24,13 @@
 
 | 变更类型 | 需同步章节 |
 | --- | --- |
-| 新增 / 删除工具 | §4 主要功能清单、§6.2 工具注册、§11 GUI 与布局规范 |
-| 新增 / 修改 IPC 通道 | §5.2 IPC 通道三张表、§2.4 来源标识注入、对应流程 |
-| 修改窗口行为 / 尺寸 | §2.1 进程模型、§4、§11 GUI 与布局规范、`package.json` 的 `ships` 配置 |
+| 新增 / 删除工具 | §4 主要功能清单、§11 GUI 与布局规范 |
+| 新增 / 修改 IPC 通道 | §5.2 IPC 通道三张表、§2.1 安全模型、对应流程 |
+| 修改窗口行为 / 尺寸 | §2.1 进程模型、§4、§8 主界面布局、§11 GUI 与布局规范、`package.json` 的 `ships` 配置 |
 | 修改设置项 | §3 核心流程、§5.1 本地数据、§4 功能清单 |
-| 修改 SSH 相关行为 | §3 核心流程、§5.1 本地数据、§5.2、§7 流程图 |
+| 修改 SSH 相关行为 | §3 核心流程、§5.1 本地数据、§5.2、§6 流程图 |
 | 修改样式常量 | §11 GUI 与布局规范、`src/renderer/styles/constants.css` |
-| 修改构建 / 脚本 / 依赖 | §8 构建与发布、`package.json`、`pnpm-lock.yaml` |
+| 修改构建 / 脚本 / 依赖 / CI | §7 构建与发布、`package.json`、`pnpm-lock.yaml`、`.github/workflows/*.yml` |
 
 ---
 
@@ -41,7 +41,7 @@
   - 说明：AGENTS 建议界面优先 Vue 3；当前实现选用**无打包器的原生 JS + Tailwind**，以减小体积、避免引入前端构建链，后续如需可平滑替换为 Vue 3。
 - **支持平台**：macOS（Darwin）。代码通过 `process.platform` 判断，非 macOS 下托盘行为与登录项设置自动降级。
 - **当前版本**：0.1.0。
-- **发布方式**：暂无打包产物；开发运行见 §8。
+- **发布方式**：通过 `electron-builder` 打包 macOS arm64 DMG，见 §7。
 
 ### 2.1 架构原理
 
@@ -63,9 +63,11 @@ Ships/
 ├── docs/PRD.md                  # 本文件
 ├── assets/icons/                # 托盘与 App 图标（脚本生成）
 │   ├── trayTemplate.png         # 托盘模板图标（18/36/54 @1x/@2x/@3x）
-│   └── app.png                  # 应用图标
+│   ├── app.png                  # 应用图标（512，README 引用）
+│   └── icon.icns                # 打包用 macOS 图标
+├── .github/workflows/build-mac.yml  # CI：构建 macOS arm64 DMG
 ├── hack/capture.cjs             # 开发用 UI 截图/操作脚本（不打包）
-├── scripts/gen-icons.mjs        # 零依赖 PNG 图标生成脚本（不打包）
+├── scripts/gen-icons.mjs        # 零依赖 PNG/icns 图标生成脚本（不打包）
 └── src/
     ├── shared/constants.js      # 主进程与预加载共享：IPC 通道、窗口配置、默认设置
     ├── main/
@@ -298,8 +300,17 @@ stateDiagram-v2
   - `start`：先 `build:css` 再 `electron .`。
   - `dev`：直接 `electron .`（需已有构建产物）。
   - `postinstall`：安装后自动 `build:css`。
-- **打包**：尚未配置 electron-builder / CI；当前通过开发模式运行。后续需产出 **macOS arm64** 产物并同步维护 GitHub Actions（见 AGENTS）。
-- **版本对齐**：`package.json` 版本、本文件“当前版本”与示例中的版本号保持一致。
+  - `dist:mac`：`build:css` + `electron-builder --mac --arm64`，产出 **DMG**。
+  - `pack:mac`：同上但加 `--dir`，仅产出 `.app`（调试用）。
+- **打包配置**（`package.json` 的 `build` 段，electron-builder）：
+  - `appId = com.ships.app`，`productName = Ships`；产物目录 `release/`。
+  - `files`：`src/**/*`、`assets/**/*`、`package.json`；依赖由 electron-builder 自动收集（`asar: true`）。
+  - `npmRebuild: false`（`ssh2` 使用纯 JS 回退，无需重编原生模块）。
+  - `mac.target`：**仅 arm64 的 dmg**；`mac.icon = assets/icons/icon.icns`；`mac.identity = null`（暂不签名）；`extendInfo.LSUIElement = true`（纯菜单栏 Agent，无 Dock）。
+  - 产物命名：`Ships-<version>-<arch>.dmg`（含 `.blockmap`）。
+- **图标生成**：`node scripts/gen-icons.mjs` 生成 `trayTemplate*.png`、`app.png`，在 macOS 上经 `iconutil` 额外生成 `icon.icns`。
+- **CI**（`.github/workflows/build-mac.yml`）：在 `macos-14` 上以 **pnpm 10 / Node 22** 安装并执行 `pnpm dist:mac`（设置 `CSC_IDENTITY_AUTO_DISCOVERY=false`），上传 DMG artifact；打 `v*` tag 时发布到 GitHub Release。
+- **版本对齐**：`package.json` 版本、本文件“当前版本”与产物文件名中的版本号保持一致。
 
 ---
 
