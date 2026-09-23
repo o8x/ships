@@ -188,7 +188,7 @@
     container.prepend(hint);
 
     function resultMeta(labelText) {
-      const root = el('div', { class: 'mb-1.5 flex items-center justify-between rounded-card border border-border bg-surface px-2.5 py-1.5' });
+      const root = el('div', { class: 'mb-2.5 flex items-center justify-between rounded-card border border-border bg-surface px-2.5 py-1.5' });
       root.appendChild(el('div', { class: 'text-[11px] text-fg-muted' }, labelText));
       const value = el('div', { class: 'font-mono text-[13px] text-fg' }, '—');
       root.appendChild(value);

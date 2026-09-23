@@ -128,7 +128,7 @@
     container.append(hint, inputSection, resultSection);
 
     function makeResultRow(labelText) {
-      const root = el('div', { class: 'mb-1.5 flex items-center justify-between gap-2 rounded-card border border-border bg-surface px-2.5 py-1.5' });
+      const root = el('div', { class: 'mb-2.5 flex items-center justify-between gap-2 rounded-card border border-border bg-surface px-2.5 py-1.5' });
       const left = el('div', { class: 'min-w-0 flex-1' });
       left.appendChild(el('div', { class: 'text-[10px] uppercase tracking-wide text-fg-muted' }, labelText));
       const value = el('div', { class: 'result-value' }, '—');

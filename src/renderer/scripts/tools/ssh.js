@@ -125,7 +125,7 @@
     header.appendChild(refreshBtn);
 
     const status = el('div', { class: 'mb-2 hidden text-[11px]' }, '');
-    const list = el('div', { class: 'flex flex-col gap-1.5' }, '');
+    const list = el('div', { class: 'flex flex-col gap-2.5' }, '');
 
     container.append(header, status, list);
 

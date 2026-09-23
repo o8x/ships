@@ -88,7 +88,7 @@
         return;
       }
 
-      const list = el('div', { class: 'flex flex-col gap-1.5' });
+      const list = el('div', { class: 'flex flex-col gap-2.5' });
       for (const host of state.hosts) list.appendChild(buildRow(host));
       root.appendChild(list);
     }

@@ -59,7 +59,7 @@
     actions.append(refreshBtn, clearBtn);
     header.appendChild(actions);
 
-    const list = el('div', { class: 'flex flex-col gap-1.5' });
+    const list = el('div', { class: 'flex flex-col gap-2.5' });
     container.append(header, list);
 
     function buildRow(item) {

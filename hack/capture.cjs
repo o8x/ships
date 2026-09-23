@@ -83,6 +83,12 @@ app.whenReady().then(async () => {
     );
     await delay(400);
   }
+  if (process.env.LOG_TABS) {
+    const order = await win.webContents.executeJavaScript(
+      `JSON.stringify({ order: (window.ShipsToolOrder || null), dom: Array.from(document.querySelectorAll('#tablist .tab')).map((b) => b.dataset.tool) })`
+    );
+    console.log('[capture] tabs:', order);
+  }
   win.webContents.invalidate();
   await delay(300);
   const image = await win.webContents.capturePage();
