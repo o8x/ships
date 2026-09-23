@@ -4,7 +4,7 @@
 | --- | --- |
 | 产品名称 | Ships |
 | 产品定位 | 面向开发者的 macOS 菜单栏（Tray）工具箱，点击托盘图标在下方展开轻量面板 |
-| 技术栈 | Electron 44（主进程）+ Tailwind CSS 3（界面样式）+ 原生 JavaScript（渲染层，无打包器）+ ssh2（SSH 探测） |
+| 技术栈 | Electron 44（主进程）+ Tailwind CSS 3（界面样式）+ 原生 JavaScript（渲染层，无打包器）+ ssh2（SSH 探测）+ 本地 geoip.json（IP 归属地） |
 | 支持平台 | macOS（arm64 / x64；当前主要面向 arm64） |
 | 当前版本 | 0.2.1 |
 | 发布方式 | 本地/CI 通过 `electron-builder` 打包 macOS arm64 DMG（`pnpm dist:mac`）；暂未签名 / 公证 |
@@ -31,6 +31,7 @@
 | 修改 SSH 相关行为 | §3 核心流程、§5.1 本地数据、§5.2、§6 流程图 |
 | 修改样式常量 | §11 GUI 与布局规范、`src/renderer/styles/constants.css` |
 | 新增 / 修改图标 | §8.3 图标与资源、`assets/icons/`（SVG）与 `assets/imgs/`（位图） |
+| 修改 GeoIP / 国旗 | §2.1 项目结构、§5.2 `geo:lookup`、§8.3、`assets/geoip.json` / `assets/flags/` |
 | 修改构建 / 脚本 / 依赖 / CI | §7 构建与发布、`package.json`、`pnpm-lock.yaml`、`.github/workflows/*.yml` |
 
 ---
@@ -50,7 +51,7 @@
 
 - **主进程**（`src/main/`）：创建托盘与窗口、读写本地数据、解析 `~/.ssh/config`、执行 iTerm 连接与 SSH 探测、注册 IPC。
 - **预加载脚本**（`src/preload/`）：在 `contextIsolation: true`、`nodeIntegration: false`、`sandbox: false` 下运行，用 `contextBridge` 暴露白名单 API（主面板用 `main-preload.js`，设置窗口用 `settings-preload.js`）。
-- **渲染进程**（`src/renderer/`）：两个页面 —— 托盘主面板 `index.html` 与设置窗口 `settings.html`；不含 Node 能力，仅通过 `window.ships`（能力）与 `window.shipsIcons`（图标）与主进程 / 预加载通信。
+- **渲染进程**（`src/renderer/`）：两个页面 —— 托盘主面板 `index.html` 与设置窗口 `settings.html`；不含 Node 能力，仅通过 `window.ships`（能力）、`window.shipsIcons`（内部 SVG 图标）与 `window.shipsFlags`（国旗 SVG）与主进程 / 预加载通信。
 - **无 Webview**：不内嵌远程 Web，无 guest 进程。
 
 **项目结构**
@@ -64,10 +65,12 @@ Ships/
 ├── docs/PRD.md                  # 本文件
 ├── assets/
 │   ├── icons/                   # 应用内部使用的 SVG 图标（kebab-case，统一由预加载读取）
-│   └── imgs/                    # 位图资源：应用图标 / 托盘 / 打包
-│       ├── trayTemplate.png     # 托盘模板图标（18/36/54 @1x/@2x/@3x）
-│       ├── app.png              # 应用图标（512，README 引用）
-│       └── icon.icns            # 打包用 macOS 图标
+│   ├── imgs/                    # 位图资源：应用图标 / 托盘 / 打包
+│   │   ├── trayTemplate.png     # 托盘模板图标（18/36/54 @1x/@2x/@3x）
+│   │   ├── app.png              # 应用图标（512，README 引用）
+│   │   └── icon.icns            # 打包用 macOS 图标
+│   ├── flags/                   # 国旗图标（`<CC>.svg` 长方形 / `<CC>_1x1.svg` 方形）
+│   └── geoip.json               # IP 归属地数据库（单行大文件，由 geo-service `require`）
 ├── .github/workflows/build-mac.yml  # CI：构建 macOS arm64 DMG
 ├── hack/capture.cjs             # 开发用 UI 截图/操作脚本（不打包）
 ├── scripts/gen-icons.mjs        # 零依赖 PNG/icns 图标生成脚本（不打包）
@@ -77,10 +80,10 @@ Ships/
     │   ├── main.js              # 应用入口：单实例、Dock 隐藏、注册 IPC、创建托盘
     │   ├── tray.js              # 托盘图标与右键菜单
     │   ├── window-manager.js    # 主面板 / 设置窗口创建、定位、显隐、广播
-    │   ├── ipc/                 # IPC 处理器（app / settings / window / ssh）
-    │   ├── services/            # settings / ssh-config / ssh 服务
+    │   ├── ipc/                 # IPC 处理器（app / settings / window / ssh / geo）
+    │   ├── services/            # settings / ssh-config / ssh / geo 服务
     │   └── utils/               # logger / json-store / paths
-    ├── preload/                 # main-preload.js / settings-preload.js / icons.js（读取 assets/icons/*.svg）
+    ├── preload/                 # main-preload.js / settings-preload.js / icons.js（assets/icons/*.svg）/ flags.js（assets/flags/*.svg）
     └── renderer/
         ├── index.html           # 托盘主面板
         ├── settings.html        # 设置窗口
@@ -155,16 +158,17 @@ Ships/
 
 | 功能 | 说明 | 默认值 / 条件 |
 | --- | --- | --- |
-| 时间戳转换 | 秒 / 毫秒 / 纳秒与日期互转；顶部显示实时当前时间；时间戳行支持自动识别单位（≤11 位为秒、≤15 位为毫秒、否则纳秒） | 实时；不可识别的输入显示错误 |
-| IP 与数字转换 | IPv4/IPv6 与十进制、十六进制、二进制互转；自动识别输入类型 | 数字超过 `4294967295` 时 IP 行为空并提示 |
-| 网段与掩码计算 | 支持 `IP/前缀`、`IP 掩码`；输出网络地址、广播地址、可用范围、主机数、掩码、反掩码、前缀、掩码二进制、地址类型 | 未给掩码时按 `/24` 计算并提示 |
-| 进制转换 | 2/8/10/16 进制四行双向实时同步；另有 2–36 自定义进制；“位宽/字节”统计 | 任一行输入即联动其余 |
+| 时间戳转换 | 秒 / 毫秒 / 纳秒与日期互转；顶部显示实时当前时间；时间戳行支持自动识别单位（≤11 位为秒、≤15 位为毫秒、否则纳秒），单位用自绘下拉选择 | 实时；不可识别的输入显示错误 |
+| IP 与数字转换 | IPv4/IPv6 与十进制、十六进制、二进制互转；自动识别输入类型；显示 IP 归属地（国旗 + 国家/省/市 + ISP，来自 `geo:lookup`） | 数字超过 `4294967295` 时 IP 行为空并提示；IPv6 不查归属地 |
+| 网段与掩码计算 | 支持 `IP/前缀`、`IP 掩码`；输出网络地址、广播地址、可用范围、主机数、掩码、反掩码、前缀、掩码二进制、地址类型；并显示输入 IP 的归属地 | 未给掩码时按 `/24` 计算并提示 |
+| 进制转换 | 2/8/10/16 进制四行双向实时同步；另有 2–36 自定义进制（自绘下拉）；“位宽/字节”统计 | 任一行输入即联动其余 |
 | 字符串编码转换 | 字符串 ↔ 十六进制 / ASCII 十进制 / Base64 双向实时同步（UTF-8） | 输入非法时标红不联动 |
-| JSON 格式化 | 粘贴自动格式化并语法高亮；缩进 2/4/Tab；键排序；压缩；清空；复制；错误定位 | 输入改变防抖 150ms |
-| SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示系统图标、`user@host(:port)`（22 不显示端口）、别名、连接与探测按钮 | 忽略通配符主机（如 `Host *`） |
-| 设置 · Ships | 语言、外观（跟随系统/浅色/深色）、主题色、开机自启、打开数据文件夹、关于 | 见 §5.1 |
+| JSON 格式化 | 粘贴/失焦后**原地格式化**（默认 4 空格）并语法高亮；键排序；压缩；清空；复制；错误定位（行列）；**结构查看**（可折叠树） | 超过 1MB 仅格式化不高亮；缩进 2/4/Tab；输入改变仅重高亮 |
+| SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示彩色系统图标、`user@host(:port)`（22 不显示端口）、别名、连接与探测按钮；探测完成后在面板给出提示，面板隐藏时发系统通知 | 忽略通配符主机（如 `Host *`）；未探测显示通用主机图标 |
+| 设置 · Ships | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、打开数据文件夹、关于 | 见 §5.1 |
 | 设置 · SSH 管理 | `~/.ssh/config` 主机的增删改（别名/HostName/User/Port/IdentityFile/ProxyJump） | 别名必填；删除二次确认 |
 | 底部栏 | 左显示版本号，右为设置入口 | 版本取 `package.json` |
+| 通用交互 | 所有下拉框为 Tailwind 自绘（非系统 `<select>`）；TAB 与图标按钮悬浮显示提示；关键区块用 emoji / 彩色图标点缀 | 见 §11 |
 
 ---
 
@@ -199,6 +203,7 @@ Ships/
 | `ssh-config:read` | — | `hosts` | |
 | `ssh-config:upsert` | `host` | 更新后的 `hosts` | 保留未管理指令与注释 |
 | `ssh-config:remove` | `alias` | 更新后的 `hosts` | |
+| `geo:lookup` | `ip`（IPv4 字符串） | `{ iso_3166, country, province, city, isp }` 或 `null` | 本地 `assets/geoip.json` 查询；内网返回 `{ isp: '保留地址' }` |
 
 **send（渲染 → 主，单向）**
 
@@ -337,6 +342,8 @@ stateDiagram-v2
 
 - **SVG 图标**：所有界面图标以独立 `.svg` 文件存放于 `assets/icons/`（kebab-case 命名，如 `clock.svg`、`arrow-left.svg`），**代码中不硬编码** SVG 标记；由 `src/preload/icons.js` 在启动时读取目录、转成 camelCase 键名并经 `contextBridge` 暴露为 `window.shipsIcons`，渲染层 `ShipsUI.Icons[name](size)` 注入尺寸后使用。新增 / 修改图标只需增删 / 编辑文件。
 - 位图资源（应用图标 / 托盘 / 打包）统一放在 `assets/imgs/`；`assets/icons/` 只保留 SVG 图标。
+- **国旗图标**：`assets/flags/<CC>.svg`（长方形）与 `assets/flags/<CC>_1x1.svg`（方形）；由 `src/preload/flags.js` 按需读取并缓存，暴露为 `window.shipsFlags.get(code, shape)`（code 为两位国家码，shape 为 `rect`/`1x1`）。
+- **归属地数据库**：`assets/geoip.json`（单行大文件），由主进程 `geo-service` 直接 `require`，不逐行读取；渲染层通过 `geo:lookup` 使用。
 - 托盘图标：`assets/imgs/trayTemplate.png`（模板图，适配深浅菜单栏）。
 - 应用图标：`assets/imgs/app.png`（README 引用）。
 - 图标由 `scripts/gen-icons.mjs` 零依赖生成；也可手工替换同名文件。
@@ -404,6 +411,9 @@ stateDiagram-v2
 **组件**
 
 - 输入 `field`、按钮 `btn` / `btn-accent`、图标按钮 `icon-btn`、结果行 `row-card`、TAB `tab` / `tab-active`、开关 `switch`、分段控件 `segment`、色块 `swatch`。
+- 自绘控件：下拉框 `select-trigger` / `select-menu` / `select-option`（`ShipsUI.createSelect`，替代系统 `<select>`）；悬浮提示 `ships-tip`（`ShipsUI.initTooltips`，元素加 `data-tip`）；JSON 覆盖式高亮编辑器 `json-editor` 与结构树 `json-tree`。
+- 视觉点缀：工具区块标题使用 emoji（如 ⏱️ / 🌐 / 🧮 / 🔢 / 📋 / 🖥）；SSH 操作系统图标按系统着色（macOS 灰 / Linux 橙 / Windows 蓝 / BSD 红）；IP 归属地展示彩色国旗。
+- 图标按钮与 TAB 一律通过 `data-tip` 提供悬浮说明。
 
 **平台差异**
 
