@@ -57,6 +57,7 @@
 
   const NS_PER_MS = 1000000n;
   const NS_PER_S = 1000000000n;
+  const NS_PER_MS_NUMBER = 1e6;
 
   function pad(value, width) {
     return String(value).padStart(width || 2, '0');
@@ -198,13 +199,31 @@
     };
     toTsSection.append(tsRows.s.root, tsRows.ms.root, tsRows.ns.root);
 
+    // High-resolution current time: performance.timeOrigin + performance.now()
+    // gives sub-millisecond precision so ns isn't always ...000000.
+    function currentParts() {
+      const totalMs = performance.timeOrigin + performance.now();
+      let seconds = Math.floor(totalMs / 1000);
+      let fractionNs = Math.round((totalMs - seconds * 1000) * NS_PER_MS_NUMBER);
+      if (fractionNs >= 1000000000) {
+        fractionNs -= 1000000000;
+        seconds += 1;
+      }
+      return {
+        totalMs,
+        seconds,
+        date: new Date(Math.floor(totalMs)),
+        ns: BigInt(seconds) * 1000000000n + BigInt(fractionNs),
+      };
+    }
+
     function updateNow() {
-      const now = new Date();
-      bigTime.textContent = formatLocal(now).slice(11, 23);
-      tzLine.textContent = `${formatLocal(now).slice(0, 10)} · ${timezoneLabel(now)}`;
-      nowRows.s.set(Math.floor(now.getTime() / 1000));
-      nowRows.ms.set(now.getTime());
-      nowRows.ns.set((BigInt(now.getTime()) * NS_PER_MS).toString());
+      const { totalMs, seconds, date, ns } = currentParts();
+      bigTime.textContent = formatLocal(date).slice(11, 23);
+      tzLine.textContent = `${formatLocal(date).slice(0, 10)} · ${timezoneLabel(date)}`;
+      nowRows.s.set(seconds);
+      nowRows.ms.set(Math.floor(totalMs));
+      nowRows.ns.set(ns.toString());
     }
 
     function updateFromTimestamp() {
@@ -266,7 +285,7 @@
       updateFromDate();
     });
 
-    const timer = setInterval(updateNow, 1000);
+    const timer = setInterval(updateNow, 50);
     return () => clearInterval(timer);
   }
 
