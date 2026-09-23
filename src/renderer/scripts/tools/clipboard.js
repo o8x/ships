@@ -67,10 +67,14 @@
       const body = el('div', { class: 'min-w-0 flex-1' });
 
       if (item.type === 'image' || item.type === 'svg') {
+        const imgClass =
+          item.type === 'svg'
+            ? 'h-16 w-16 object-contain rounded-control border border-border bg-surface-2 p-1'
+            : 'max-h-16 max-w-full rounded-control border border-border bg-surface-2';
         const image = el('img', {
           src: item.thumb,
           alt: item.type,
-          class: 'max-h-[64px] max-w-full rounded-control border border-border bg-surface-2',
+          class: imgClass,
         });
         body.appendChild(image);
         const label = item.type === 'svg' ? i18n.t('clipboard.svg') : i18n.t('clipboard.image');

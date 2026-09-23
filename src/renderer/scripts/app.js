@@ -64,7 +64,7 @@
         'data-tip': i18n.t(`tools.${tool.id}`),
         dataset: { tool: tool.id },
       });
-      btn.innerHTML = Icons[tool.icon](17);
+      btn.innerHTML = Icons[tool.icon](20);
       btn.addEventListener('click', () => setActive(tool.id));
       dom.tablist.appendChild(btn);
     }

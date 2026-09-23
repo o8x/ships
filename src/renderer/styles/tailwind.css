@@ -80,7 +80,7 @@
     @apply flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-2;
   }
   .tab {
-    @apply icon-btn h-7 w-7;
+    @apply icon-btn h-8 w-8;
   }
   .tab:focus,
   .tab:focus-visible {
