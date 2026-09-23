@@ -26,7 +26,6 @@ window.ShipsI18n = (function createI18n() {
       },
       tools: {
         timestamp: '时间戳转换',
-        ipNumber: 'IP 与数字转换',
         subnet: '网段与掩码计算',
         radix: '进制转换',
         json: 'JSON 格式化',
@@ -61,7 +60,6 @@ window.ShipsI18n = (function createI18n() {
       },
       tools: {
         timestamp: 'Timestamp',
-        ipNumber: 'IP & Number',
         subnet: 'Subnet & Mask',
         radix: 'Radix',
         json: 'JSON',

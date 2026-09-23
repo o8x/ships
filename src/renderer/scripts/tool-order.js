@@ -5,8 +5,7 @@
 window.ShipsToolOrder = [
     "ssh", // SSH 管理
     "timestamp", // 时间戳转换
-    "ipNumber", // IP 与数字转换
-    "subnet", // 网段与掩码计算
+    "subnet", // IP / 网段与掩码计算
     "encode", // 编码转换（字符串 / Base64 / 十六进制 / URL / ASCII）
     "radix", // 进制转换
     "json", // JSON 格式化

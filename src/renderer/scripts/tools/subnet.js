@@ -7,9 +7,13 @@
   i18n.extend({
     zh: {
       subnet: {
-        input: '网段 / 掩码',
-        placeholder: '如 192.168.1.10/24 或 192.168.1.0 255.255.255.0',
+        input: 'IP / 网段 / 掩码',
+        placeholder: '如 192.168.1.10/24、192.168.1.0 255.255.255.0 或 3232235777',
         defaultMask: '未指定掩码，默认按 /24 计算',
+        baseTitle: 'IP 进制',
+        decimal: '十进制',
+        hex: '十六进制',
+        binary: '二进制',
         network: '网络地址',
         broadcast: '广播地址',
         netmask: '子网掩码',
@@ -19,24 +23,32 @@
         prefix: '网络前缀',
         binaryMask: '掩码二进制',
         scope: '地址类型',
-        geo: '归属地',
         cidr: 'CIDR',
+        kindIpv4: '识别为 IPv4',
+        kindIpv6: '识别为 IPv6',
+        kindNumber: '识别为数字',
+        kindHex: '识别为十六进制数字',
         errorIp: 'IP 地址无效',
         errorMask: '掩码无效',
-        empty: '输入网段或 IP/掩码，实时计算',
+        empty: '输入 IP / 网段 / 掩码，实时计算',
         scopePrivate: '私有地址',
         scopePublic: '公网地址',
         scopeLoopback: '环回地址',
         scopeLinkLocal: '链路本地',
         scopeCgnat: '运营商级 NAT',
+        geo: '归属地',
         none: '无',
       },
     },
     en: {
       subnet: {
-        input: 'Subnet / mask',
-        placeholder: 'e.g. 192.168.1.10/24 or 192.168.1.0 255.255.255.0',
+        input: 'IP / subnet / mask',
+        placeholder: 'e.g. 192.168.1.10/24, 192.168.1.0 255.255.255.0 or 3232235777',
         defaultMask: 'No mask given, using /24',
+        baseTitle: 'IP bases',
+        decimal: 'Decimal',
+        hex: 'Hex',
+        binary: 'Binary',
         network: 'Network',
         broadcast: 'Broadcast',
         netmask: 'Netmask',
@@ -46,16 +58,20 @@
         prefix: 'Prefix',
         binaryMask: 'Netmask binary',
         scope: 'Scope',
-        geo: 'Location',
         cidr: 'CIDR',
+        kindIpv4: 'Detected IPv4',
+        kindIpv6: 'Detected IPv6',
+        kindNumber: 'Detected number',
+        kindHex: 'Detected hex number',
         errorIp: 'Invalid IP address',
         errorMask: 'Invalid mask',
-        empty: 'Enter a subnet or IP/mask to compute live',
+        empty: 'Enter IP / subnet / mask to compute live',
         scopePrivate: 'Private',
         scopePublic: 'Public',
         scopeLoopback: 'Loopback',
         scopeLinkLocal: 'Link-local',
         scopeCgnat: 'CGNAT',
+        geo: 'Location',
         none: 'None',
       },
     },
@@ -92,15 +108,22 @@
     return firstZero === -1 ? 32 : firstZero;
   }
 
+  function binaryIPv4(value) {
+    return [24, 16, 8, 0].map((shift) => ((value >>> shift) & 255).toString(2).padStart(8, '0')).join('.');
+  }
+
   function binaryMask(mask) {
-    const binary = (mask >>> 0).toString(2).padStart(32, '0');
-    return binary.match(/.{8}/g).join('.');
+    return (mask >>> 0).toString(2).padStart(32, '0').match(/.{8}/g).join('.');
+  }
+
+  function toHex(value) {
+    return `0x${(value >>> 0).toString(16).toUpperCase().padStart(8, '0')}`;
   }
 
   function scopeOf(value) {
     const inRange = (base, prefix) => {
       const mask = maskFromPrefix(prefix);
-      return (value & mask) >>> 0 === (base & mask) >>> 0;
+      return ((value & mask) >>> 0) === ((base & mask) >>> 0);
     };
     if (inRange(ipToInt('127.0.0.0'), 8)) return 'scopeLoopback';
     if (inRange(ipToInt('10.0.0.0'), 8)) return 'scopePrivate';
@@ -111,9 +134,50 @@
     return 'scopePublic';
   }
 
+  function parseIPv6(text) {
+    let source = text.trim().toLowerCase();
+    if (!source.includes(':')) return null;
+
+    const lastColon = source.lastIndexOf(':');
+    const tail = source.slice(lastColon + 1);
+    if (tail.includes('.')) {
+      const v4 = ipToInt(tail);
+      if (v4 == null) return null;
+      const high = ((v4 >>> 16) & 0xffff).toString(16);
+      const low = (v4 & 0xffff).toString(16);
+      source = `${source.slice(0, lastColon + 1)}${high}:${low}`;
+    }
+
+    const halves = source.split('::');
+    if (halves.length > 2) return null;
+    const head = halves[0] ? halves[0].split(':') : [];
+    const rest = halves.length === 2 ? (halves[1] ? halves[1].split(':') : []) : [];
+    const all = head.concat(rest);
+    if (all.some((group) => !/^[0-9a-f]{1,4}$/.test(group))) return null;
+
+    let groups;
+    if (halves.length === 2) {
+      const missing = 8 - all.length;
+      if (missing < 0) return null;
+      groups = head.concat(new Array(missing).fill('0'), rest);
+    } else {
+      if (all.length !== 8) return null;
+      groups = all;
+    }
+
+    let value = 0n;
+    for (const group of groups) value = (value << 16n) + BigInt(parseInt(group || '0', 16));
+    return value;
+  }
+
   function parseInput(raw) {
     const text = (raw || '').trim();
     if (!text) return { empty: true };
+
+    if (text.includes(':')) {
+      const value = parseIPv6(text);
+      return value == null ? { error: 'errorIp' } : { mode: 'ipv6', value, kind: 'kindIpv6' };
+    }
 
     let ipPart = text;
     let maskPart = null;
@@ -129,27 +193,41 @@
       }
     }
 
-    const ip = ipToInt(ipPart);
+    let ip;
+    let kind = 'kindIpv4';
+    if (ipPart.includes('.')) {
+      ip = ipToInt(ipPart);
+    } else if (/^0x[0-9a-f]+$/i.test(ipPart)) {
+      const big = BigInt(ipPart);
+      kind = 'kindHex';
+      ip = big <= 0xffffffffn ? Number(big) : null;
+    } else if (/^\d+$/.test(ipPart)) {
+      const big = BigInt(ipPart);
+      kind = 'kindNumber';
+      ip = big <= 0xffffffffn ? Number(big) : null;
+    } else {
+      ip = null;
+    }
     if (ip == null) return { error: 'errorIp' };
 
     let prefix = DEFAULT_PREFIX;
-    let defaulted = false;
-    if (maskPart == null || maskPart === '') {
-      defaulted = true;
-    } else if (/^\d{1,2}$/.test(maskPart)) {
-      prefix = Number(maskPart);
-    } else if (maskPart.includes('.')) {
-      const maskInt = ipToInt(maskPart);
-      if (maskInt == null) return { error: 'errorMask' };
-      const derived = prefixFromMask(maskInt);
-      if (derived == null) return { error: 'errorMask' };
-      prefix = derived;
-    } else {
-      return { error: 'errorMask' };
+    let defaulted = maskPart == null || maskPart === '';
+    if (maskPart) {
+      if (/^\d{1,2}$/.test(maskPart)) {
+        prefix = Number(maskPart);
+      } else if (maskPart.includes('.')) {
+        const maskInt = ipToInt(maskPart);
+        if (maskInt == null) return { error: 'errorMask' };
+        const derived = prefixFromMask(maskInt);
+        if (derived == null) return { error: 'errorMask' };
+        prefix = derived;
+      } else {
+        return { error: 'errorMask' };
+      }
     }
-
     if (prefix < 0 || prefix > 32) return { error: 'errorMask' };
-    return { ip, prefix, defaulted };
+
+    return { mode: 'ipv4', ip, prefix, defaulted, kind };
   }
 
   function mount(container) {
@@ -159,6 +237,14 @@
     const store = persistState('subnet');
     const hint = el('div', { class: 'mt-2 text-[11px] text-fg-muted' }, i18n.t('subnet.empty'));
     inputSection.appendChild(hint);
+
+    const baseRows = {
+      decimal: resultRow(i18n.t('subnet.decimal')),
+      hex: resultRow(i18n.t('subnet.hex')),
+      binary: resultRow(i18n.t('subnet.binary')),
+    };
+    const baseSection = section(i18n.t('subnet.baseTitle'));
+    for (const key of Object.keys(baseRows)) baseSection.appendChild(baseRows[key].root);
 
     const rows = {
       network: resultRow(i18n.t('subnet.network')),
@@ -171,9 +257,8 @@
       binaryMask: resultRow(i18n.t('subnet.binaryMask')),
       scope: resultRow(i18n.t('subnet.scope')),
     };
-
-    const outSection = section();
-    for (const key of Object.keys(rows)) outSection.appendChild(rows[key].root);
+    const calcSection = section();
+    for (const key of Object.keys(rows)) calcSection.appendChild(rows[key].root);
 
     const geoSection = section(i18n.t('subnet.geo'));
     const geoRow = createGeoRow();
@@ -192,10 +277,17 @@
       });
     }
 
-    function clearRows() {
+    function clearAll() {
+      for (const key of Object.keys(baseRows)) baseRows[key].set(null);
       for (const key of Object.keys(rows)) rows[key].set(null);
       geoToken += 1;
       geoRow.set(null);
+    }
+
+    function setBase(value, hex, binary) {
+      baseRows.decimal.set(value);
+      baseRows.hex.set(hex);
+      baseRows.binary.set(binary);
     }
 
     function update() {
@@ -203,32 +295,46 @@
       if (parsed.empty) {
         hint.textContent = i18n.t('subnet.empty');
         hint.style.color = '';
-        clearRows();
+        calcSection.classList.remove('hidden');
+        geoSection.classList.remove('hidden');
+        clearAll();
         return;
       }
       if (parsed.error) {
         hint.textContent = i18n.t(`subnet.${parsed.error}`);
         hint.style.color = 'var(--color-danger)';
-        clearRows();
+        calcSection.classList.remove('hidden');
+        geoSection.classList.remove('hidden');
+        clearAll();
         return;
       }
+
+      hint.style.color = '';
+
+      if (parsed.mode === 'ipv6') {
+        hint.textContent = i18n.t('subnet.kindIpv6');
+        setBase(parsed.value.toString(), `0x${parsed.value.toString(16).toUpperCase()}`, parsed.value.toString(2).padStart(128, '0'));
+        for (const key of Object.keys(rows)) rows[key].set(null);
+        calcSection.classList.add('hidden');
+        geoSection.classList.add('hidden');
+        return;
+      }
+
+      calcSection.classList.remove('hidden');
+      geoSection.classList.remove('hidden');
+      hint.textContent = parsed.defaulted ? i18n.t('subnet.defaultMask') : i18n.t(`subnet.${parsed.kind}`);
 
       const { ip, prefix } = parsed;
       const mask = maskFromPrefix(prefix);
       const network = (ip & mask) >>> 0;
       const broadcast = (network | (~mask >>> 0)) >>> 0;
 
-      hint.textContent = parsed.defaulted ? i18n.t('subnet.defaultMask') : '';
-      hint.style.color = '';
+      setBase(String(ip), toHex(ip), binaryIPv4(ip));
 
       rows.network.set(intToIp(network));
       rows.broadcast.set(intToIp(broadcast));
-
-      if (prefix >= 31) {
-        rows.range.set(intToIp(network));
-      } else {
-        rows.range.set(`${intToIp(network + 1)} - ${intToIp(broadcast - 1)}`);
-      }
+      if (prefix >= 31) rows.range.set(intToIp(network));
+      else rows.range.set(`${intToIp(network + 1)} - ${intToIp(broadcast - 1)}`);
 
       let hosts;
       if (prefix <= 30) hosts = Math.pow(2, 32 - prefix) - 2;
@@ -241,6 +347,7 @@
       rows.prefix.set(`/${prefix}  ·  ${intToIp(network)}/${prefix}`);
       rows.binaryMask.set(binaryMask(mask));
       rows.scope.set(i18n.t(`subnet.${scopeOf(ip)}`));
+
       lookupGeo(intToIp(ip));
     }
 
@@ -250,7 +357,7 @@
     });
     input.addEventListener('blur', update);
 
-    container.append(inputSection, outSection, geoSection);
+    container.append(inputSection, baseSection, calcSection, geoSection);
     update();
 
     store.load((saved) => {
