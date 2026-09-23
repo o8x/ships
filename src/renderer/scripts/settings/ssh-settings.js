@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerSshSettings() {
-  const { Icons, el, field, osIconInfo } = window.ShipsUI;
+  const { Icons, el, field, inputField, osIconInfo } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   const DEFAULT_IDENTITY = '~/.ssh/id_ed25519';
@@ -19,6 +19,7 @@
         user: '用户名',
         port: '端口',
         identityFile: '私钥文件',
+        chooseFile: '选择文件',
         proxyJump: '跳板机',
         save: '保存',
         cancel: '取消',
@@ -47,6 +48,7 @@
         user: 'User',
         port: 'Port',
         identityFile: 'IdentityFile',
+        chooseFile: 'Choose file',
         proxyJump: 'ProxyJump',
         save: 'Save',
         cancel: 'Cancel',
@@ -236,11 +238,30 @@
       ];
 
       for (const [key, label, type, placeholder] of defs) {
+        const initial = editing[key] != null && editing[key] !== '' ? String(editing[key]) : '';
+
+        if (key === 'identityFile') {
+          const input = el('input', { class: 'field font-mono', spellcheck: 'false', placeholder });
+          input.dataset.key = key;
+          input.value = initial;
+          const pick = el('button', { class: 'btn shrink-0', type: 'button', 'data-tip': i18n.t('sshSettings.chooseFile') });
+          pick.appendChild(el('span', { class: 'inline-flex' }, Icons.folder(14)));
+          pick.addEventListener('click', async () => {
+            const info = await window.ships.openFile({ defaultPath: '~/.ssh' });
+            if (info) input.value = info.tilde || info.path;
+          });
+          const row = el('div', { class: 'flex items-center gap-2' });
+          row.append(input, pick);
+          inputs[key] = input;
+          form.appendChild(inputField(label, row));
+          continue;
+        }
+
         const attrs = { placeholder, spellcheck: 'false' };
         if (type) attrs.type = type;
         const built = field(label, attrs);
         built.input.dataset.key = key;
-        built.input.value = editing[key] != null && editing[key] !== '' ? String(editing[key]) : '';
+        built.input.value = initial;
         inputs[key] = built.input;
         form.appendChild(built.wrapper);
       }

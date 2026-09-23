@@ -23,6 +23,7 @@ const api = {
   openDevTools: (target) => ipcRenderer.invoke(IPC.DEVTOOLS_OPEN, target),
   sshDetectHost: (host) => ipcRenderer.invoke(IPC.SSH_DETECT_HOST, host),
   sshGetDetected: () => ipcRenderer.invoke(IPC.SSH_GET_DETECTED),
+  openFile: (options) => ipcRenderer.invoke(IPC.DIALOG_OPEN_FILE, options),
   sshConfig: {
     read: () => ipcRenderer.invoke(IPC.SSH_CONFIG_READ),
     upsert: (host) => ipcRenderer.invoke(IPC.SSH_CONFIG_UPSERT, host),

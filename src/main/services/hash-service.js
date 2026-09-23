@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -33,7 +34,9 @@ function hashFile(file) {
 
 function fileInfo(file) {
   const stat = fs.statSync(file);
-  return { path: file, name: path.basename(file), size: stat.size };
+  const home = os.homedir();
+  const tilde = file.startsWith(home) ? `~${file.slice(home.length)}` : file;
+  return { path: file, name: path.basename(file), size: stat.size, tilde };
 }
 
 module.exports = { hashText, hashFile, fileInfo, ALGORITHMS };

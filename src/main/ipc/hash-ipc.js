@@ -1,6 +1,7 @@
 'use strict';
 
 const { dialog, BrowserWindow } = require('electron');
+const os = require('os');
 const { IPC } = require('../../shared/constants');
 const hashService = require('../services/hash-service');
 
@@ -17,9 +18,14 @@ function registerHashIpc(ipcMain) {
     }
   });
 
-  ipcMain.handle(IPC.DIALOG_OPEN_FILE, async (event) => {
+  ipcMain.handle(IPC.DIALOG_OPEN_FILE, async (event, options) => {
     const win = BrowserWindow.fromWebContents(event.sender);
-    const result = await dialog.showOpenDialog(win, { properties: ['openFile'] });
+    const dialogOptions = { properties: ['openFile', 'showHiddenFiles'] };
+    if (options && options.defaultPath) {
+      const dir = String(options.defaultPath);
+      dialogOptions.defaultPath = dir.startsWith('~') ? dir.replace(/^~/, os.homedir()) : dir;
+    }
+    const result = await dialog.showOpenDialog(win, dialogOptions);
     if (result.canceled || !result.filePaths.length) return null;
     const file = result.filePaths[0];
     try {
