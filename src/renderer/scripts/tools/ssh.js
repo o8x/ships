@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerSshTool() {
-  const { Icons, el, section } = window.ShipsUI;
+  const { Icons, el, osIconInfo } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -42,61 +42,6 @@
       },
     },
   });
-
-  const OS_ICON = {
-    macos: 'command',
-    linux: 'terminal',
-    windows: 'windows',
-    bsd: 'server',
-    unknown: 'server',
-  };
-
-  const OS_COLOR = {
-    macos: '#8e8e93',
-    linux: '#e95420',
-    windows: '#0a84ff',
-    bsd: '#e5484d',
-    unknown: 'var(--color-fg-muted)',
-  };
-
-  const LEGACY_FAMILY = { macos: 'macos', linux: 'linux', windows: 'windows', bsd: 'bsd' };
-
-  // Detected distro id -> brand icon file in assets/icons (colored).
-  const OS_ICON_FILE = {
-    ubuntu: 'ubuntu',
-    debian: 'debian',
-    fedora: 'fedora',
-    arch: 'arch',
-    centos: 'centos',
-    rhel: 'RHEL',
-    redhat: 'RHEL',
-    'red-hat': 'RHEL',
-    rocky: 'rocky',
-    linuxmint: 'mint',
-    mint: 'mint',
-    opensuse: 'opensuse',
-    'opensuse-leap': 'opensuse',
-    'opensuse-tumbleweed': 'opensuse',
-    macos: 'command',
-    windows: 'windows',
-    linux: 'linux',
-  };
-
-  function familyOf(detected) {
-    if (!detected) return null;
-    if (detected.family) return detected.family;
-    return LEGACY_FAMILY[detected.os] || 'unknown';
-  }
-
-  function iconFor(detected) {
-    if (!detected) return { name: 'server', color: 'var(--color-fg-muted)' };
-    const brand = OS_ICON_FILE[detected.os];
-    if (brand && Icons[brand]) {
-      return { name: brand, color: detected.os === 'macos' ? '#8e8e93' : '' };
-    }
-    const family = familyOf(detected);
-    return { name: OS_ICON[family] || 'server', color: OS_COLOR[family] || 'var(--color-fg-muted)' };
-  }
 
   function osLabel(detected) {
     if (!detected) return i18n.t('ssh.unknown');
@@ -147,7 +92,7 @@
         connect(host);
       });
 
-      const iconInfo = iconFor(detected);
+      const iconInfo = osIconInfo(detected);
       const icon = el('span', { class: 'flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-surface-2' });
       icon.innerHTML = Icons[iconInfo.name] ? Icons[iconInfo.name](17) : Icons.server(17);
       icon.style.color = iconInfo.color || '';

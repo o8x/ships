@@ -127,6 +127,46 @@ window.ShipsUI = (function createUI() {
     }
   }
 
+  const OS_BRAND_ICON = {
+    ubuntu: 'ubuntu',
+    debian: 'debian',
+    fedora: 'fedora',
+    arch: 'arch',
+    centos: 'centos',
+    rhel: 'RHEL',
+    redhat: 'RHEL',
+    'red-hat': 'RHEL',
+    rocky: 'rocky',
+    linuxmint: 'mint',
+    mint: 'mint',
+    opensuse: 'opensuse',
+    'opensuse-leap': 'opensuse',
+    'opensuse-tumbleweed': 'opensuse',
+    macos: 'command',
+    windows: 'windows',
+    linux: 'linux',
+  };
+  const OS_FAMILY_ICON = { macos: 'command', linux: 'terminal', windows: 'windows', bsd: 'server', unknown: 'server' };
+  const OS_FAMILY_COLOR = {
+    macos: '#8e8e93',
+    linux: '#e95420',
+    windows: '#0a84ff',
+    bsd: '#e5484d',
+    unknown: 'var(--color-fg-muted)',
+  };
+  const OS_LEGACY_FAMILY = { macos: 'macos', linux: 'linux', windows: 'windows', bsd: 'bsd' };
+
+  // Shared OS icon mapping for a detection result (brand icon when known).
+  function osIconInfo(detected) {
+    if (!detected) return { name: 'server', color: 'var(--color-fg-muted)' };
+    const brand = OS_BRAND_ICON[detected.os];
+    if (brand && Icons[brand]) {
+      return { name: brand, color: detected.os === 'macos' ? '#8e8e93' : '' };
+    }
+    const family = detected.family || OS_LEGACY_FAMILY[detected.os] || 'unknown';
+    return { name: OS_FAMILY_ICON[family] || 'server', color: OS_FAMILY_COLOR[family] || 'var(--color-fg-muted)' };
+  }
+
   function flagHtml(code, opts) {
     const options = opts || {};
     if (!code || !window.shipsFlags) return '';
@@ -355,6 +395,7 @@ window.ShipsUI = (function createUI() {
     resultRow,
     field,
     flagHtml,
+    osIconInfo,
     createGeoRow,
     createSelect,
     segmented,

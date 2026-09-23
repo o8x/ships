@@ -1,10 +1,10 @@
 'use strict';
 
 (function registerSshSettings() {
-  const { Icons, el, field } = window.ShipsUI;
+  const { Icons, el, field, osIconInfo } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
-  const DEFAULT_IDENTITY = '~/.ssh/id_rsa';
+  const DEFAULT_IDENTITY = '~/.ssh/id_ed25519';
 
   i18n.extend({
     zh: {
@@ -141,7 +141,7 @@
         render();
       });
       actions.append(exportBtn, addBtn);
-      root.appendChild(header(i18n.t('sshSettings.title'), actions));
+      root.appendChild(el('div', { class: 'mb-3 flex items-center justify-end gap-2' })).appendChild(actions);
 
       if (state.message) {
         root.appendChild(el('div', { class: 'mb-2 text-[11px] text-success' }, state.message));
@@ -161,6 +161,11 @@
 
     function buildRow(host) {
       const row = el('div', { class: 'row-card' });
+      const detected = state.detectedMap[host.alias];
+      const iconInfo = osIconInfo(detected);
+      const icon = el('span', { class: 'flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-surface-2' });
+      icon.innerHTML = Icons[iconInfo.name] ? Icons[iconInfo.name](17) : Icons.server(17);
+      icon.style.color = iconInfo.color || '';
       const info = el('div', { class: 'min-w-0 flex-1' });
       info.appendChild(el('div', { class: 'truncate text-[13px] font-medium text-fg' }, host.alias));
       const portSuffix = host.port && Number(host.port) !== 22 ? `:${host.port}` : '';
@@ -171,7 +176,7 @@
           `${host.user ? `${host.user}@` : ''}${host.hostName}${portSuffix}`
         )
       );
-      row.appendChild(info);
+      row.append(icon, info);
 
       if (state.confirmAlias === host.alias) {
         const confirmWrap = el('div', { class: 'flex shrink-0 items-center gap-1' });
@@ -294,6 +299,8 @@
       if (!value.identityFile) inputs.identityFile.value = DEFAULT_IDENTITY;
 
       const current = readInputs(inputs);
+      // Keep the form values so a failed detection does not clear them.
+      Object.assign(state.editing, current);
       if (!current.hostName) {
         state.detected = null;
         state.detectError = i18n.t('sshSettings.requiredAlias');
