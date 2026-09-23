@@ -21,10 +21,13 @@ const api = {
   openExternal: (url) => ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url),
   closeSettings: () => ipcRenderer.send(IPC.WINDOW_CLOSE_SETTINGS),
   openDevTools: (target) => ipcRenderer.invoke(IPC.DEVTOOLS_OPEN, target),
+  sshDetectHost: (host) => ipcRenderer.invoke(IPC.SSH_DETECT_HOST, host),
+  sshGetDetected: () => ipcRenderer.invoke(IPC.SSH_GET_DETECTED),
   sshConfig: {
     read: () => ipcRenderer.invoke(IPC.SSH_CONFIG_READ),
     upsert: (host) => ipcRenderer.invoke(IPC.SSH_CONFIG_UPSERT, host),
     remove: (alias) => ipcRenderer.invoke(IPC.SSH_CONFIG_REMOVE, alias),
+    export: () => ipcRenderer.invoke(IPC.SSH_CONFIG_EXPORT),
   },
 };
 

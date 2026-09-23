@@ -146,11 +146,11 @@ Ships/
 
 ### 3.5 SSH 操作系统探测
 
-1. 点击探测图标 → `ssh:detect`（仅传 `alias`），主进程立即返回 `{ queued: true }`，在**后台**执行。
+1. 入口：设置 → SSH 管理 表单内的「探测系统」按钮（`ssh:detect-host`，可对**尚未保存**的主机探测）；主面板列表不再提供探测按钮。
 2. 使用 `ssh2` 连接：代理 socket 先取 `SSH_AUTH_SOCK`，无则回退 `launchctl getenv SSH_AUTH_SOCK`（GUI 从 Finder 启动时不继承 shell 环境）；有 `IdentityFile` 时读取私钥。执行 `uname -s; echo '|||'; cat /etc/os-release`；识别不到时回退 `cmd /c ver`。
 3. 归类到具体系统 / 发行版：Linux 读取 `/etc/os-release` 的 `ID`（如 `ubuntu` / `fedora` / `arch` / `centos` / `debian` / `rhel` / `alpine` …），macOS 为 `macos`，BSD 为 `freebsd` / `openbsd` 等，Windows 为 `windows`；同时给出 `family`（`macos`/`linux`/`windows`/`bsd`/`unknown`）与显示名 `label`。
 4. 结果（`{ os, family, label, at }`）写入 `ssh-detected.json` 并广播 `ssh:detected` 事件；渲染层据此更新左侧彩色系统图标与提示。
-5. 探测进行中该按钮显示旋转态并禁用；同一 alias 去重（`pending` 集合）。
+5. 表单内探测期间按钮显示「探测中…」且禁用；**探测成功后**才启用「保存」。
 6. **日志**：探测的每一步（开始、目标、认证方式、执行命令、stdout/stderr、解析结果、连接报错）都会追加写入 `ships.log`（设置 → 开发者 → 日志文件可打开）；便于排查本地网络 / 权限问题。
 7. **macOS 本地网络权限**：Info.plist 含 `NSLocalNetworkUsageDescription`。macOS 15+ 首次访问局域网（如 192.168.x / 10.x）时会弹「本地网络」授权，需允许 Ships，否则连接会被系统拦截（表现即“没有本地 SSH 探测权限”）；可在「系统设置 → 隐私与安全性 → 本地网络」中开启。
 
@@ -171,13 +171,13 @@ Ships/
 | 网段与掩码计算 | 支持 `IP/前缀`、`IP 掩码`；输出网络地址、广播地址、可用范围、主机数、掩码、反掩码、前缀、掩码二进制、地址类型；并显示输入 IP 的归属地 | 未给掩码时按 `/24` 计算并提示 |
 | 进制转换 | 2/8/10/16 进制四行双向实时同步；另有 2–36 自定义进制（自绘下拉）；“位宽/字节”统计 | 任一行输入即联动其余 |
 | JSON 格式化 | 粘贴/失焦后**原地格式化**（默认 4 空格）并语法高亮；键排序；压缩；清空；复制；错误定位（行列）；**结构查看**（可折叠树） | 超过 1MB 仅格式化不高亮；缩进 2/4/Tab；输入改变仅重高亮 |
-| SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示系统图标、`user@host(:port)`（22 不显示端口）、别名、连接与探测按钮；**双击条目（按钮除外）等同于连接**；探测识别到具体系统 / 发行版（Ubuntu、Fedora、Arch、CentOS、macOS、Windows…）后**直接显示 `assets/icons` 下对应的品牌彩色图标**，完成后在面板给出提示，面板隐藏时发系统通知 | 忽略通配符主机（如 `Host *`）；未探测显示通用主机图标 |
+| SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示系统图标、`user@host(:port)`（22 不显示端口）、别名与**连接按钮**；**双击条目（按钮除外）等同于连接**；列表在打开面板时自动刷新；系统图标来自缓存的探测结果（品牌彩色图标，探测在「设置 · SSH 管理」进行） | 忽略通配符主机（如 `Host *`）；未探测显示通用主机图标 |
 | 剪贴板 | 主进程按设置周期轮询系统剪贴板，展示最近 N 条记录（默认 **3**，可在设置调整）；文本固定 2 行截断预览，图片渲染为小缩略图，**SVG 代码也渲染为小图（固定 64×64 框内等比缩放）**；每条可复制，支持一键清空历史 | 历史仅存内存、退出即清空；文本超 10 万字截断；图片按「大小+哈希」去重；SVG 超 20 万字符按文本处理 |
 | 编码转换 | 字符串 / Base64 / 十六进制 / URL 编码 / ASCII 十进制 五个字段双向实时同步（UTF-8） | 输入非法时标红不联动 |
 | 哈希计算 | 计算 **MD5 / SHA1 / SHA256**；支持输入字符串或**选择本地文件**（流式计算，适合大文件）；切换类型时清空结果 | 字符串输入防抖 200ms；文件经系统对话框选择 |
 | 营养成分 | 输入商品名与每 100g 的能量(kJ)/蛋白质/脂肪/碳水/钠及商品总重，实时换算：盐、千卡、千焦（含每日推荐 2250kcal / 9410kJ 对比与超出量）、慢跑与步行消耗（公里 / 分钟 / 步数）；支持**清空**与**一键复制输入 / 结果** | 输入自动本地持久化、下次打开自动载入；不做历史列表与商品保存 |
 | 设置 · Ships | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、固定悬浮（置顶常驻、失焦不隐藏）、剪贴板条数、剪贴板轮询间隔、打开数据文件夹、关于、开发者（打开悬浮界面 / 设置界面 DevTools） | 见 §5.1 |
-| 设置 · SSH 管理 | `~/.ssh/config` 主机的增删改（别名/HostName/User/Port/IdentityFile/ProxyJump）；新增保存时未填则默认 **别名 = 主机地址、用户 = root、端口 = 22** | 别名与主机地址至少填一项；删除二次确认 |
+| 设置 · SSH 管理 | `~/.ssh/config` 主机的增删改（别名/HostName/User/Port/IdentityFile/ProxyJump）；新增时自动预填 **用户 root / 端口 22 / 私钥 `~/.ssh/id_rsa`**，保存时别名默认取主机地址；表单内含「探测系统」，**探测成功后才允许保存**；支持**导出 config** | 别名与主机地址至少填一项；删除二次确认 |
 | 底部栏 | 左显示版本号；右侧依次为**图钉（固定悬浮）**与设置入口 | 图钉状态取 `settings.pinWindow`；版本取 `package.json` |
 | 通用交互 | 顶部栏左侧为 App 彩色图标 + 名称、右侧 TAB 右对齐；所有下拉框为 Tailwind 自绘（非系统 `<select>`）；TAB 与图标按钮悬浮显示提示；切换类组件均带过渡 / 入场动画；各工具输入会本地持久化，未修改或清空则下次打开仍显示 | 见 §11 |
 
@@ -214,10 +214,13 @@ Ships/
 | `settings:set` | `patch` | 合并后的 `settings` | 副作用：写盘 + 广播 + 可能修改登录项 |
 | `ssh:list` | — | `{ hosts, detected }` | 读 `~/.ssh/config` |
 | `ssh:connect` | `{ alias }` | `{ ok, command?, error? }` | 仅按 alias 查表 |
-| `ssh:detect` | `{ alias }` | `{ queued }` | 异步，结果经 `ssh:detected` 回传 |
+| `ssh:detect` | `{ alias }` | `{ queued }` | 异步，结果经 `ssh:detected` 回传（兼容保留） |
+| `ssh:detect-host` | `{ alias?, hostName, user?, port?, identityFile?, proxyJump? }` | `{ ok, alias, info }` | 对任意主机（可尚未保存）同步探测，结果写入缓存并广播 |
+| `ssh:get-detected` | — | `{ [alias]: { os, family, label, at } }` | 读取探测缓存 |
 | `ssh-config:read` | — | `hosts` | |
 | `ssh-config:upsert` | `host` | 更新后的 `hosts` | 保留未管理指令与注释 |
 | `ssh-config:remove` | `alias` | 更新后的 `hosts` | |
+| `ssh-config:export` | — | `{ ok, path?, canceled?, error? }` | 经保存对话框导出 `~/.ssh/config` 副本 |
 | `geo:lookup` | `ip`（IPv4 字符串） | `{ iso_3166, country, province, city, isp }` 或 `null` | 本地 `assets/geoip.json` 查询；内网返回 `{ isp: '保留地址' }` |
 | `devtools:open` | `'main' \| 'settings'` | `{ ok }` | 打开对应窗口的开发者工具（detach 模式；主面板会先显示） |
 | `state:get` | `key` | 任意值或 `undefined` | 读取工具输入持久化数据 |
@@ -386,10 +389,10 @@ stateDiagram-v2
 
 ### 8.4 SSH 主列表行
 
-- 结构：`[系统图标] [user@host(:port)]` + 别名小字 → 右侧 `[连接] [探测]`。
+- 结构：`[系统图标] [user@host(:port)]` + 别名小字 → 右侧 `[连接]`（探测已移至设置）。
 - 未探测时显示通用主机图标；探测完成后直接替换为对应系统品牌图标（如 `ubuntu.svg`、`windows.svg`）。
 - 端口为 22 时省略；通配符主机不展示。
-- **交互**：点击右侧「连接」按钮，或**双击条目**（按钮区域除外）均打开 iTerm 连接。
+- **交互**：点击右侧「连接」按钮，或**双击条目**（按钮区域除外）均打开 iTerm 连接；打开面板时自动刷新列表。
 
 ---
 

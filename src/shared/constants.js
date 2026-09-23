@@ -39,10 +39,13 @@ const IPC = {
   SSH_LIST: 'ssh:list',
   SSH_CONNECT: 'ssh:connect',
   SSH_DETECT: 'ssh:detect',
+  SSH_DETECT_HOST: 'ssh:detect-host',
+  SSH_GET_DETECTED: 'ssh:get-detected',
   SSH_DETECTED: 'ssh:detected',
   SSH_CONFIG_READ: 'ssh-config:read',
   SSH_CONFIG_UPSERT: 'ssh-config:upsert',
   SSH_CONFIG_REMOVE: 'ssh-config:remove',
+  SSH_CONFIG_EXPORT: 'ssh-config:export',
 };
 
 const WINDOW = Object.assign(

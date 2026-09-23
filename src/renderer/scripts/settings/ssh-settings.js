@@ -4,6 +4,8 @@
   const { Icons, el, field } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
+  const DEFAULT_IDENTITY = '~/.ssh/id_rsa';
+
   i18n.extend({
     zh: {
       sshSettings: {
@@ -23,6 +25,14 @@
         requiredAlias: '请至少填写别名或主机地址',
         confirmDelete: '确认删除？',
         delete: '删除',
+        detect: '探测系统',
+        detecting: '探测中…',
+        detected: '已识别：{os}',
+        detectFailed: '探测失败，请检查地址/端口/私钥',
+        detectFirst: '探测成功后才能保存',
+        export: '导出',
+        exportDone: '已导出到 {path}',
+        exportFailed: '导出失败：{error}',
       },
     },
     en: {
@@ -43,43 +53,99 @@
         requiredAlias: 'Alias or host address is required',
         confirmDelete: 'Delete this host?',
         delete: 'Delete',
+        detect: 'Detect OS',
+        detecting: 'Detecting…',
+        detected: 'Detected: {os}',
+        detectFailed: 'Detection failed. Check address/port/key',
+        detectFirst: 'Detect successfully before saving',
+        export: 'Export',
+        exportDone: 'Exported to {path}',
+        exportFailed: 'Export failed: {error}',
       },
     },
   });
 
   function mount(pane, ctx) {
-    const state = { hosts: [], editing: null, confirmAlias: null, error: '' };
+    const state = {
+      hosts: [],
+      detectedMap: {},
+      detected: null,
+      detecting: false,
+      detectError: '',
+      editing: null,
+      confirmAlias: null,
+      error: '',
+      message: '',
+      messageTimer: null,
+    };
     const root = el('div', {});
     pane.appendChild(root);
 
     async function reload() {
       state.hosts = await window.ships.sshConfig.read();
+      try {
+        state.detectedMap = await window.ships.sshGetDetected();
+      } catch (err) {
+        state.detectedMap = {};
+      }
       render();
     }
 
-    function header(titleText, actionButton) {
-      const head = el('div', { class: 'mb-3 flex items-center justify-between' });
-      const left = el('div', {});
+    function showMessage(text) {
+      state.message = text;
+      render();
+      clearTimeout(state.messageTimer);
+      state.messageTimer = setTimeout(() => {
+        state.message = '';
+        render();
+      }, 4000);
+    }
+
+    function header(titleText, actions) {
+      const head = el('div', { class: 'mb-3 flex items-center justify-between gap-2' });
+      const left = el('div', { class: 'min-w-0' });
       left.appendChild(el('h2', { class: 'tool-title mb-0' }, titleText));
       left.appendChild(el('div', { class: 'text-[11px] text-fg-muted' }, i18n.t('sshSettings.subtitle')));
       head.appendChild(left);
-      if (actionButton) head.appendChild(actionButton);
+      if (actions) head.appendChild(actions);
       return head;
     }
 
     function renderList() {
       root.innerHTML = '';
+
+      const actions = el('div', { class: 'flex shrink-0 items-center gap-2' });
+      const exportBtn = el('button', { class: 'btn', type: 'button' });
+      exportBtn.append(
+        el('span', { class: 'inline-flex' }, Icons.external(14)),
+        el('span', {}, i18n.t('sshSettings.export'))
+      );
+      exportBtn.addEventListener('click', doExport);
       const addBtn = el('button', { class: 'btn', type: 'button' });
       addBtn.append(
         el('span', { class: 'inline-flex' }, Icons.plus(14)),
         el('span', {}, i18n.t('sshSettings.add'))
       );
       addBtn.addEventListener('click', () => {
-        state.editing = { alias: '', hostName: '', user: '', port: 22, identityFile: '', proxyJump: '' };
+        state.editing = {
+          alias: '',
+          hostName: '',
+          user: 'root',
+          port: 22,
+          identityFile: DEFAULT_IDENTITY,
+          proxyJump: '',
+        };
         state.error = '';
+        state.detected = null;
+        state.detectError = '';
         render();
       });
-      root.appendChild(header(i18n.t('sshSettings.title'), addBtn));
+      actions.append(exportBtn, addBtn);
+      root.appendChild(header(i18n.t('sshSettings.title'), actions));
+
+      if (state.message) {
+        root.appendChild(el('div', { class: 'mb-2 text-[11px] text-success' }, state.message));
+      }
 
       if (!state.hosts.length) {
         root.appendChild(
@@ -126,14 +192,16 @@
       }
 
       const actions = el('div', { class: 'flex shrink-0 items-center gap-1' });
-      const editBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', title: i18n.t('sshSettings.edit') });
+      const editBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', 'data-tip': i18n.t('sshSettings.edit') });
       editBtn.innerHTML = Icons.edit(15);
       editBtn.addEventListener('click', () => {
         state.editing = Object.assign({ originalAlias: host.alias }, host);
         state.error = '';
+        state.detectError = '';
+        state.detected = state.detectedMap[host.alias] || null;
         render();
       });
-      const delBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', title: i18n.t('sshSettings.delete') });
+      const delBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', 'data-tip': i18n.t('sshSettings.delete') });
       delBtn.innerHTML = Icons.trash(15);
       delBtn.addEventListener('click', () => {
         state.confirmAlias = host.alias;
@@ -148,9 +216,7 @@
       root.innerHTML = '';
       const editing = state.editing;
       const isNew = !editing.originalAlias;
-      root.appendChild(
-        header(isNew ? i18n.t('sshSettings.add') : i18n.t('sshSettings.edit'), null)
-      );
+      root.appendChild(header(isNew ? i18n.t('sshSettings.add') : i18n.t('sshSettings.edit'), null));
 
       const form = el('div', { class: 'flex flex-col' });
       const inputs = {};
@@ -160,7 +226,7 @@
         ['hostName', i18n.t('sshSettings.hostName'), '', '192.168.1.10'],
         ['user', i18n.t('sshSettings.user'), '', 'root'],
         ['port', i18n.t('sshSettings.port'), 'number', '22'],
-        ['identityFile', i18n.t('sshSettings.identityFile'), '', '~/.ssh/id_ed25519'],
+        ['identityFile', i18n.t('sshSettings.identityFile'), '', DEFAULT_IDENTITY],
         ['proxyJump', i18n.t('sshSettings.proxyJump'), '', 'bastion'],
       ];
 
@@ -169,7 +235,7 @@
         if (type) attrs.type = type;
         const built = field(label, attrs);
         built.input.dataset.key = key;
-        built.input.value = editing[key] != null && editing[key] !== '' ? String(editing[key]) : key === 'port' ? '22' : '';
+        built.input.value = editing[key] != null && editing[key] !== '' ? String(editing[key]) : '';
         inputs[key] = built.input;
         form.appendChild(built.wrapper);
       }
@@ -178,26 +244,94 @@
         form.appendChild(el('div', { class: 'mb-2 text-[11px] text-danger' }, state.error));
       }
 
+      const detectStatus = el('div', { class: 'mb-2 text-[11px]' }, '');
+      if (state.detecting) {
+        detectStatus.textContent = i18n.t('sshSettings.detecting');
+        detectStatus.style.color = 'var(--color-fg-muted)';
+      } else if (state.detected && state.detected.label) {
+        detectStatus.textContent = i18n.t('sshSettings.detected', { os: state.detected.label });
+        detectStatus.style.color = 'var(--color-success)';
+      } else if (state.detectError) {
+        detectStatus.textContent = state.detectError;
+        detectStatus.style.color = 'var(--color-danger)';
+      } else {
+        detectStatus.textContent = i18n.t('sshSettings.detectFirst');
+        detectStatus.style.color = 'var(--color-fg-muted)';
+      }
+      form.appendChild(detectStatus);
+
       const actions = el('div', { class: 'mt-1 flex items-center gap-2' });
+      const detectBtn = el('button', { class: 'btn', type: 'button' }, i18n.t('sshSettings.detect'));
+      detectBtn.disabled = state.detecting;
+      detectBtn.addEventListener('click', () => doDetect(inputs));
       const saveBtn = el('button', { class: 'btn btn-accent', type: 'button' }, i18n.t('sshSettings.save'));
+      saveBtn.disabled = !state.detected || state.detecting;
       saveBtn.addEventListener('click', save);
       const cancelBtn = el('button', { class: 'btn', type: 'button' }, i18n.t('sshSettings.cancel'));
       cancelBtn.addEventListener('click', () => {
         state.editing = null;
+        state.detected = null;
+        state.detectError = '';
         render();
       });
-      actions.append(saveBtn, cancelBtn);
+      actions.append(detectBtn, saveBtn, cancelBtn);
       form.appendChild(actions);
       root.appendChild(form);
     }
 
-    async function save() {
+    function readInputs(inputs) {
       const value = {};
-      for (const input of root.querySelectorAll('input')) {
-        value[input.dataset.key] = input.value.trim();
+      for (const key of Object.keys(inputs)) value[key] = inputs[key].value.trim();
+      return value;
+    }
+
+    // Fill defaults into empty fields, then detect the OS using current values.
+    async function doDetect(inputs) {
+      const value = readInputs(inputs);
+      if (!value.alias) inputs.alias.value = value.hostName || '';
+      if (!value.user) inputs.user.value = 'root';
+      if (!value.port) inputs.port.value = '22';
+      if (!value.identityFile) inputs.identityFile.value = DEFAULT_IDENTITY;
+
+      const current = readInputs(inputs);
+      if (!current.hostName) {
+        state.detected = null;
+        state.detectError = i18n.t('sshSettings.requiredAlias');
+        render();
+        return;
       }
+
+      state.detecting = true;
+      state.detected = null;
+      state.detectError = '';
+      render();
+
+      const result = await window.ships.sshDetectHost({
+        alias: current.alias || current.hostName,
+        hostName: current.hostName,
+        user: current.user,
+        port: Number(current.port) || 22,
+        identityFile: current.identityFile,
+        proxyJump: current.proxyJump,
+      });
+
+      state.detecting = false;
+      if (result && result.ok && result.info && result.info.os && result.info.os !== 'unknown') {
+        state.detected = result.info;
+        state.detectError = '';
+      } else {
+        state.detected = null;
+        state.detectError = i18n.t('sshSettings.detectFailed');
+      }
+      render();
+    }
+
+    async function save() {
+      if (!state.detected) return;
+      const inputs = {};
+      for (const input of root.querySelectorAll('input')) inputs[input.dataset.key] = input;
+      const value = readInputs(inputs);
       const hostName = value.hostName;
-      // Defaults when adding: alias -> host address, user -> root, port -> 22.
       const alias = value.alias || hostName;
       if (!alias) {
         state.error = i18n.t('sshSettings.requiredAlias');
@@ -214,7 +348,16 @@
         proxyJump: value.proxyJump,
       });
       state.editing = null;
+      state.detected = null;
+      state.detectError = '';
       await reload();
+    }
+
+    async function doExport() {
+      const result = await window.ships.sshConfig.export();
+      if (result && result.ok) showMessage(i18n.t('sshSettings.exportDone', { path: result.path }));
+      else if (result && result.canceled) return;
+      else showMessage(i18n.t('sshSettings.exportFailed', { error: (result && result.error) || 'error' }));
     }
 
     async function doRemove(alias) {

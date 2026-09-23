@@ -1,7 +1,8 @@
 'use strict';
 
+const fs = require('fs');
 const { IPC } = require('../../shared/constants');
-const { Notification } = require('electron');
+const { Notification, dialog, BrowserWindow } = require('electron');
 const configService = require('../services/ssh-config-service');
 const sshService = require('../services/ssh-service');
 const { broadcast, getMainWindow } = require('../window-manager');
@@ -30,9 +31,47 @@ function registerSshIpc(ipcMain) {
     return { queued: true };
   });
 
+  // Detect an arbitrary host (used by the settings form before the host exists).
+  ipcMain.handle(IPC.SSH_DETECT_HOST, async (_event, payload) => {
+    const host = payload || {};
+    if (!host.hostName) return { ok: false, error: 'hostName required' };
+    const alias = host.alias || host.hostName;
+    const info = await sshService.runDetect({
+      alias,
+      hostName: host.hostName,
+      port: host.port,
+      user: host.user,
+      identityFile: host.identityFile,
+      proxyJump: host.proxyJump,
+    });
+    sshService.setDetected(alias, info);
+    return { ok: true, alias, info };
+  });
+
+  ipcMain.handle(IPC.SSH_GET_DETECTED, () => sshService.getDetected());
+
   ipcMain.handle(IPC.SSH_CONFIG_READ, () => configService.list());
   ipcMain.handle(IPC.SSH_CONFIG_UPSERT, (_event, host) => configService.upsert(host));
   ipcMain.handle(IPC.SSH_CONFIG_REMOVE, (_event, alias) => configService.remove(alias));
+
+  ipcMain.handle(IPC.SSH_CONFIG_EXPORT, async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showSaveDialog(win, {
+      title: 'config',
+      defaultPath: 'config',
+    });
+    if (result.canceled || !result.filePath) return { ok: false, canceled: true };
+    try {
+      if (fs.existsSync(configService.CONFIG_FILE)) {
+        fs.copyFileSync(configService.CONFIG_FILE, result.filePath);
+      } else {
+        fs.writeFileSync(result.filePath, '', 'utf8');
+      }
+      return { ok: true, path: result.filePath };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
 
   sshService.on('detected', (payload) => {
     broadcast(IPC.SSH_DETECTED, payload);

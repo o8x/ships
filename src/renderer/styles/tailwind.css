@@ -56,6 +56,13 @@
   .btn:hover {
     background: var(--color-surface-3);
   }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn:disabled:hover {
+    background: var(--color-surface-2);
+  }
   .btn-accent {
     background: var(--color-accent);
     border-color: transparent;

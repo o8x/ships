@@ -13,6 +13,7 @@
         connect: '连接',
         detect: '探测操作系统',
         detecting: '探测中…',
+        notDetected: '未探测',
         unknown: '未知',
         alias: '别名',
         connected: '已在 iTerm 中连接 {host}',
@@ -30,6 +31,7 @@
         connect: 'Connect',
         detect: 'Detect OS',
         detecting: 'Detecting…',
+        notDetected: 'Not detected',
         unknown: 'Unknown',
         alias: 'Alias',
         connected: 'Connecting to {host} in iTerm',
@@ -113,7 +115,6 @@
     const state = {
       hosts: [],
       detected: {},
-      pending: new Set(),
       disposers: [],
       statusTimer: null,
     };
@@ -139,7 +140,6 @@
 
     function buildRow(host) {
       const detected = state.detected[host.alias];
-      const pending = state.pending.has(host.alias);
 
       const row = el('div', { class: 'row-card cursor-pointer' });
       row.addEventListener('dblclick', (event) => {
@@ -151,7 +151,7 @@
       const icon = el('span', { class: 'flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-surface-2' });
       icon.innerHTML = Icons[iconInfo.name] ? Icons[iconInfo.name](17) : Icons.server(17);
       icon.style.color = iconInfo.color || '';
-      const tip = detected ? i18n.t('ssh.detectedAs', { os: osLabel(detected) }) : i18n.t('ssh.detect');
+      const tip = detected ? i18n.t('ssh.detectedAs', { os: osLabel(detected) }) : i18n.t('ssh.notDetected');
       icon.setAttribute('data-tip', tip);
 
       const info = el('div', { class: 'min-w-0 flex-1' });
@@ -167,16 +167,7 @@
       const connectBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', 'data-tip': i18n.t('ssh.connect') });
       connectBtn.innerHTML = Icons.plug(15);
       connectBtn.addEventListener('click', () => connect(host));
-      const detectBtn = el('button', {
-        class: 'icon-btn h-7 w-7',
-        type: 'button',
-        'data-tip': pending ? i18n.t('ssh.detecting') : i18n.t('ssh.detect'),
-      });
-      detectBtn.innerHTML = Icons.search(15);
-      if (pending) detectBtn.querySelector('svg').classList.add('animate-spin');
-      detectBtn.disabled = pending;
-      detectBtn.addEventListener('click', () => detect(host));
-      actions.append(connectBtn, detectBtn);
+      actions.append(connectBtn);
 
       row.append(icon, info, actions);
       return row;
@@ -210,18 +201,19 @@
       else showStatus(i18n.t('ssh.connectFailed', { error: (result && result.error) || 'error' }), true);
     }
 
-    async function detect(host) {
-      state.pending.add(host.alias);
-      render();
-      await window.ships.ssh.detect({ alias: host.alias });
-    }
-
     refreshBtn.addEventListener('click', load);
+
+    // Refresh the list whenever the popover is opened (shown / focused).
+    const onFocus = () => load();
+    window.addEventListener('focus', onFocus);
+    const onVisible = () => {
+      if (!document.hidden) load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
 
     state.disposers.push(
       window.ships.ssh.onDetected((payload) => {
         if (!payload) return;
-        state.pending.delete(payload.alias);
         state.detected[payload.alias] = {
           os: payload.os,
           family: payload.family,
@@ -241,6 +233,8 @@
 
     return () => {
       state.disposers.forEach((dispose) => dispose && dispose());
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
       clearTimeout(state.statusTimer);
     };
   }
