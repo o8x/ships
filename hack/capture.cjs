@@ -26,7 +26,25 @@ app.whenReady().then(async () => {
   const win = wm.createMainWindow();
   await waitLoad(win);
   win.show();
-  await delay(1600);
+  await delay(1200);
+  if (process.env.TAB) {
+    const result = await win.webContents.executeJavaScript(
+      `(() => { const list = document.querySelectorAll('.tab'); const i = ${Number(process.env.TAB)};` +
+        ` if (list[i]) { list[i].click(); return 'clicked ' + i + ' of ' + list.length; }` +
+        ` return 'missing ' + i + ' of ' + list.length; })();`
+    );
+    console.log('[capture] tab:', result);
+    await delay(400);
+  }
+  if (process.env.INPUT) {
+    const result = await win.webContents.executeJavaScript(
+      `(() => { const i = document.querySelector('#content input'); if (!i) return 'no input';` +
+        ` i.value = ${JSON.stringify(process.env.INPUT)}; i.dispatchEvent(new Event('input', { bubbles: true }));` +
+        ` return 'set ' + i.value; })();`
+    );
+    console.log('[capture] input:', result);
+    await delay(400);
+  }
   const image = await win.webContents.capturePage();
   fs.writeFileSync(process.env.OUT || '/tmp/ships.png', image.toPNG());
 

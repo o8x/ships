@@ -146,18 +146,15 @@
 
   function mount(container) {
     const nowSection = section(i18n.t('timestamp.now'));
-    const nowCard = el('div', { class: 'rounded-card border border-border bg-surface p-3' });
-    const bigTime = el('div', { class: 'mb-2 font-mono text-[20px] font-semibold text-fg' }, '--:--:--');
+    const bigTime = el('div', { class: 'mb-1 font-mono text-[22px] font-semibold text-fg' }, '--:--:--');
     const tzLine = el('div', { class: 'mb-2 text-[11px] text-fg-muted' }, '');
-    nowCard.append(bigTime, tzLine);
 
     const nowRows = {
       s: resultRow(i18n.t('timestamp.seconds')),
       ms: resultRow(i18n.t('timestamp.milliseconds')),
       ns: resultRow(i18n.t('timestamp.nanoseconds')),
     };
-    nowCard.append(nowRows.s.root, nowRows.ms.root, nowRows.ns.root);
-    nowSection.appendChild(nowCard);
+    nowSection.append(bigTime, tzLine, nowRows.s.root, nowRows.ms.root, nowRows.ns.root);
 
     const toDateSection = section(i18n.t('timestamp.toDate'));
     const tsField = field(i18n.t('timestamp.timestamp'), {
