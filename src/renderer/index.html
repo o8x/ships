@@ -20,9 +20,28 @@
         border: 1px solid var(--color-border);
       "
     >
-      <div class="flex flex-1 items-center justify-center text-fg-muted">Ships</div>
+      <header
+        id="tabbar"
+        class="flex shrink-0 items-center justify-center gap-1 px-2"
+        style="height: var(--tabbar-height); border-bottom: 1px solid var(--color-border)"
+      ></header>
+
+      <main id="content" class="flex-1 overflow-y-auto px-4 py-3"></main>
+
+      <footer
+        class="flex shrink-0 items-center justify-between px-3 text-fg-muted"
+        style="height: var(--footer-height); border-top: 1px solid var(--color-border)"
+      >
+        <span id="footer-version" class="font-mono text-[11px]"></span>
+        <button id="btn-settings" class="icon-btn h-6 w-6" type="button"></button>
+      </footer>
     </div>
+
     <script src="./scripts/theme.js"></script>
+    <script src="./scripts/constants.js"></script>
+    <script src="./scripts/i18n.js"></script>
+    <script src="./scripts/ui.js"></script>
+    <script src="./scripts/tool-registry.js"></script>
     <script src="./scripts/app.js"></script>
   </body>
 </html>

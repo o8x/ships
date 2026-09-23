@@ -79,4 +79,24 @@
   .row-card {
     @apply flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-2;
   }
+  .tab {
+    @apply icon-btn h-9 w-9;
+  }
+  .tab-active,
+  .tab-active:hover {
+    color: var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  }
+  .tool-title {
+    @apply mb-3 text-[15px] font-semibold tracking-tight text-fg;
+  }
+  .tool-label {
+    @apply mb-1 block text-[11px] font-medium text-fg-muted;
+  }
+  .result-value {
+    @apply font-mono text-[14px] break-all text-fg;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-pill border border-border bg-surface-2 px-2 py-0.5 text-[11px] text-fg-muted;
+  }
 }
