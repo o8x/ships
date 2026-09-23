@@ -231,29 +231,17 @@
    - **PATCH**（`x.y.Z`）：向后兼容的问题修复，以及文档/样式等无行为变化的微调。
    - 判断依据：`git log <上一个 tag>..HEAD`（或与上次发版对比）的提交内容；递增某一位后，低位归零（如 `4.1.3` 有新增功能 → `4.2.0`；有破坏性变更 → `5.0.0`）。
    - 若无法明确归类，**先向用户确认**，不要擅自决定。
-3. **单独提交版本 commit**：代码改动已在前一步作为独立 commit 提交后，本 commit **只包含版本与文档信息**——`package.json` 版本号与 PRD 版本号；若本次为 **MINOR**，**同一 commit 一并包含白皮书**（见下「白皮书更新规则」），即白皮书不再单独提交。**版本 commit 的统一提交信息为 `Bump vX.Y.Z`**，tag 指向这个 commit。**该 commit 不得包含任何业务代码改动**（如确需附带，先说明）。
+3. **单独提交版本 commit**：代码改动已在前一步作为独立 commit 提交后，本 commit **只包含版本与文档信息**——`package.json` 版本号与 PRD 版本号。**版本 commit 的统一提交信息为 `Bump vX.Y.Z`**，tag 指向这个 commit。**该 commit 不得包含任何业务代码改动**（如确需附带，先说明）。
 4. 按「PRD 维护（项目相关）」同步更新文档中的版本号。
-5. **创建对应 tag**：`git tag vX.Y.Z`（指向上述版本提交，即与 bump、白皮书同一个 commit）。tag 默认只创建在本地，不自动 push。
+5. **创建对应 tag**：`git tag vX.Y.Z`（指向上述版本提交）。tag 默认只创建在本地，不自动 push。
 
 未经用户明确要求，不要 `push`（tag 会随 bump 创建，但默认不 push）。
-
-## 白皮书更新规则（MINOR 必做）
-
-当本次版本递增的是 **MINOR**（`x.Y.0`，即“中间版本”）时，必须同步更新功能使用白皮书：
-
-1. **新建**：以 `docs/` 中现有白皮书为模板，创建 `docs/功能使用白皮书-v<新版本>.md`；更新头部「对应软件版本」「文档版本」，并按本次改动补充/修订功能描述，保持既有章节结构。
-2. **生成 PDF**：运行 `pnpm run whitepaper`（等价于 `node hack/build-whitepaper.mjs`，自动选取 `docs/` 中版本号最高的白皮书）；也可显式指定文件：`node hack/build-whitepaper.mjs "docs/功能使用白皮书-v<新版本>.md"`。脚本用系统 Chrome/Chromium 渲染并输出同名 `.pdf`（找不到浏览器时用 `CHROME_PATH` 指定可执行文件）。
-3. **删除旧版**：移除上一版本白皮书的 `.md` 与 `.pdf`，`docs/` 中只保留当前版本。
-4. **提交**：白皮书**不单独提交**，必须与版本变更（`package.json`、PRD 版本号）放进**同一个** `Bump vX.Y.Z` commit，并让 tag 指向该 commit。若本次涉及用户可见的功能变化，也一并写进白皮书并放进同一个 commit。
-5. **顺序**：先「新建/更新白皮书 → 生成 PDF → 删旧版 → 改 `package.json`/PRD 版本号」，全部完成后一次性提交；bump、白皮书、tag 共用同一个 commit。
-
-> MAJOR / PATCH 版本不强制更新白皮书；若本次涉及用户可见的功能变化，建议同样刷新白皮书并放入同一个版本 commit。
 
 ## 更新并推送规则
 
 当用户提到「更新并推送」（或等价表述）时：
 
-1. 先完整执行上面的「版本更新规则」（确认干净 → 改 `package.json`/PRD 版本号 → **同一个版本 commit（MINOR 时含白皮书）** → 创建 tag）。
+1. 先完整执行上面的「版本更新规则」（确认干净 → 改 `package.json`/PRD 版本号 → 创建 tag）。
 2. 然后**强制推送当前分支到本地的所有 remote**：
    - 用 `git remote` 列出全部 remote；
    - 对每个 remote 执行 `git push --force <remote> <当前分支>`。

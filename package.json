@@ -13,8 +13,7 @@
     "start": "pnpm run build:css && electron .",
     "dev": "electron .",
     "dist:mac": "pnpm run build:css && electron-builder --mac --arm64",
-    "pack:mac": "pnpm run build:css && electron-builder --mac --arm64 --dir",
-    "whitepaper": "node hack/build-whitepaper.mjs"
+    "pack:mac": "pnpm run build:css && electron-builder --mac --arm64 --dir"
   },
   "dependencies": {
     "ssh2": "^1.17.0"
@@ -22,7 +21,6 @@
   "devDependencies": {
     "electron": "^44.0.0",
     "electron-builder": "^26.15.3",
-    "marked": "^18.0.14",
     "tailwindcss": "^3.4.19"
   },
   "ships": {

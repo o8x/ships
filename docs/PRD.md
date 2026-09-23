@@ -302,7 +302,6 @@ stateDiagram-v2
   - `postinstall`：安装后自动 `build:css`。
   - `dist:mac`：`build:css` + `electron-builder --mac --arm64`，产出 **DMG**。
   - `pack:mac`：同上但加 `--dir`，仅产出 `.app`（调试用）。
-  - `whitepaper`：`node hack/build-whitepaper.mjs`，将 `docs/` 中版本号最高的 `功能使用白皮书-v*.md` 用系统 Chrome/Chromium 渲染为同名 `.pdf`（可用 `CHROME_PATH` 指定浏览器）。
 - **打包配置**（`package.json` 的 `build` 段，electron-builder）：
   - `appId = com.ships.app`，`productName = Ships`；产物目录 `release/`。
   - `files`：`src/**/*`、`assets/**/*`、`package.json`；依赖由 electron-builder 自动收集（`asar: true`）。
