@@ -82,6 +82,10 @@
   .tab {
     @apply icon-btn h-9 w-9;
   }
+  .tab:focus,
+  .tab:focus-visible {
+    outline: none;
+  }
   .tab-active,
   .tab-active:hover {
     color: var(--color-accent);

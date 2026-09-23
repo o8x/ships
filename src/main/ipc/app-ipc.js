@@ -1,12 +1,12 @@
 'use strict';
 
 const { app, shell } = require('electron');
-const { IPC } = require('../../shared/constants');
+const { IPC, VERSION } = require('../../shared/constants');
 const { DATA_DIR, describeDataFiles } = require('../utils/paths');
 
 function registerAppIpc(ipcMain) {
   ipcMain.handle(IPC.APP_INFO, () => ({
-    version: app.getVersion(),
+    version: VERSION,
     platform: process.platform,
     arch: process.arch,
     systemLocale: app.getLocale(),

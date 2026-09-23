@@ -16,6 +16,7 @@
     settings: {},
     version: window.ShipsConstants.FALLBACK_VERSION,
     activeId: null,
+    cleanup: null,
   };
 
   function emptyState(message) {
@@ -23,6 +24,14 @@
   }
 
   function mountTool(id) {
+    if (typeof state.cleanup === 'function') {
+      try {
+        state.cleanup();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    state.cleanup = null;
     dom.content.innerHTML = '';
     const tool = registry.get(id);
     if (!tool) {
@@ -30,7 +39,8 @@
       return;
     }
     try {
-      tool.mount(dom.content);
+      const dispose = tool.mount(dom.content);
+      if (typeof dispose === 'function') state.cleanup = dispose;
     } catch (err) {
       console.error(err);
       dom.content.innerHTML = emptyState(String(err && err.message));
