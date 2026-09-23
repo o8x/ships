@@ -61,7 +61,3 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   require('./services/clipboard-service').stop();
 });
-
-app.on('activate', () => {
-  wm.showMainWindow();
-});

@@ -95,6 +95,8 @@ function positionUnderTray() {
 }
 
 function showMainWindow() {
+  // Menu bar app: only open from the tray (ignore launch-time activation).
+  if (!trayRef) return;
   const win = getMainWindow() || createMainWindow();
   const pinned = Boolean(settings.get('pinWindow'));
   if (!pinned || !pinnedPositioned) positionUnderTray();
