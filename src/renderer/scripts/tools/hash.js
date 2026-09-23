@@ -53,6 +53,14 @@
       (value) => {
         stringPanel.classList.toggle('hidden', value !== 'string');
         filePanel.classList.toggle('hidden', value !== 'file');
+        setHashes(null);
+        if (value === 'string') {
+          if (textarea.value) computeText();
+        } else {
+          fileLabel.textContent = i18n.t('hash.noFile');
+          chooseBtn.querySelector('.choose-label').textContent = i18n.t('hash.chooseFile');
+          delete textarea.dataset.file;
+        }
         saveState();
       }
     );
