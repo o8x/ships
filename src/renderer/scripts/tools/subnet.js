@@ -243,7 +243,7 @@
       hex: resultRow(i18n.t('subnet.hex')),
       binary: resultRow(i18n.t('subnet.binary')),
     };
-    const baseSection = section(i18n.t('subnet.baseTitle'));
+    const baseSection = section();
     for (const key of Object.keys(baseRows)) baseSection.appendChild(baseRows[key].root);
 
     const rows = {
@@ -260,7 +260,7 @@
     const calcSection = section();
     for (const key of Object.keys(rows)) calcSection.appendChild(rows[key].root);
 
-    const geoSection = section(i18n.t('subnet.geo'));
+    const geoSection = section();
     const geoRow = createGeoRow();
     geoSection.appendChild(geoRow.root);
 
