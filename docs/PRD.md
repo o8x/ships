@@ -164,12 +164,12 @@ Ships/
 | 进制转换 | 2/8/10/16 进制四行双向实时同步；另有 2–36 自定义进制（自绘下拉）；“位宽/字节”统计 | 任一行输入即联动其余 |
 | 字符串编码转换 | 字符串 ↔ 十六进制 / ASCII 十进制 / Base64 双向实时同步（UTF-8） | 输入非法时标红不联动 |
 | JSON 格式化 | 粘贴/失焦后**原地格式化**（默认 4 空格）并语法高亮；键排序；压缩；清空；复制；错误定位（行列）；**结构查看**（可折叠树） | 超过 1MB 仅格式化不高亮；缩进 2/4/Tab；输入改变仅重高亮 |
-| SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示彩色系统图标、`user@host(:port)`（22 不显示端口）、别名、连接与探测按钮；探测识别到具体系统 / 发行版（Ubuntu、Fedora、Arch、CentOS、macOS、Windows…），完成后在面板给出提示，面板隐藏时发系统通知 | 忽略通配符主机（如 `Host *`）；未探测显示通用主机图标 |
+| SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示系统图标、`user@host(:port)`（22 不显示端口）、别名、连接与探测按钮；探测识别到具体系统 / 发行版（Ubuntu、Fedora、Arch、CentOS、macOS、Windows…）后**直接显示 `assets/icons` 下对应的品牌彩色图标**，完成后在面板给出提示，面板隐藏时发系统通知 | 忽略通配符主机（如 `Host *`）；未探测显示通用主机图标 |
 | 剪贴板 | 主进程每约 1.2s 轮询系统剪贴板，展示最近 5 条记录；文本显示预览，图片渲染为小缩略图；每条可复制，支持一键清空历史 | 历史仅存内存、退出即清空；文本超 10 万字截断；图片按内容哈希去重 |
 | 设置 · Ships | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、固定悬浮（置顶常驻、失焦不隐藏）、打开数据文件夹、关于、开发者（打开悬浮界面 / 设置界面 DevTools） | 见 §5.1 |
 | 设置 · SSH 管理 | `~/.ssh/config` 主机的增删改（别名/HostName/User/Port/IdentityFile/ProxyJump） | 别名必填；删除二次确认 |
 | 底部栏 | 左显示版本号，右为设置入口 | 版本取 `package.json` |
-| 通用交互 | 所有下拉框为 Tailwind 自绘（非系统 `<select>`）；TAB 与图标按钮悬浮显示提示；SSH 系统图标与国旗着色；各工具输入会本地持久化，未修改或清空则下次打开仍显示 | 见 §11 |
+| 通用交互 | 顶部栏左侧为 App 彩色图标 + 名称、右侧 TAB 右对齐；所有下拉框为 Tailwind 自绘（非系统 `<select>`）；TAB 与图标按钮悬浮显示提示；切换类组件均带过渡 / 入场动画；各工具输入会本地持久化，未修改或清空则下次打开仍显示 | 见 §11 |
 
 ---
 
@@ -338,7 +338,7 @@ stateDiagram-v2
 ### 8.1 主面板（托盘弹出）
 
 - 尺寸：**400 × 500**（`ships.window.width/height`），无边框、透明、不可缩放、置顶、不占 Dock。
-- 结构：顶部 TAB 栏（高 46px，**左对齐**，左右各 16px padding）→ 内容区（可滚动）→ 底部栏（高 34px）。
+- 结构：顶部栏（高 46px）：**左侧**为 App 彩色图标 + 名称，**右侧**为 TAB 图标区（右对齐、可横向滚动）→ 内容区（可滚动）→ 底部栏（高 34px）。
 - 圆角：外层面板 `--radius-window`（12px），透明窗口使圆角外露。
 - 底部栏：左侧版本号（`vX.Y.Z`），右侧设置按钮（齿轮）。
 - `Escape` 隐藏面板；失焦自动隐藏。
@@ -351,7 +351,7 @@ stateDiagram-v2
 
 ### 8.3 图标与资源
 
-- **SVG 图标**：所有界面图标以独立 `.svg` 文件存放于 `assets/icons/`（kebab-case 命名，如 `clock.svg`、`arrow-left.svg`），**代码中不硬编码** SVG 标记；由 `src/preload/icons.js` 在启动时读取目录、转成 camelCase 键名并经 `contextBridge` 暴露为 `window.shipsIcons`，渲染层 `ShipsUI.Icons[name](size)` 注入尺寸后使用。新增 / 修改图标只需增删 / 编辑文件。
+- **SVG 图标**：所有界面图标以独立 `.svg` 文件存放于 `assets/icons/`（kebab-case 命名，如 `clock.svg`、`arrow-left.svg`），**代码中不硬编码** SVG 标记；由 `src/preload/icons.js` 在启动时读取目录、转成 camelCase 键名并经 `contextBridge` 暴露为 `window.shipsIcons`，渲染层 `ShipsUI.Icons[name](size)` 注入尺寸后使用（会先移除图标根标签上已有的 `width` / `height` 再注入，兼容自带尺寸的品牌图标）。新增 / 修改图标只需增删 / 编辑文件；系统品牌图标（`ubuntu.svg` / `fedora.svg` / `arch.svg` / `centos.svg` / `debian.svg` / `linux.svg` / `mint.svg` / `opensuse.svg` / `RHEL.svg` / `rocky.svg` / `windows.svg` 等）同样放在此处，用于 SSH 探测结果展示。
 - 位图资源（应用图标 / 托盘 / 打包）统一放在 `assets/imgs/`；`assets/icons/` 只保留 SVG 图标。
 - **国旗图标**：`assets/flags/<CC>.svg`（长方形）与 `assets/flags/<CC>_1x1.svg`（方形）；由 `src/preload/flags.js` 按需读取并缓存，暴露为 `window.shipsFlags.get(code, shape)`（code 为两位国家码，shape 为 `rect`/`1x1`）。
 - **归属地数据库**：`assets/geoip.json`（单行大文件），由主进程 `geo-service` 直接 `require`，不逐行读取；渲染层通过 `geo:lookup` 使用。
@@ -362,6 +362,7 @@ stateDiagram-v2
 ### 8.4 SSH 主列表行
 
 - 结构：`[系统图标] [user@host(:port)]` + 别名小字 → 右侧 `[连接] [探测]`。
+- 未探测时显示通用主机图标；探测完成后直接替换为对应系统品牌图标（如 `ubuntu.svg`、`windows.svg`）。
 - 端口为 22 时省略；通配符主机不展示。
 
 ---
@@ -423,7 +424,8 @@ stateDiagram-v2
 
 - 输入 `field`、按钮 `btn` / `btn-accent`、图标按钮 `icon-btn`、结果行 `row-card`、TAB `tab` / `tab-active`、开关 `switch`、分段控件 `segment`、色块 `swatch`。
 - 自绘控件：下拉框 `select-trigger` / `select-menu` / `select-option`（`ShipsUI.createSelect`，替代系统 `<select>`）；悬浮提示 `ships-tip`（`ShipsUI.initTooltips`，元素加 `data-tip`）；JSON 覆盖式高亮编辑器 `json-editor` 与结构树 `json-tree`。
-- 视觉点缀：不使用 emoji；SSH 操作系统图标按系统着色（macOS 灰 / Linux 橙 / Windows 蓝 / BSD 红）；IP 归属地展示彩色国旗。
+- 视觉点缀：不使用 emoji；SSH 探测结果直接使用 `assets/icons` 中的品牌彩色图标（Ubuntu/Fedora/Arch/CentOS/… 及 Windows），macOS 用灰色 command 图标；IP 归属地展示彩色国旗。
+- **动效**：TAB 选中、分段控件、下拉菜单、开关、JSON 视图切换均有过渡 / 入场动画；工具与设置分区内容进入时带 `ships-fade-up`，下拉菜单与 TAB 选中带 `ships-pop`（详见 `styles/tailwind.css` 的 Motion 段）。
 - 图标按钮与 TAB 一律通过 `data-tip` 提供悬浮说明。
 
 **平台差异**
