@@ -141,7 +141,11 @@
       const detected = state.detected[host.alias];
       const pending = state.pending.has(host.alias);
 
-      const row = el('div', { class: 'row-card' });
+      const row = el('div', { class: 'row-card cursor-pointer' });
+      row.addEventListener('dblclick', (event) => {
+        if (event.target.closest('button')) return;
+        connect(host);
+      });
 
       const iconInfo = iconFor(detected);
       const icon = el('span', { class: 'flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-surface-2' });
