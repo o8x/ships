@@ -1,18 +1,19 @@
 'use strict';
 
 (function registerIpNumberTool() {
-  const { el, section, field, resultRow } = window.ShipsUI;
+  const { el, section, field, resultRow, createGeoRow } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
     zh: {
       ipNumber: {
-        input: 'IP 地址 / 数字',
+        input: '🌐 IP 地址 / 数字',
         placeholder: '如 192.168.1.1 或 3232235777',
         address: 'IP 地址',
         decimal: '十进制',
         hex: '十六进制',
         binary: '二进制',
+        geo: '📍 归属地',
         kindIpv4: '识别为 IPv4',
         kindIpv6: '识别为 IPv6',
         kindNumber: '识别为数字',
@@ -24,12 +25,13 @@
     },
     en: {
       ipNumber: {
-        input: 'IP address / number',
+        input: '🌐 IP address / number',
         placeholder: 'e.g. 192.168.1.1 or 3232235777',
         address: 'IP address',
         decimal: 'Decimal',
         hex: 'Hex',
         binary: 'Binary',
+        geo: '📍 Location',
         kindIpv4: 'Detected IPv4',
         kindIpv6: 'Detected IPv6',
         kindNumber: 'Detected number',
@@ -157,8 +159,27 @@
     const outSection = section();
     for (const key of Object.keys(rows)) outSection.appendChild(rows[key].root);
 
+    const geoSection = section(i18n.t('ipNumber.geo'));
+    const geoRow = createGeoRow();
+    geoSection.appendChild(geoRow.root);
+
+    let geoToken = 0;
+    function lookupGeo(ip) {
+      const token = ++geoToken;
+      if (!ip || !window.ships.geoLookup) {
+        geoRow.set(null);
+        return;
+      }
+      window.ships.geoLookup(ip).then((info) => {
+        if (token !== geoToken) return;
+        geoRow.set(info);
+      });
+    }
+
     function clearRows() {
       for (const key of Object.keys(rows)) rows[key].set(null);
+      geoToken += 1;
+      geoRow.set(null);
     }
 
     function toHex(value) {
@@ -191,6 +212,7 @@
         rows.decimal.set(value.toString());
         rows.hex.set(toHex(value));
         rows.binary.set(binaryIPv4(value));
+        lookupGeo(ipv4ToString(value));
         return;
       }
 
@@ -201,6 +223,8 @@
         rows.decimal.set(value.toString());
         rows.hex.set(toHex(value));
         rows.binary.set(value.toString(2).padStart(128, '0'));
+        geoToken += 1;
+        geoRow.set(null);
         return;
       }
 
@@ -208,10 +232,13 @@
       if (value > MAX_IPV4) {
         hint.textContent = i18n.t('ipNumber.outOfRange');
         hint.style.color = 'var(--color-danger)';
+        geoToken += 1;
+        geoRow.set(null);
         rows.address.set(null);
       } else {
         hint.textContent = i18n.t(kind === 'hex' ? 'ipNumber.kindHex' : 'ipNumber.kindNumber');
         rows.address.set(ipv4ToString(value));
+        lookupGeo(ipv4ToString(value));
       }
       rows.decimal.set(value.toString());
       rows.hex.set(toHex(value));
@@ -221,7 +248,7 @@
     input.addEventListener('input', update);
     input.addEventListener('blur', update);
 
-    container.append(inputSection, outSection);
+    container.append(inputSection, outSection, geoSection);
     update();
   }
 

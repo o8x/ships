@@ -19,6 +19,8 @@ const IPC = {
   WINDOW_CLOSE_SETTINGS: 'window:close-settings',
   THEME_CHANGED: 'theme:changed',
 
+  GEO_LOOKUP: 'geo:lookup',
+
   SSH_LIST: 'ssh:list',
   SSH_CONNECT: 'ssh:connect',
   SSH_DETECT: 'ssh:detect',

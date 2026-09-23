@@ -3,6 +3,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const { IPC } = require('../shared/constants');
 const { loadIcons } = require('./icons');
+const { get: getFlag } = require('./flags');
 
 function on(channel, cb) {
   const listener = (_event, payload) => cb(payload);
@@ -20,6 +21,7 @@ const api = {
   openSettings: () => ipcRenderer.send(IPC.WINDOW_OPEN_SETTINGS),
   openDataFolder: () => ipcRenderer.invoke(IPC.OPEN_DATA_FOLDER),
   openExternal: (url) => ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url),
+  geoLookup: (ip) => ipcRenderer.invoke(IPC.GEO_LOOKUP, ip),
   ssh: {
     list: () => ipcRenderer.invoke(IPC.SSH_LIST),
     connect: (payload) => ipcRenderer.invoke(IPC.SSH_CONNECT, payload),
@@ -30,3 +32,4 @@ const api = {
 
 contextBridge.exposeInMainWorld('ships', api);
 contextBridge.exposeInMainWorld('shipsIcons', loadIcons());
+contextBridge.exposeInMainWorld('shipsFlags', { get: (code, shape) => getFlag(code, shape) });

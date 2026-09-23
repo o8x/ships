@@ -1,13 +1,13 @@
 'use strict';
 
 (function registerSubnetTool() {
-  const { el, section, field, resultRow } = window.ShipsUI;
+  const { el, section, field, resultRow, createGeoRow } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
     zh: {
       subnet: {
-        input: '网段 / 掩码',
+        input: '🧮 网段 / 掩码',
         placeholder: '如 192.168.1.10/24 或 192.168.1.0 255.255.255.0',
         defaultMask: '未指定掩码，默认按 /24 计算',
         network: '网络地址',
@@ -19,6 +19,7 @@
         prefix: '网络前缀',
         binaryMask: '掩码二进制',
         scope: '地址类型',
+        geo: '📍 归属地',
         cidr: 'CIDR',
         errorIp: 'IP 地址无效',
         errorMask: '掩码无效',
@@ -33,7 +34,7 @@
     },
     en: {
       subnet: {
-        input: 'Subnet / mask',
+        input: '🧮 Subnet / mask',
         placeholder: 'e.g. 192.168.1.10/24 or 192.168.1.0 255.255.255.0',
         defaultMask: 'No mask given, using /24',
         network: 'Network',
@@ -45,6 +46,7 @@
         prefix: 'Prefix',
         binaryMask: 'Netmask binary',
         scope: 'Scope',
+        geo: '📍 Location',
         cidr: 'CIDR',
         errorIp: 'Invalid IP address',
         errorMask: 'Invalid mask',
@@ -172,8 +174,27 @@
     const outSection = section();
     for (const key of Object.keys(rows)) outSection.appendChild(rows[key].root);
 
+    const geoSection = section(i18n.t('subnet.geo'));
+    const geoRow = createGeoRow();
+    geoSection.appendChild(geoRow.root);
+
+    let geoToken = 0;
+    function lookupGeo(ip) {
+      const token = ++geoToken;
+      if (!ip || !window.ships.geoLookup) {
+        geoRow.set(null);
+        return;
+      }
+      window.ships.geoLookup(ip).then((info) => {
+        if (token !== geoToken) return;
+        geoRow.set(info);
+      });
+    }
+
     function clearRows() {
       for (const key of Object.keys(rows)) rows[key].set(null);
+      geoToken += 1;
+      geoRow.set(null);
     }
 
     function update() {
@@ -219,12 +240,13 @@
       rows.prefix.set(`/${prefix}  ·  ${intToIp(network)}/${prefix}`);
       rows.binaryMask.set(binaryMask(mask));
       rows.scope.set(i18n.t(`subnet.${scopeOf(ip)}`));
+      lookupGeo(intToIp(ip));
     }
 
     input.addEventListener('input', update);
     input.addEventListener('blur', update);
 
-    container.append(inputSection, outSection);
+    container.append(inputSection, outSection, geoSection);
     update();
   }
 

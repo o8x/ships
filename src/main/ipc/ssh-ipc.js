@@ -1,9 +1,12 @@
 'use strict';
 
 const { IPC } = require('../../shared/constants');
+const { Notification } = require('electron');
 const configService = require('../services/ssh-config-service');
 const sshService = require('../services/ssh-service');
-const { broadcast } = require('../window-manager');
+const { broadcast, getMainWindow } = require('../window-manager');
+
+const OS_LABEL = { macos: 'macOS', linux: 'Linux', windows: 'Windows', bsd: 'BSD' };
 
 function findHost(alias) {
   if (!alias) return null;
@@ -33,7 +36,16 @@ function registerSshIpc(ipcMain) {
   ipcMain.handle(IPC.SSH_CONFIG_UPSERT, (_event, host) => configService.upsert(host));
   ipcMain.handle(IPC.SSH_CONFIG_REMOVE, (_event, alias) => configService.remove(alias));
 
-  sshService.on('detected', (payload) => broadcast(IPC.SSH_DETECTED, payload));
+  sshService.on('detected', (payload) => {
+    broadcast(IPC.SSH_DETECTED, payload);
+    const win = getMainWindow();
+    if ((!win || !win.isVisible()) && Notification.isSupported()) {
+      new Notification({
+        title: 'Ships',
+        body: `${payload.alias} · ${OS_LABEL[payload.os] || 'Unknown'}`,
+      }).show();
+    }
+  });
 }
 
 module.exports = { registerSshIpc };

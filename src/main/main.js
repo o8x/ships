@@ -7,6 +7,7 @@ const { registerAppIpc } = require('./ipc/app-ipc');
 const { registerWindowIpc } = require('./ipc/window-ipc');
 const { registerSettingsIpc } = require('./ipc/settings-ipc');
 const { registerSshIpc } = require('./ipc/ssh-ipc');
+const { registerGeoIpc } = require('./ipc/geo-ipc');
 const logger = require('./utils/logger');
 const { DATA_FILES } = require('./utils/paths');
 const { APP_NAME, VERSION, ships } = require('../shared/constants');
@@ -28,6 +29,7 @@ function onReady() {
   registerWindowIpc(ipcMain);
   registerSettingsIpc(ipcMain);
   registerSshIpc(ipcMain);
+  registerGeoIpc(ipcMain);
 
   wm.createMainWindow();
 

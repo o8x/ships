@@ -7,7 +7,7 @@
   i18n.extend({
     zh: {
       ssh: {
-        title: '主机',
+        title: '🖥 主机',
         refresh: '刷新',
         empty: '未找到主机，请检查 ~/.ssh/config',
         connect: '连接',
@@ -18,11 +18,13 @@
         connected: '已在 iTerm 中连接 {host}',
         connectFailed: '连接失败：{error}',
         detectedAs: '系统：{os}',
+        detectDone: '{host}：{os}',
+        copyCmd: '复制连接命令',
       },
     },
     en: {
       ssh: {
-        title: 'Hosts',
+        title: '🖥 Hosts',
         refresh: 'Refresh',
         empty: 'No hosts found. Check ~/.ssh/config',
         connect: 'Connect',
@@ -33,6 +35,8 @@
         connected: 'Connecting to {host} in iTerm',
         connectFailed: 'Connect failed: {error}',
         detectedAs: 'OS: {os}',
+        detectDone: '{host}: {os}',
+        copyCmd: 'Copy connect command',
       },
     },
   });
@@ -43,6 +47,13 @@
     windows: 'windows',
     bsd: 'server',
     unknown: 'server',
+  };
+
+  const OS_COLOR = {
+    macos: '#8e8e93',
+    linux: '#e95420',
+    windows: '#0a84ff',
+    bsd: '#e5484d',
   };
 
   function osLabel(os) {
@@ -65,7 +76,7 @@
 
     const header = el('div', { class: 'mb-3 flex items-center justify-between' });
     header.appendChild(el('h2', { class: 'tool-title mb-0' }, i18n.t('ssh.title')));
-    const refreshBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', title: i18n.t('ssh.refresh') });
+    const refreshBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', 'data-tip': i18n.t('ssh.refresh') });
     refreshBtn.innerHTML = Icons.refresh(15);
     header.appendChild(refreshBtn);
 
@@ -91,8 +102,10 @@
 
       const icon = el('span', { class: 'flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-surface-2' });
       icon.innerHTML = Icons[OS_ICON[osName] || 'server'](17);
-      icon.style.color = osName && osName !== 'unknown' ? 'var(--color-accent)' : 'var(--color-fg-muted)';
+      icon.style.color = osName && OS_COLOR[osName] ? OS_COLOR[osName] : 'var(--color-fg-muted)';
       icon.title = osName ? i18n.t('ssh.detectedAs', { os: osLabel(osName) }) : i18n.t('ssh.detect');
+      icon.setAttribute('data-tip', icon.title);
+      icon.removeAttribute('title');
 
       const info = el('div', { class: 'min-w-0 flex-1' });
       const address = el('div', { class: 'truncate font-mono text-[13px] text-fg' }, '');
@@ -104,13 +117,13 @@
       }
 
       const actions = el('div', { class: 'flex shrink-0 items-center gap-1' });
-      const connectBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', title: i18n.t('ssh.connect') });
+      const connectBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', 'data-tip': i18n.t('ssh.connect') });
       connectBtn.innerHTML = Icons.plug(15);
       connectBtn.addEventListener('click', () => connect(host));
       const detectBtn = el('button', {
         class: 'icon-btn h-7 w-7',
         type: 'button',
-        title: pending ? i18n.t('ssh.detecting') : i18n.t('ssh.detect'),
+        'data-tip': pending ? i18n.t('ssh.detecting') : i18n.t('ssh.detect'),
       });
       detectBtn.innerHTML = Icons.search(15);
       if (pending) detectBtn.querySelector('svg').classList.add('animate-spin');
@@ -164,6 +177,10 @@
         state.pending.delete(payload.alias);
         state.detected[payload.alias] = { os: payload.os, at: payload.at };
         render();
+        showStatus(
+          i18n.t('ssh.detectDone', { host: payload.alias, os: osLabel(payload.os) }),
+          payload.os === 'unknown'
+        );
       })
     );
 

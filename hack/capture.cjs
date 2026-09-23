@@ -20,12 +20,14 @@ app.whenReady().then(async () => {
   const { registerWindowIpc } = require('../src/main/ipc/window-ipc');
   const { registerSettingsIpc } = require('../src/main/ipc/settings-ipc');
   const { registerSshIpc } = require('../src/main/ipc/ssh-ipc');
+  const { registerGeoIpc } = require('../src/main/ipc/geo-ipc');
   const wm = require('../src/main/window-manager');
 
   registerAppIpc(ipcMain);
   registerWindowIpc(ipcMain);
   registerSettingsIpc(ipcMain);
   registerSshIpc(ipcMain);
+  registerGeoIpc(ipcMain);
 
   const win = wm.createMainWindow();
   win.webContents.setBackgroundThrottling(false);
@@ -47,10 +49,17 @@ app.whenReady().then(async () => {
       `(() => { const list = document.querySelectorAll('#content input, #content textarea'); const i = list[${index}];` +
         ` if (!i) return 'no input ' + list.length;` +
         ` i.value = ${JSON.stringify(process.env.INPUT)}; i.dispatchEvent(new Event('input', { bubbles: true }));` +
+        ` i.dispatchEvent(new Event('blur', { bubbles: true }));` +
         ` return 'set ' + i.value; })();`
     );
     console.log('[capture] input:', result);
     await delay(400);
+  }
+  if (process.env.MAIN_CLICK) {
+    await win.webContents.executeJavaScript(
+      `document.querySelector(${JSON.stringify(process.env.MAIN_CLICK)})?.click();`
+    );
+    await delay(700);
   }
   if (process.env.PATCH) {
     await win.webContents.executeJavaScript(
