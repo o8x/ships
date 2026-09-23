@@ -62,13 +62,13 @@
       statusTimer: null,
     };
 
-    const header = el('div', { class: 'mb-3 flex items-center justify-between' });
+    const header = el('div', { class: 'mb-2.5 flex items-center justify-between' });
     header.appendChild(el('h2', { class: 'tool-title mb-0' }, i18n.t('ssh.title')));
     const refreshBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', 'data-tip': i18n.t('ssh.refresh') });
     refreshBtn.innerHTML = Icons.refresh(15);
     header.appendChild(refreshBtn);
 
-    const status = el('div', { class: 'mb-2 hidden text-[11px]' }, '');
+    const status = el('div', { class: 'mb-2.5 hidden text-[11px]' }, '');
     const list = el('div', { class: 'flex flex-col gap-2.5' }, '');
 
     container.append(header, status, list);

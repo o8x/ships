@@ -235,7 +235,7 @@
     const input = field(null, { placeholder: i18n.t('subnet.placeholder'), spellcheck: 'false' }).input;
     inputSection.appendChild(input);
     const store = persistState('subnet');
-    const hint = el('div', { class: 'mt-2 text-[11px] text-fg-muted' }, i18n.t('subnet.empty'));
+    const hint = el('div', { class: 'text-[11px] text-fg-muted' }, i18n.t('subnet.empty'));
     inputSection.appendChild(hint);
 
     const baseRows = {

@@ -70,9 +70,10 @@
   }
 
   function mount(container) {
-    const hint = el('div', { class: 'mb-3 text-[11px] text-fg-muted' }, i18n.t('radix.hint'));
+    const hint = el('div', { class: 'mb-2.5 text-[11px] text-fg-muted' }, i18n.t('radix.hint'));
     const rows = [];
     const store = persistState('radix');
+    const rowsSection = section();
 
     function makeRow(labelText, base, placeholder) {
       const input = el('input', {
@@ -83,10 +84,9 @@
         placeholder: placeholder || '',
       });
       const wrapper = inputField(labelText, input);
-      wrapper.classList.add('mb-2');
       const meta = el('div', { class: 'mt-1 text-[10px] text-fg-muted' }, '');
       wrapper.appendChild(meta);
-      container.appendChild(wrapper);
+      rowsSection.appendChild(wrapper);
       const row = { base, input, meta, setError: null };
       input.addEventListener('input', () => onInput(row));
       input.addEventListener('blur', () => onInput(row));
@@ -152,7 +152,7 @@
     rows.push(binRow, octRow, decRow, hexRow);
 
     const customSection = section(i18n.t('radix.custom'));
-    const baseWrap = el('label', { class: 'mb-2 block' });
+    const baseWrap = el('label', { class: 'block' });
     baseWrap.appendChild(el('span', { class: 'tool-label' }, i18n.t('radix.base')));
     baseWrap.appendChild(baseSelect.el);
     customSection.appendChild(baseWrap);
@@ -164,11 +164,9 @@
       placeholder: 'Z',
     });
     const customWrap = inputField(i18n.t('radix.custom'), customInput);
-    customWrap.classList.add('mb-2');
     const customMeta = el('div', { class: 'mt-1 text-[10px] text-fg-muted' }, '');
     customWrap.appendChild(customMeta);
     customSection.appendChild(customWrap);
-    container.appendChild(customSection);
 
     const customRow = {
       base: customBase,
@@ -183,12 +181,12 @@
     const metaBits = resultMeta(i18n.t('radix.bits'));
     const metaBytes = resultMeta(i18n.t('radix.bytes'));
     metaSection.append(metaBits.root, metaBytes.root);
-    container.appendChild(metaSection);
 
+    container.append(rowsSection, customSection, metaSection);
     container.prepend(hint);
 
     function resultMeta(labelText) {
-      const root = el('div', { class: 'mb-2.5 flex items-center justify-between rounded-card border border-border bg-surface px-2.5 py-1.5' });
+      const root = el('div', { class: 'flex items-center justify-between rounded-card border border-border bg-surface px-2.5 py-1.5' });
       root.appendChild(el('div', { class: 'text-[11px] text-fg-muted' }, labelText));
       const value = el('div', { class: 'font-mono text-[13px] text-fg' }, '—');
       root.appendChild(value);

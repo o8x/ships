@@ -103,12 +103,12 @@
   }
 
   function mount(container) {
-    const hint = el('div', { class: 'mb-3 text-[11px] text-fg-muted' }, i18n.t('json.hint'));
+    const hint = el('div', { class: 'mb-2.5 text-[11px] text-fg-muted' }, i18n.t('json.hint'));
 
     const state = { view: 'text', tooLarge: false };
 
     // ---- toolbar ----
-    const toolbar = el('div', { class: 'mb-2 flex flex-col gap-2' });
+    const toolbar = el('div', { class: 'mb-2.5 flex flex-col gap-2' });
     const indentSelect = createSelect({
       options: [
         { value: '2', label: i18n.t('json.indent2') },
@@ -165,7 +165,7 @@
     // ---- tree view ----
     const tree = el('div', { class: 'json-tree select-text hidden' });
 
-    const status = el('div', { class: 'mt-2 text-[11px] text-fg-muted' }, i18n.t('json.empty'));
+    const status = el('div', { class: 'mt-2.5 text-[11px] text-fg-muted' }, i18n.t('json.empty'));
 
     container.append(hint, toolbar, editor, tree, status);
 

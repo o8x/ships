@@ -98,7 +98,7 @@
   }
 
   function mount(container) {
-    const hint = el('div', { class: 'mb-3 text-[11px] text-fg-muted' }, i18n.t('encode.hint'));
+    const hint = el('div', { class: 'mb-2.5 text-[11px] text-fg-muted' }, i18n.t('encode.hint'));
     const store = persistState('encode');
 
     function area(label, placeholder) {

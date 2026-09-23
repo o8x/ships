@@ -96,7 +96,7 @@
     background: color-mix(in srgb, var(--color-accent) 15%, transparent);
   }
   .tool-title {
-    @apply mb-3 text-[15px] font-semibold tracking-tight text-fg;
+    @apply text-[15px] font-semibold tracking-tight text-fg;
   }
   .tool-label {
     @apply mb-1 block text-[11px] font-medium text-fg-muted;
@@ -423,6 +423,14 @@ input[type='color'].swatch::-webkit-color-swatch {
 }
 .json-preview {
   color: var(--color-fg-muted);
+}
+
+/* Uniform vertical rhythm: sections are 10px apart, children 10px apart. */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
 /* Clipboard text preview: fixed two lines, truncate the rest. */

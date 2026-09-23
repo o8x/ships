@@ -147,8 +147,8 @@
 
   function mount(container) {
     const nowSection = section(i18n.t('timestamp.now'));
-    const bigTime = el('div', { class: 'mb-1 font-mono text-[22px] font-semibold text-fg' }, '--:--:--');
-    const tzLine = el('div', { class: 'mb-2 text-[11px] text-fg-muted' }, '');
+    const bigTime = el('div', { class: 'font-mono text-[22px] font-semibold text-fg' }, '--:--:--');
+    const tzLine = el('div', { class: 'text-[11px] text-fg-muted' }, '');
 
     const nowRows = {
       s: resultRow(i18n.t('timestamp.seconds')),
@@ -176,7 +176,7 @@
       },
     });
     tsRow.append(tsField.wrapper, unitSelect.el);
-    const detected = el('div', { class: 'mt-1 text-[11px] text-fg-muted' }, '');
+    const detected = el('div', { class: 'text-[11px] text-fg-muted' }, '');
     toDateSection.append(tsRow, detected);
 
     const dateRows = {

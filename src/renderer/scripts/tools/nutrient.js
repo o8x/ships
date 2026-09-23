@@ -79,7 +79,7 @@
   ];
 
   function mount(container) {
-    const hint = el('div', { class: 'mb-3 text-[11px] text-fg-muted' }, i18n.t('nutrient.hint'));
+    const hint = el('div', { class: 'mb-2.5 text-[11px] text-fg-muted' }, i18n.t('nutrient.hint'));
     const store = persistState('nutrient');
 
     const nameInput = el('input', {

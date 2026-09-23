@@ -104,7 +104,7 @@
     }
 
     function header(titleText, actions) {
-      const head = el('div', { class: 'mb-3 flex items-center justify-between gap-2' });
+      const head = el('div', { class: 'mb-2.5 flex items-center justify-between gap-2' });
       const left = el('div', { class: 'min-w-0' });
       left.appendChild(el('h2', { class: 'tool-title mb-0' }, titleText));
       left.appendChild(el('div', { class: 'text-[11px] text-fg-muted' }, i18n.t('sshSettings.subtitle')));
@@ -143,10 +143,10 @@
         render();
       });
       actions.append(exportBtn, addBtn);
-      root.appendChild(el('div', { class: 'mb-3 flex items-center justify-end gap-2' })).appendChild(actions);
+      root.appendChild(el('div', { class: 'mb-2.5 flex items-center justify-end gap-2' })).appendChild(actions);
 
       if (state.message) {
-        root.appendChild(el('div', { class: 'mb-2 text-[11px] text-success' }, state.message));
+        root.appendChild(el('div', { class: 'mb-2.5 text-[11px] text-success' }, state.message));
       }
 
       if (!state.hosts.length) {
@@ -225,7 +225,7 @@
       const isNew = !editing.originalAlias;
       root.appendChild(header(isNew ? i18n.t('sshSettings.add') : i18n.t('sshSettings.edit'), null));
 
-      const form = el('div', { class: 'flex flex-col' });
+      const form = el('div', { class: 'flex flex-col gap-2.5' });
       const inputs = {};
 
       const defs = [
@@ -267,10 +267,10 @@
       }
 
       if (state.error) {
-        form.appendChild(el('div', { class: 'mb-2 text-[11px] text-danger' }, state.error));
+        form.appendChild(el('div', { class: 'text-[11px] text-danger' }, state.error));
       }
 
-      const detectStatus = el('div', { class: 'mb-2 text-[11px]' }, '');
+      const detectStatus = el('div', { class: 'text-[11px]' }, '');
       if (state.detecting) {
         detectStatus.textContent = i18n.t('sshSettings.detecting');
         detectStatus.style.color = 'var(--color-fg-muted)';
@@ -286,7 +286,7 @@
       }
       form.appendChild(detectStatus);
 
-      const actions = el('div', { class: 'mt-1 flex items-center gap-2' });
+      const actions = el('div', { class: 'flex items-center gap-2' });
       const detectBtn = el('button', { class: 'btn', type: 'button' }, i18n.t('sshSettings.detect'));
       detectBtn.disabled = state.detecting;
       detectBtn.addEventListener('click', () => doDetect(inputs));

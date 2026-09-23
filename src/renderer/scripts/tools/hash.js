@@ -42,7 +42,7 @@
   }
 
   function mount(container) {
-    const hint = el('div', { class: 'mb-3 text-[11px] text-fg-muted' }, i18n.t('hash.hint'));
+    const hint = el('div', { class: 'mb-2.5 text-[11px] text-fg-muted' }, i18n.t('hash.hint'));
 
     const modeSegment = segmented(
       [
@@ -72,12 +72,12 @@
       spellcheck: 'false',
       placeholder: i18n.t('hash.placeholder'),
     });
-    const stringPanel = el('div', {});
+    const stringPanel = el('div', { class: 'mb-2.5 flex flex-col gap-2.5' });
     stringPanel.appendChild(inputField(null, textarea));
 
     // File panel
-    const filePanel = el('div', { class: 'hidden' });
-    const fileLabel = el('div', { class: 'mb-2 truncate text-[12px] text-fg-muted' }, i18n.t('hash.noFile'));
+    const filePanel = el('div', { class: 'mb-2.5 flex flex-col gap-2.5 hidden' });
+    const fileLabel = el('div', { class: 'truncate text-[12px] text-fg-muted' }, i18n.t('hash.noFile'));
     const chooseBtn = el('button', { class: 'btn', type: 'button' });
     chooseBtn.append(
       el('span', { class: 'inline-flex' }, Icons.folder(14)),
