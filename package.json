@@ -12,7 +12,7 @@
     "watch:css": "tailwindcss -i ./src/renderer/styles/tailwind.css -o ./src/renderer/styles/tailwind.build.css --watch",
     "start": "pnpm run build:css && electron .",
     "dev": "electron .",
-    "dist:mac": "bash hack/dist-mac.sh",
+    "dist:mac": "bash scripts/dist-mac.sh",
     "pack:mac": "pnpm run build:css && electron-builder --mac --arm64 --dir"
   },
   "dependencies": {
@@ -63,7 +63,7 @@
       "en",
       "zh_CN"
     ],
-    "afterSign": "hack/notarize.cjs",
+    "afterSign": "scripts/notarize.cjs",
     "mac": {
       "target": [
         {
