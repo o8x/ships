@@ -24,6 +24,7 @@ app.whenReady().then(async () => {
   registerSettingsIpc(ipcMain);
 
   const win = wm.createMainWindow();
+  win.webContents.setBackgroundThrottling(false);
   await waitLoad(win);
   win.show();
   await delay(1200);
@@ -34,7 +35,7 @@ app.whenReady().then(async () => {
         ` return 'missing ' + i + ' of ' + list.length; })();`
     );
     console.log('[capture] tab:', result);
-    await delay(400);
+    await delay(900);
   }
   if (process.env.INPUT) {
     const result = await win.webContents.executeJavaScript(
@@ -45,7 +46,13 @@ app.whenReady().then(async () => {
     console.log('[capture] input:', result);
     await delay(400);
   }
+  win.webContents.invalidate();
+  await delay(300);
   const image = await win.webContents.capturePage();
+  const activeTool = await win.webContents.executeJavaScript(
+    `document.querySelector('.tab-active') && document.querySelector('.tab-active').dataset.tool;`
+  );
+  console.log('[capture] active:', activeTool);
   fs.writeFileSync(process.env.OUT || '/tmp/ships.png', image.toPNG());
 
   if (process.env.SETTINGS_OUT) {
