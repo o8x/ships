@@ -76,15 +76,13 @@
 }
 
 /*
- * 原生毛玻璃（macOS vibrancy，主面板启用时由 app.js 在 <html> 上置 data-vibrancy="on"）：
- * 把基础 / 卡片背景改为半透明，让系统 blur 透出；设置窗口不置该属性，保持不透明。
+ * 原生毛玻璃（macOS Liquid Glass / vibrancy，主面板启用时由 app.js 在 <html> 上置
+ * data-vibrancy="on"）：只把面板底色置为透明，让玻璃透出；卡片 / 输入框保持
+ * 主题的不透明底色，保证深色文字可读、不出现半透明白叠玻璃形成的灰雾。
+ * 设置窗口不置该属性，保持不透明。
  */
 [data-vibrancy='on'] {
   --color-bg: transparent;
-  --color-surface: rgba(255, 255, 255, 0.5);
-  --color-surface-2: rgba(255, 255, 255, 0.4);
-  --color-surface-3: rgba(255, 255, 255, 0.32);
-  --color-border: rgba(0, 0, 0, 0.12);
 }
 
 [data-vibrancy='on'][data-theme='dark'] {
