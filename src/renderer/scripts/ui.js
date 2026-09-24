@@ -351,6 +351,8 @@ window.ShipsUI = (function createUI() {
     let items = (options.options || []).slice();
     let menu = null;
     let suppressFocusOpen = false;
+    // Current preset value; null when the text is free-form (not a preset).
+    let current = null;
 
     const input = el('input', {
       class: 'field combo-input',
@@ -363,7 +365,24 @@ window.ShipsUI = (function createUI() {
     chevron.innerHTML = Icons.chevronDown(14);
     const root = el('div', { class: `combo ${options.className}` });
     root.append(input, chevron);
-    input.value = options.value == null ? '' : options.value;
+
+    function findItem(value) {
+      return items.find((item) => String(item.value) === String(value));
+    }
+
+    // Show a preset's label in the field, keep its raw value for getValue().
+    function applyValue(value) {
+      const item = findItem(value);
+      if (item) {
+        current = item.value;
+        input.value = item.label;
+      } else {
+        current = null;
+        input.value = value == null ? '' : value;
+      }
+    }
+
+    applyValue(options.value);
 
     function close() {
       if (!menu) return;
@@ -385,8 +404,9 @@ window.ShipsUI = (function createUI() {
       for (const item of items) {
         const opt = el('button', { type: 'button', class: 'select-option', dataset: { value: item.value } });
         opt.append(el('span', { class: 'select-option-label truncate' }, item.label));
+        if (findItem(current) === item) opt.classList.add('active');
         opt.addEventListener('click', () => {
-          input.value = item.value;
+          applyValue(item.value);
           close();
           options.onChange(item.value);
           suppressFocusOpen = true;
@@ -417,7 +437,10 @@ window.ShipsUI = (function createUI() {
       window.addEventListener('scroll', close, true);
     }
 
-    input.addEventListener('input', () => options.onChange(input.value));
+    input.addEventListener('input', () => {
+      current = null;
+      options.onChange(input.value);
+    });
     input.addEventListener('focus', () => {
       if (!suppressFocusOpen) open();
     });
@@ -433,10 +456,8 @@ window.ShipsUI = (function createUI() {
     return {
       root,
       input,
-      getValue: () => input.value,
-      setValue(value) {
-        input.value = value == null ? '' : value;
-      },
+      getValue: () => (current != null ? current : input.value),
+      setValue: applyValue,
       setOptions(next) {
         items = next.slice();
       },
