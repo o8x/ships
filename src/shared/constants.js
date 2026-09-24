@@ -67,8 +67,9 @@ const SETTINGS_WINDOW = Object.assign(
 );
 
 // macOS only: NSVisualEffectMaterial used when the native frosted glass is on.
+// 'content' stays bright and see-through (avoids the gray tint of 'under-window').
 const VIBRANCY = {
-  type: 'under-window',
+  type: 'content',
   state: 'active',
 };
 

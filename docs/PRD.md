@@ -370,7 +370,7 @@ stateDiagram-v2
 - 圆角：外层面板 `--radius-window`（10px），透明窗口使圆角外露；**主窗口无描边边框**（仅卡片/输入框有边框）。
 - 底部栏：左侧版本号（`vX.Y.Z`），右侧依次为图钉（固定悬浮）与设置按钮（齿轮）。
 - `Escape` 隐藏面板；默认失焦自动隐藏；固定悬浮时保持显示并可通过顶部「应用图标 + 名称」区域拖动。
-- **原生毛玻璃（`settings.vibrancy`，仅 macOS）**：开启时主面板使用系统 `under-window` vibrancy（`visualEffectState: active`，见 `shared/constants.js` 的 `VIBRANCY`），创建窗口时同时传入 `vibrancy`、`visualEffectState` 与 **`roundedCorners: true`**（关闭时为 `false`，由 CSS 圆角塑形）——因为 `roundedCorners` 与 `vibrancy` 都是**创建期参数**，切换该设置时丢弃并按新配置**重建主面板**（此时面板隐藏，无闪烁；`main.js` 已订阅 `window-all-closed` 不退出）。`app.js` 在 macOS 下于 `<html>` 置 `data-vibrancy="on"`，`constants.css` 把 `--color-bg` 置 `transparent`、卡片背景改为半透明，让系统 blur 透出；另由 `nativeTheme.themeSource` 使原生材质跟随应用主题。**仅作用于主面板**，设置窗口保持不透明；非 macOS 不生效（属性置 `off`）。默认关闭。
+- **原生毛玻璃（`settings.vibrancy`，仅 macOS）**：开启时主面板使用系统 `content` vibrancy（明亮、通透，避免 `under-window` 的灰调；`visualEffectState: active`，见 `shared/constants.js` 的 `VIBRANCY`），创建窗口时同时传入 `vibrancy`、`visualEffectState` 与 **`roundedCorners: true`**（关闭时为 `false`，由 CSS 圆角塑形）——因为 `roundedCorners` 与 `vibrancy` 都是**创建期参数**，切换该设置时丢弃并按新配置**重建主面板**（此时面板隐藏，无闪烁；`main.js` 已订阅 `window-all-closed` 不退出）。`app.js` 在 macOS 下于 `<html>` 置 `data-vibrancy="on"`，`constants.css` 把 `--color-bg` 置 `transparent`、卡片背景改为半透明，让系统 blur 透出；另由 `nativeTheme.themeSource` 使原生材质跟随应用主题。**仅作用于主面板**，设置窗口保持不透明；非 macOS 不生效（属性置 `off`）。默认关闭。
 
 ### 8.2 设置窗口
 
