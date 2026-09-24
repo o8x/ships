@@ -199,7 +199,7 @@
   border: none;
   background: transparent;
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   font-size: 12px;
   color: var(--color-fg-muted);
   cursor: pointer;
@@ -316,7 +316,7 @@ input[type='color'].swatch::-webkit-color-swatch {
   gap: 8px;
   width: 100%;
   padding: 6px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border: none;
   background: transparent;
   color: var(--color-fg);
@@ -331,6 +331,42 @@ input[type='color'].swatch::-webkit-color-swatch {
   color: var(--color-accent);
 }
 
+/* Editable combo box (free-text input + preset dropdown) */
+.combo {
+  position: relative;
+  display: block;
+}
+.combo .combo-input {
+  padding-right: 26px;
+}
+.combo-chevron {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+.combo-chevron:hover {
+  color: var(--color-fg);
+}
+.combo.open .combo-chevron {
+  transform: translateY(-50%) rotate(180deg);
+}
+.combo.invalid .combo-input {
+  border-color: var(--color-danger);
+}
+.combo.invalid .combo-chevron {
+  color: var(--color-danger);
+}
+
 /* Tooltip */
 .ships-tip {
   position: fixed;
@@ -339,7 +375,7 @@ input[type='color'].swatch::-webkit-color-swatch {
   opacity: 0;
   max-width: 240px;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   font-size: 11px;
   line-height: 1.4;
   color: var(--color-fg);

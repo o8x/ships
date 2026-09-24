@@ -166,7 +166,7 @@ Ships/
 
 | 功能 | 说明 | 默认值 / 条件 |
 | --- | --- | --- |
-| 时间戳转换 | 秒 / 毫秒 / 纳秒与日期互转；顶部实时当前时间，纳秒用 `performance.timeOrigin + performance.now()` 高精度计算（约 50ms 刷新，非固定 `000000`）；时间戳行支持自动识别单位（≤11 位为秒、≤15 位为毫秒、否则纳秒），单位用自绘下拉选择 | 实时；不可识别的输入显示错误 |
+| 时间戳转换 | 秒 / 毫秒 / 纳秒与日期互转；顶部实时当前时间，纳秒用 `performance.timeOrigin + performance.now()` 高精度计算（约 50ms 刷新，非固定 `000000`）；时间戳单位**自动识别**（≤11 位为秒、≤15 位为毫秒、否则纳秒），无单位选择框；**时间戳 → 日期**与**日期 → 时间戳**的输入框**同一行右侧**各有一个**可输入的时间偏移组合框**（自绘，见 §11），可输入 `-30m` / `+2h` / `90`（纯数字按秒；单位 `s`/`m`/`h`/`d`/`w`/`mo`，月按 30 天），带符号表示「前（-） / 后（+）」，输出结果叠加该偏移；下拉预设为：无偏移、±1 分钟、±30 分钟、±1 小时、±1 天、±1 周、±1 个月；偏移文本非法时组合框描红且按无偏移计算 | 实时；不可识别的时间戳显示错误；输入与偏移本地持久化 |
 | IP / 网段与掩码 | 输入 `IP`、`IP/前缀`、`IP 掩码`、纯数字或 `0x` 十六进制；自上而下显示：**归属地** → **IP 进制（十进制 / 十六进制 / 二进制）** → 网段结果（网络地址、广播地址、可用范围、主机数、掩码、反掩码、前缀、掩码二进制、地址类型）；IPv6 仅显示 IP 进制 | 未给掩码时按 `/24` 计算并提示；IPv6 不查归属地；归属地卡片固定高度，无运营商显示 `-` |
 | 进制转换 | 2/8/10/16 进制四行双向实时同步；另有 2–36 自定义进制（自绘下拉）；“位宽/字节”统计 | 任一行输入即联动其余 |
 | JSON 格式化 | 粘贴/失焦后**原地格式化**（固定 4 空格缩进）并语法高亮；工具栏单行：文本/结构切换、键排序、复制、压缩、清空；错误定位（行列）；**结构查看**（可折叠树） | 超过 1MB 仅格式化不高亮；输入改变仅重高亮；编辑器高度 180px |
@@ -366,7 +366,7 @@ stateDiagram-v2
 - 尺寸：**400 × 500**（`ships.window.width/height`），无边框、透明、不可缩放、置顶、不占 Dock。
 - 结构：顶部栏（高 46px）：**左侧**为 App 彩色图标 + 名称（固定不压缩），**右侧**为 TAB 图标区（右对齐、超出可横向滚动；图标 22×22px、按钮 36×36px、间距 6px）→ 内容区（可滚动）→ 底部栏（高 34px）。
 - TAB 工具顺序由单一文件 `src/renderer/scripts/tool-order.js` 的 `window.ShipsToolOrder` 数组决定（改数组即改顺序；未列出的工具按注册顺序追加到末尾）。
-- 圆角：外层面板 `--radius-window`（12px），透明窗口使圆角外露；**主窗口无描边边框**（仅卡片/输入框有边框）。
+- 圆角：外层面板 `--radius-window`（10px），透明窗口使圆角外露；**主窗口无描边边框**（仅卡片/输入框有边框）。
 - 底部栏：左侧版本号（`vX.Y.Z`），右侧依次为图钉（固定悬浮）与设置按钮（齿轮）。
 - `Escape` 隐藏面板；默认失焦自动隐藏；固定悬浮时保持显示并可通过顶部「应用图标 + 名称」区域拖动。
 
@@ -445,9 +445,10 @@ stateDiagram-v2
 | 设置窗口尺寸 | 720 × 520 |
 | `--tabbar-height` | 46px |
 | `--footer-height` | 34px |
-| `--radius-window` | 12px |
-| `--radius-card` | 10px |
-| `--radius-control` | 8px |
+| `--radius-window` | 10px |
+| `--radius-card` | 5px |
+| `--radius-control` | 5px |
+| `--radius-xs` | 2px |
 | 间距 `--space-1..5` | 4 / 8 / 12 / 16 / 20px |
 
 **组件**
@@ -455,7 +456,7 @@ stateDiagram-v2
 - 输入 `field`、按钮 `btn` / `btn-accent`、图标按钮 `icon-btn`、结果行 `row-card`、TAB `tab` / `tab-active`、开关 `switch`、分段控件 `segment`、色块 `swatch`。
 - **纵向间距统一 10px**：工具/设置分区用 `.section`（`gap: 10px`、`margin-bottom: 10px`）；结果行、输入、区块之间的间距均为 10px（不再混用 8/12/16px）。
 - **统一标题**：每个工具内容区顶部由 `app.js` 渲染统一头部 `.tool-head`（标题取 `tools.<id>`、说明取 `toolDesc.<id>`）；切换 TAB 时内容区自动滚动回顶部。
-- 自绘控件：下拉框 `select-trigger` / `select-menu` / `select-option`（`ShipsUI.createSelect`，替代系统 `<select>`）；悬浮提示 `ships-tip`（`ShipsUI.initTooltips`，元素加 `data-tip`）；JSON 覆盖式高亮编辑器 `json-editor` 与结构树 `json-tree`。
+- 自绘控件：下拉框 `select-trigger` / `select-menu` / `select-option`（`ShipsUI.createSelect`，替代系统 `<select>`）；**可输入下拉组合框** `combo` / `combo-input` / `combo-chevron`（`ShipsUI.createCombo`，自由输入 + 预设菜单，`.invalid` 时描红；时间戳工具的偏移控件即用它）；悬浮提示 `ships-tip`（`ShipsUI.initTooltips`，元素加 `data-tip`）；JSON 覆盖式高亮编辑器 `json-editor` 与结构树 `json-tree`。
 - 视觉点缀：不使用 emoji；SSH 探测结果直接使用 `assets/icons` 中的品牌彩色图标（Ubuntu/Fedora/Arch/CentOS/… 及 Windows），macOS 用灰色 command 图标；IP 归属地展示彩色国旗。
 - **动效**：TAB 选中、分段控件、下拉菜单、开关、JSON 视图切换均有过渡 / 入场动画；工具与设置分区内容进入时带 `ships-fade-up`，下拉菜单与 TAB 选中带 `ships-pop`（详见 `styles/tailwind.css` 的 Motion 段）。
 - 图标按钮与 TAB 一律通过 `data-tip` 提供悬浮说明。

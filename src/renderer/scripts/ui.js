@@ -176,7 +176,7 @@ window.ShipsUI = (function createUI() {
     const width = options.shape === '1x1' ? size : Math.round(size * 1.333);
     return svg.replace(
       '<svg',
-      `<svg width="${width}" height="${size}" class="${options.class || ''}" style="border-radius:2px" `
+      `<svg width="${width}" height="${size}" class="${options.class || ''}" style="border-radius:var(--radius-xs)" `
     );
   }
 
@@ -344,6 +344,106 @@ window.ShipsUI = (function createUI() {
     };
   }
 
+  /* Editable combo box: free-text input + preset dropdown (e.g. time offsets). */
+  function createCombo(config) {
+    const options = { onChange: () => {}, className: '', align: 'right', placeholder: '' };
+    Object.assign(options, config || {});
+    let items = (options.options || []).slice();
+    let menu = null;
+    let suppressFocusOpen = false;
+
+    const input = el('input', {
+      class: 'field combo-input',
+      type: 'text',
+      spellcheck: 'false',
+      autocomplete: 'off',
+      placeholder: options.placeholder || '',
+    });
+    const chevron = el('button', { type: 'button', class: 'combo-chevron', tabindex: '-1' });
+    chevron.innerHTML = Icons.chevronDown(14);
+    const root = el('div', { class: `combo ${options.className}` });
+    root.append(input, chevron);
+    input.value = options.value == null ? '' : options.value;
+
+    function close() {
+      if (!menu) return;
+      menu.remove();
+      menu = null;
+      root.classList.remove('open');
+      document.removeEventListener('mousedown', onDocDown, true);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, true);
+    }
+
+    function onDocDown(event) {
+      if (menu && !menu.contains(event.target) && !root.contains(event.target)) close();
+    }
+
+    function open() {
+      if (menu || !items.length) return;
+      menu = el('div', { class: 'select-menu combo-menu' });
+      for (const item of items) {
+        const opt = el('button', { type: 'button', class: 'select-option', dataset: { value: item.value } });
+        opt.append(el('span', { class: 'select-option-label truncate' }, item.label));
+        opt.addEventListener('click', () => {
+          input.value = item.value;
+          close();
+          options.onChange(item.value);
+          suppressFocusOpen = true;
+          input.focus();
+          setTimeout(() => {
+            suppressFocusOpen = false;
+          }, 0);
+        });
+        menu.appendChild(opt);
+      }
+      document.body.appendChild(menu);
+      root.classList.add('open');
+
+      const rect = root.getBoundingClientRect();
+      const menuRect = menu.getBoundingClientRect();
+      let left = options.align === 'right' ? rect.right - menuRect.width : rect.left;
+      left = Math.max(6, Math.min(left, window.innerWidth - menuRect.width - 6));
+      let top = rect.bottom + 4;
+      if (top + menuRect.height > window.innerHeight - 6) {
+        top = Math.max(6, rect.top - menuRect.height - 4);
+      }
+      menu.style.left = `${left}px`;
+      menu.style.top = `${top}px`;
+      menu.style.minWidth = `${rect.width}px`;
+
+      document.addEventListener('mousedown', onDocDown, true);
+      window.addEventListener('resize', close);
+      window.addEventListener('scroll', close, true);
+    }
+
+    input.addEventListener('input', () => options.onChange(input.value));
+    input.addEventListener('focus', () => {
+      if (!suppressFocusOpen) open();
+    });
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && menu) {
+        event.stopPropagation();
+        close();
+      }
+    });
+    chevron.addEventListener('mousedown', (event) => event.preventDefault());
+    chevron.addEventListener('click', () => (menu ? close() : open()));
+
+    return {
+      root,
+      input,
+      getValue: () => input.value,
+      setValue(value) {
+        input.value = value == null ? '' : value;
+      },
+      setOptions(next) {
+        items = next.slice();
+      },
+      close,
+    };
+  }
+
   /* Lightweight self-drawn tooltip for elements with [data-tip]. */
   function initTooltips() {
     const tip = el('div', { class: 'ships-tip' }, '');
@@ -425,6 +525,7 @@ window.ShipsUI = (function createUI() {
     osIconInfo,
     createGeoRow,
     createSelect,
+    createCombo,
     segmented,
     persistState,
     initTooltips,

@@ -23,6 +23,7 @@ module.exports = {
       borderRadius: {
         card: 'var(--radius-card)',
         control: 'var(--radius-control)',
+        xs: 'var(--radius-xs)',
         pill: 'var(--radius-pill)',
       },
       boxShadow: {
