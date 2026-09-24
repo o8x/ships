@@ -67,9 +67,10 @@ const SETTINGS_WINDOW = Object.assign(
 );
 
 // macOS only: NSVisualEffectMaterial used when the native frosted glass is on.
-// 'content' stays bright and see-through (avoids the gray tint of 'under-window').
+// 'hud' gives the strongly see-through, low-opacity look of the system HUD
+// (Control Center style); 'content'/'under-window' are effectively opaque/gray.
 const VIBRANCY = {
-  type: 'content',
+  type: 'hud',
   state: 'active',
 };
 
