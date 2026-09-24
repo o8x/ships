@@ -31,7 +31,7 @@
     "window": {
       "width": 380,
       "height": 500,
-      "gapBelowTray": 6,
+      "gapBelowTray": 2,
       "cornerRadius": 12
     },
     "settingsWindow": {
