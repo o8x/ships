@@ -433,7 +433,7 @@ stateDiagram-v2
 | `--color-success` | `#2f9e44` | `#4ade80` |
 
 - JSON 语法色：`--color-json-key/str/num/bool/null`（深浅各一套）。
-- **强调色派生**：`--color-border`、`--color-surface`、`--color-surface-2/-3` 由 `--color-accent` 通过 `color-mix` 派生（边框约 24%、卡片背景约 4%、输入背景约 8%、悬停约 12%），因此修改主题色会体现在**输入框与卡片的边框与背景**上；窗口底色 `--color-bg` 保持纯白 / 深色不受影响。
+- **强调色使用范围**：`--color-accent` 仅用于高亮与控件（TAB 选中、分段控件、开关、焦点环、强调按钮、色板等），**不**用于卡片 / 输入框的边框与背景（这些保持中性色）。
 - 强调色由设置写入 `:root` 的 `--color-accent`；TAB 选中、开关、按钮等统一引用。
 
 **尺寸与圆角**
