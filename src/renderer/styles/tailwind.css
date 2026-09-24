@@ -109,6 +109,30 @@
   }
 }
 
+/* --------------------------- Crispness ------------------------------- */
+/* Hairline borders on Retina displays (matches native macOS look). */
+@media (min-resolution: 2dppx) {
+  .field,
+  .row-card,
+  .segment,
+  .select-trigger,
+  .chip,
+  .json-editor,
+  .json-tree,
+  .select-menu,
+  .ships-tip {
+    border-width: 0.5px;
+  }
+}
+
+/* Subtle elevation for cards (light theme only). */
+.row-card {
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.03);
+}
+[data-theme='dark'] .row-card {
+  box-shadow: none;
+}
+
 /* JSON syntax colors (class names built dynamically, so kept outside @layer). */
 .json-key {
   color: var(--color-json-key);
