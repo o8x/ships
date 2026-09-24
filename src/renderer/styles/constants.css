@@ -76,7 +76,7 @@
 }
 
 /*
- * 原生毛玻璃（macOS Liquid Glass / vibrancy，主面板启用时由 app.js 在 <html> 上置
+ * Liquid Glass（macOS Liquid Glass / vibrancy，主面板启用时由 app.js 在 <html> 上置
  * data-vibrancy="on"）：面板底色透明、卡片 / 输入框也几乎不填色（仅留极淡的一层
  * 与描边），让原生玻璃的 blur 直接透出，贴近系统 Liquid Glass 应用的观感；
  * 同时加深文字以保证在玻璃上的可读性。设置窗口不置该属性，保持不透明。
