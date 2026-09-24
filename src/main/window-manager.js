@@ -15,19 +15,49 @@ let trayRef = null;
 let blurSuppressed = false;
 let pinnedPositioned = false;
 
+// electron-liquid-glass is a macOS-only native addon (NSGlassEffectView, macOS
+// 26+); load it lazily so non-macOS builds never touch it.
+let liquidGlassModule;
+let liquidGlassResolved = false;
+function getLiquidGlass() {
+  if (liquidGlassResolved) return liquidGlassModule;
+  liquidGlassResolved = true;
+  liquidGlassModule = null;
+  if (process.platform !== 'darwin') return null;
+  try {
+    liquidGlassModule = require('electron-liquid-glass');
+  } catch (err) {
+    logger.warn('electron-liquid-glass unavailable:', err.message);
+  }
+  return liquidGlassModule;
+}
+
+function liquidGlassAvailable() {
+  const lg = getLiquidGlass();
+  try {
+    return Boolean(lg && typeof lg.isGlassSupported === 'function' && lg.isGlassSupported());
+  } catch (err) {
+    return false;
+  }
+}
+
+// Glass mode for the popover: 'liquid' (native Liquid Glass, macOS 26+),
+// 'vibrancy' (hud NSVisualEffectView fallback) or 'off'.
+function glassMode() {
+  if (process.platform !== 'darwin' || !settings.get('vibrancy')) return 'off';
+  return liquidGlassAvailable() ? 'liquid' : 'vibrancy';
+}
+
 function setTray(tray) {
   trayRef = tray;
 }
 
-// Native frosted glass is macOS-only and only meaningful for the transparent
-// popover. Returns creation-time options (empty when disabled/unsupported).
-function vibrancyOptions() {
-  if (process.platform !== 'darwin' || !settings.get('vibrancy')) return {};
-  return { vibrancy: VIBRANCY.type, visualEffectState: VIBRANCY.state };
-}
-
 function createMainWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
+
+  const mode = glassMode();
+  const glassOptions =
+    mode === 'vibrancy' ? { vibrancy: VIBRANCY.type, visualEffectState: VIBRANCY.state } : {};
 
   mainWindow = new BrowserWindow({
     width: WINDOW.width,
@@ -35,7 +65,7 @@ function createMainWindow() {
     show: false,
     frame: false,
     transparent: true,
-    ...vibrancyOptions(),
+    ...glassOptions,
     resizable: false,
     movable: false,
     minimizable: false,
@@ -44,9 +74,9 @@ function createMainWindow() {
     skipTaskbar: true,
     alwaysOnTop: true,
     hasShadow: true,
-    // With native vibrancy the OS must clip the material, so rely on the
-    // native rounded frame; otherwise the CSS radius shapes the panel.
-    roundedCorners: Boolean(settings.get('vibrancy')),
+    // Liquid Glass rounds itself; hud vibrancy needs the native rounded frame;
+    // otherwise the CSS radius shapes the panel.
+    roundedCorners: mode === 'vibrancy',
     backgroundColor: '#00000000',
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'main-preload.js'),
@@ -60,6 +90,20 @@ function createMainWindow() {
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   if (mainWindow.setMovable) mainWindow.setMovable(Boolean(settings.get('pinWindow')));
   mainWindow.loadFile(path.join(RENDERER_DIR, 'index.html'));
+
+  if (mode === 'liquid') {
+    const win = mainWindow;
+    win.webContents.once('did-finish-load', () => {
+      try {
+        const lg = getLiquidGlass();
+        if (lg && !win.isDestroyed()) {
+          lg.addView(win.getNativeWindowHandle(), { cornerRadius: WINDOW.cornerRadius });
+        }
+      } catch (err) {
+        logger.warn('liquid glass addView failed:', err.message);
+      }
+    });
+  }
 
   mainWindow.on('blur', () => {
     if (blurSuppressed) return;

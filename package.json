@@ -16,6 +16,7 @@
     "pack:mac": "pnpm run build:css && electron-builder --mac --arm64 --dir"
   },
   "dependencies": {
+    "electron-liquid-glass": "^1.1.1",
     "ssh2": "^1.17.0"
   },
   "devDependencies": {
@@ -32,7 +33,7 @@
       "width": 380,
       "height": 500,
       "gapBelowTray": 2,
-      "cornerRadius": 12
+      "cornerRadius": 10
     },
     "settingsWindow": {
       "width": 720,
@@ -59,6 +60,10 @@
       "package.json"
     ],
     "asar": true,
+    "asarUnpack": [
+      "**/*.node",
+      "node_modules/electron-liquid-glass/**"
+    ],
     "npmRebuild": false,
     "compression": "maximum",
     "electronLanguages": [

@@ -53,7 +53,7 @@ const WINDOW = Object.assign(
     width: 400,
     height: 500,
     gapBelowTray: 2,
-    cornerRadius: 12,
+    cornerRadius: 10,
   },
   ships.window || {}
 );
