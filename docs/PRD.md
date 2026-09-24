@@ -159,7 +159,7 @@ Ships/
 1. 设置窗口任一控件变更 → `settings:set`（增量 patch）。
 2. 主进程合并写入 `settings.json`，必要时应用登录项，并广播 `settings:changed`。
 3. 主面板与设置窗口同步应用主题 / 强调色 / 语言；主题为“跟随系统”时监听 `nativeTheme` 的 `updated` 事件（广播 `theme:changed`）。
-4. 副作用：`pinWindow` → `applyPin`；`vibrancy` → `applyVibrancy`（主进程对主面板调用 `win.setVibrancy`），主面板同时更新 `<html data-vibrancy="on|off">`。
+4. 副作用：`pinWindow` → `applyPin`；`vibrancy` → `applyVibrancy`（销毁并按新配置重建主面板，使原生 `vibrancy` 与 `roundedCorners` 同时生效），主面板同时更新 `<html data-vibrancy="on|off">`；`theme` → `nativeTheme.themeSource`（使原生材质与应用主题一致）。
 
 ---
 
@@ -370,7 +370,7 @@ stateDiagram-v2
 - 圆角：外层面板 `--radius-window`（10px），透明窗口使圆角外露；**主窗口无描边边框**（仅卡片/输入框有边框）。
 - 底部栏：左侧版本号（`vX.Y.Z`），右侧依次为图钉（固定悬浮）与设置按钮（齿轮）。
 - `Escape` 隐藏面板；默认失焦自动隐藏；固定悬浮时保持显示并可通过顶部「应用图标 + 名称」区域拖动。
-- **原生毛玻璃（`settings.vibrancy`，仅 macOS）**：开启时主面板使用系统 `under-window` vibrancy（`visualEffectState: active`，见 `shared/constants.js` 的 `VIBRANCY`），主进程创建 / 切换时调用 `win.setVibrancy`；`app.js` 在 macOS 下于 `<html>` 置 `data-vibrancy="on"`，`constants.css` 据此把 `--color-bg` / `--color-surface*` 改为半透明，让系统 blur 透出。**仅作用于主面板**，设置窗口保持不透明；非 macOS 不生效（属性置 `off`）。默认关闭。
+- **原生毛玻璃（`settings.vibrancy`，仅 macOS）**：开启时主面板使用系统 `under-window` vibrancy（`visualEffectState: active`，见 `shared/constants.js` 的 `VIBRANCY`），创建窗口时同时传入 `vibrancy`、`visualEffectState` 与 **`roundedCorners: true`**（关闭时为 `false`，由 CSS 圆角塑形）——因为 `roundedCorners` 与 `vibrancy` 都是**创建期参数**，切换该设置时丢弃并按新配置**重建主面板**（此时面板隐藏，无闪烁；`main.js` 已订阅 `window-all-closed` 不退出）。`app.js` 在 macOS 下于 `<html>` 置 `data-vibrancy="on"`，`constants.css` 把 `--color-bg` 置 `transparent`、卡片背景改为半透明，让系统 blur 透出；另由 `nativeTheme.themeSource` 使原生材质跟随应用主题。**仅作用于主面板**，设置窗口保持不透明；非 macOS 不生效（属性置 `off`）。默认关闭。
 
 ### 8.2 设置窗口
 
@@ -438,7 +438,7 @@ stateDiagram-v2
 - **强调色使用范围**：`--color-accent` 仅用于高亮与控件（TAB 选中、分段控件、开关、焦点环、强调按钮、色板等），**不**用于卡片 / 输入框的边框与背景（这些保持中性色）。
 - **清晰度**：`theme.js` 按 `window.devicePixelRatio` 在 `<html>` 上设置 `data-dpr`（≥2 为 `2`，否则 `1`，并在 `resize` / 分辨率变化时更新）。仅当 `data-dpr="2"` 时，卡片 / 输入框 / 分段 / 下拉等使用 **0.5px 发丝线**、浅色卡片带轻微投影；非 HiDPI 下**不使用**这些效果。
 - 强调色由设置写入 `:root` 的 `--color-accent`；TAB 选中、开关、按钮等统一引用。
-- **原生毛玻璃配色**：`[data-vibrancy='on']`（浅色）与 `[data-vibrancy='on'][data-theme='dark']`（深色）在 `constants.css` 中把 `--color-bg` / `--color-surface` / `--color-surface-2` / `--color-surface-3` 覆盖为半透明 `rgba()`，供系统 vibrancy 透出；属性由主面板 `app.js` 设置，设置窗口不设置（保持不透明）。
+- **原生毛玻璃配色**：`[data-vibrancy='on']`（浅色）与 `[data-vibrancy='on'][data-theme='dark']`（深色）在 `constants.css` 中把 `--color-bg` 覆盖为 `transparent`、`--color-surface*` 覆盖为半透明 `rgba()`，供系统 vibrancy 透出；属性由主面板 `app.js` 设置，设置窗口不设置（保持不透明）。原生材质明暗由主进程 `nativeTheme.themeSource`（取 `settings.theme`）控制。
 
 **尺寸与圆角**
 

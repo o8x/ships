@@ -17,6 +17,12 @@ function applyLaunchAtLogin(enabled) {
   }
 }
 
+// Keep the native window appearance (incl. the vibrancy material) in sync with
+// the app theme, so forced light/dark also tints the frosted glass correctly.
+function applyThemeSource(theme) {
+  nativeTheme.themeSource = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : 'system';
+}
+
 function registerSettingsIpc(ipcMain) {
   ipcMain.handle(IPC.SETTINGS_GET, () => settings.getAll());
 
@@ -32,6 +38,7 @@ function registerSettingsIpc(ipcMain) {
     broadcast(IPC.SETTINGS_CHANGED, data);
     if (!keys || keys.includes('pinWindow')) applyPin(Boolean(data.pinWindow));
     if (!keys || keys.includes('vibrancy')) applyVibrancy(Boolean(data.vibrancy));
+    if (!keys || keys.includes('theme')) applyThemeSource(data.theme);
   });
 
   nativeTheme.on('updated', () => {
@@ -39,6 +46,7 @@ function registerSettingsIpc(ipcMain) {
   });
 
   applyLaunchAtLogin(settings.get('launchAtLogin'));
+  applyThemeSource(settings.get('theme'));
 }
 
 module.exports = { registerSettingsIpc, applyLaunchAtLogin };

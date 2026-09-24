@@ -44,7 +44,9 @@ function createMainWindow() {
     skipTaskbar: true,
     alwaysOnTop: true,
     hasShadow: true,
-    roundedCorners: false,
+    // With native vibrancy the OS must clip the material, so rely on the
+    // native rounded frame; otherwise the CSS radius shapes the panel.
+    roundedCorners: Boolean(settings.get('vibrancy')),
     backgroundColor: '#00000000',
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'main-preload.js'),
@@ -66,8 +68,8 @@ function createMainWindow() {
     hideMainWindow();
   });
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
+  mainWindow.on('closed', function onClosed() {
+    if (mainWindow === this) mainWindow = null;
   });
 
   return mainWindow;
@@ -127,17 +129,17 @@ function applyPin(pinned) {
   }
 }
 
-// Toggle the native frosted glass on the (transparent) popover at runtime.
-function applyVibrancy(enabled) {
+// Toggle the native frosted glass. `vibrancy` and `roundedCorners` are
+// creation-time only (and must match so the material is clipped correctly),
+// so rebuild the popover — it is hidden while the settings window is open.
+function applyVibrancy() {
   if (process.platform !== 'darwin') return;
   const win = getMainWindow();
-  if (!win || typeof win.setVibrancy !== 'function') return;
-  if (enabled) {
-    win.setVibrancy(VIBRANCY.type);
-    if (typeof win.setVisualEffectState === 'function') win.setVisualEffectState(VIBRANCY.state);
-  } else {
-    win.setVibrancy(null);
-  }
+  if (!win || win.isDestroyed()) return;
+  if (win.isVisible()) win.hide();
+  win.destroy();
+  pinnedPositioned = false;
+  createMainWindow();
 }
 
 function hideMainWindow() {
