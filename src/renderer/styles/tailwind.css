@@ -330,6 +330,10 @@ input[type='color'].swatch::-webkit-color-swatch {
 .select-option.active {
   color: var(--color-accent);
 }
+/* Popovers need a touch more fill than in-flow cards to stand out from the glass. */
+[data-vibrancy='on'] .select-menu {
+  background: var(--color-surface-3);
+}
 
 /* Editable combo box (free-text input + preset dropdown) */
 .combo {

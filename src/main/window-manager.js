@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('path');
-const { BrowserWindow, screen, nativeTheme } = require('electron');
+const { BrowserWindow, screen } = require('electron');
 const { WINDOW, SETTINGS_WINDOW, VIBRANCY, IPC } = require('../shared/constants');
 const settings = require('./services/settings-service');
 const logger = require('./utils/logger');
@@ -14,7 +14,6 @@ let settingsWindow = null;
 let trayRef = null;
 let blurSuppressed = false;
 let pinnedPositioned = false;
-let themeListenerBound = false;
 
 // electron-liquid-glass is a macOS-only native addon (NSGlassEffectView, macOS
 // 26+); load it lazily so non-macOS builds never touch it.
@@ -49,31 +48,15 @@ function glassMode() {
   return liquidGlassAvailable() ? 'liquid' : 'vibrancy';
 }
 
-function effectiveDark() {
-  const theme = settings.get('theme');
-  if (theme === 'dark') return true;
-  if (theme === 'light') return false;
-  return nativeTheme.shouldUseDarkColors;
-}
-
-// (Re)apply Liquid Glass to a window. Calling addView again replaces the
-// previous glass view, so this doubles as the appearance-change refresh.
+// Apply Liquid Glass to a window (native NSGlassEffectView behind the content).
 function applyLiquidGlass(win) {
   const lg = getLiquidGlass();
   if (!lg || !win || win.isDestroyed()) return;
   try {
-    lg.addView(win.getNativeWindowHandle(), {
-      cornerRadius: WINDOW.cornerRadius,
-      tintColor: effectiveDark() ? undefined : VIBRANCY.lightTint,
-    });
+    lg.addView(win.getNativeWindowHandle(), { cornerRadius: WINDOW.cornerRadius });
   } catch (err) {
     logger.warn('liquid glass addView failed:', err.message);
   }
-}
-
-function refreshLiquidGlass() {
-  if (glassMode() !== 'liquid') return;
-  applyLiquidGlass(getMainWindow());
 }
 
 function setTray(tray) {
@@ -122,12 +105,6 @@ function createMainWindow() {
   if (mode === 'liquid') {
     const win = mainWindow;
     win.webContents.once('did-finish-load', () => applyLiquidGlass(win));
-  }
-
-  // Keep the glass tint in sync with the effective light/dark appearance.
-  if (!themeListenerBound) {
-    nativeTheme.on('updated', refreshLiquidGlass);
-    themeListenerBound = true;
   }
 
   mainWindow.on('blur', () => {

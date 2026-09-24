@@ -72,9 +72,6 @@ const SETTINGS_WINDOW = Object.assign(
 const VIBRANCY = {
   type: 'hud',
   state: 'active',
-  // Light appearance: tint the Liquid Glass white so dark text stays readable
-  // even when the backdrop behind the popover is dark.
-  lightTint: '#FFFFFFB3',
 };
 
 const DEFAULT_SETTINGS = {
