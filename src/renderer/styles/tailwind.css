@@ -110,26 +110,24 @@
 }
 
 /* --------------------------- Crispness ------------------------------- */
-/* Hairline borders on Retina displays (matches native macOS look). */
-@media (min-resolution: 2dppx) {
-  .field,
-  .row-card,
-  .segment,
-  .select-trigger,
-  .chip,
-  .json-editor,
-  .json-tree,
-  .select-menu,
-  .ships-tip {
-    border-width: 0.5px;
-  }
+/* Hairline borders only on HiDPI (data-dpr=2 set by theme.js). */
+[data-dpr='2'] .field,
+[data-dpr='2'] .row-card,
+[data-dpr='2'] .segment,
+[data-dpr='2'] .select-trigger,
+[data-dpr='2'] .chip,
+[data-dpr='2'] .json-editor,
+[data-dpr='2'] .json-tree,
+[data-dpr='2'] .select-menu,
+[data-dpr='2'] .ships-tip {
+  border-width: 0.5px;
 }
 
-/* Subtle elevation for cards (light theme only). */
-.row-card {
+/* Subtle elevation for cards, HiDPI + light theme only. */
+[data-dpr='2'] .row-card {
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.03);
 }
-[data-theme='dark'] .row-card {
+[data-dpr='2'][data-theme='dark'] .row-card {
   box-shadow: none;
 }
 

@@ -85,7 +85,7 @@ app.whenReady().then(async () => {
   }
   if (process.env.LOG_TABS) {
     const order = await win.webContents.executeJavaScript(
-      `JSON.stringify({ order: (window.ShipsToolOrder || null), dom: Array.from(document.querySelectorAll('#tablist .tab')).map((b) => b.dataset.tool) })`
+      `JSON.stringify({ order: (window.ShipsToolOrder || null), dpr: document.documentElement.dataset.dpr, ratio: window.devicePixelRatio, dom: Array.from(document.querySelectorAll('#tablist .tab')).map((b) => b.dataset.tool) })`
     );
     console.log('[capture] tabs:', order);
   }

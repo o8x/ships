@@ -434,7 +434,7 @@ stateDiagram-v2
 
 - JSON 语法色：`--color-json-key/str/num/bool/null`（深浅各一套）。
 - **强调色使用范围**：`--color-accent` 仅用于高亮与控件（TAB 选中、分段控件、开关、焦点环、强调按钮、色板等），**不**用于卡片 / 输入框的边框与背景（这些保持中性色）。
-- **清晰度**：Retina（`min-resolution: 2dppx`）下卡片 / 输入框 / 分段 / 下拉等边框使用 **0.5px 发丝线**；浅色主题卡片带轻微投影（深色主题不加），提升视觉清晰度。
+- **清晰度**：`theme.js` 按 `window.devicePixelRatio` 在 `<html>` 上设置 `data-dpr`（≥2 为 `2`，否则 `1`，并在 `resize` / 分辨率变化时更新）。仅当 `data-dpr="2"` 时，卡片 / 输入框 / 分段 / 下拉等使用 **0.5px 发丝线**、浅色卡片带轻微投影；非 HiDPI 下**不使用**这些效果。
 - 强调色由设置写入 `:root` 的 `--color-accent`；TAB 选中、开关、按钮等统一引用。
 
 **尺寸与圆角**
