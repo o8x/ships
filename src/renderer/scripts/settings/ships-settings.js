@@ -25,6 +25,8 @@
         launchAtLoginHint: '登录时自动启动 Ships',
         pin: '固定悬浮',
         pinHint: '主界面置顶常驻，失焦不自动隐藏',
+        vibrancy: '原生毛玻璃',
+        vibrancyHint: '主界面使用系统原生毛玻璃背景（仅 macOS）',
         clipboardLimit: '剪贴板条数',
         clipboardLimitHint: '最多保留最近几条记录',
         clipboardPoll: '剪贴板轮询间隔',
@@ -59,6 +61,8 @@
         launchAtLoginHint: 'Start Ships when you log in',
         pin: 'Keep on top',
         pinHint: 'Pin the popover and never auto-hide on blur',
+        vibrancy: 'Native frosted glass',
+        vibrancyHint: 'Use the system native frosted-glass background (macOS only)',
         clipboardLimit: 'Clipboard items',
         clipboardLimitHint: 'How many recent items to keep',
         clipboardPoll: 'Clipboard poll interval',
@@ -175,6 +179,11 @@
 
     const pinSwitch = switchControl(settings.pinWindow, (value) => patch({ pinWindow: value }));
     generalSection.appendChild(row(i18n.t('settingsPage.pin'), i18n.t('settingsPage.pinHint'), pinSwitch.root));
+
+    const vibrancySwitch = switchControl(settings.vibrancy, (value) => patch({ vibrancy: value }));
+    generalSection.appendChild(
+      row(i18n.t('settingsPage.vibrancy'), i18n.t('settingsPage.vibrancyHint'), vibrancySwitch.root)
+    );
 
     const limitSelect = createSelect({
       options: [3, 5, 10].map((value) => ({ value, label: String(value) })),

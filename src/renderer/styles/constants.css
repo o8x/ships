@@ -74,3 +74,23 @@
   --color-json-null: #98989f;
   --shadow-popover: 0 12px 40px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
 }
+
+/*
+ * 原生毛玻璃（macOS vibrancy，主面板启用时由 app.js 在 <html> 上置 data-vibrancy="on"）：
+ * 把基础 / 卡片背景改为半透明，让系统 blur 透出；设置窗口不置该属性，保持不透明。
+ */
+[data-vibrancy='on'] {
+  --color-bg: rgba(255, 255, 255, 0.4);
+  --color-surface: rgba(255, 255, 255, 0.62);
+  --color-surface-2: rgba(255, 255, 255, 0.5);
+  --color-surface-3: rgba(255, 255, 255, 0.4);
+  --color-border: rgba(0, 0, 0, 0.12);
+}
+
+[data-vibrancy='on'][data-theme='dark'] {
+  --color-bg: rgba(28, 28, 30, 0.4);
+  --color-surface: rgba(44, 44, 46, 0.62);
+  --color-surface-2: rgba(58, 58, 60, 0.5);
+  --color-surface-3: rgba(70, 70, 74, 0.4);
+  --color-border: rgba(255, 255, 255, 0.14);
+}

@@ -66,12 +66,19 @@ const SETTINGS_WINDOW = Object.assign(
   ships.settingsWindow || {}
 );
 
+// macOS only: NSVisualEffectMaterial used when the native frosted glass is on.
+const VIBRANCY = {
+  type: 'under-window',
+  state: 'active',
+};
+
 const DEFAULT_SETTINGS = {
   locale: ships.defaultLocale || 'zh',
   theme: ships.defaultTheme || 'system',
   accent: ships.defaultAccent || '#2e6bfc',
   launchAtLogin: false,
   pinWindow: false,
+  vibrancy: false,
   clipboardLimit: 3,
   clipboardPollMs: 1200,
 };
@@ -83,5 +90,6 @@ module.exports = {
   IPC,
   WINDOW,
   SETTINGS_WINDOW,
+  VIBRANCY,
   DEFAULT_SETTINGS,
 };

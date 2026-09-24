@@ -3,7 +3,7 @@
 const { app, nativeTheme } = require('electron');
 const { IPC } = require('../../shared/constants');
 const settings = require('../services/settings-service');
-const { broadcast, applyPin } = require('../window-manager');
+const { broadcast, applyPin, applyVibrancy } = require('../window-manager');
 const logger = require('../utils/logger');
 
 function applyLaunchAtLogin(enabled) {
@@ -31,6 +31,7 @@ function registerSettingsIpc(ipcMain) {
   settings.on('changed', (data, keys) => {
     broadcast(IPC.SETTINGS_CHANGED, data);
     if (!keys || keys.includes('pinWindow')) applyPin(Boolean(data.pinWindow));
+    if (!keys || keys.includes('vibrancy')) applyVibrancy(Boolean(data.vibrancy));
   });
 
   nativeTheme.on('updated', () => {

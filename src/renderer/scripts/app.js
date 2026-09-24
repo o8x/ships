@@ -18,6 +18,7 @@
   const state = {
     settings: {},
     version: window.ShipsConstants.FALLBACK_VERSION,
+    platform: null,
     activeId: null,
     cleanup: null,
   };
@@ -120,6 +121,9 @@
     state.settings = settings || {};
     i18n.setLocale(state.settings.locale || 'zh');
     window.ShipsTheme.set(state.settings);
+    // Glass is macOS-only; on other platforms keep the opaque surfaces.
+    const glass = Boolean(state.settings.vibrancy) && state.platform === 'darwin';
+    document.documentElement.setAttribute('data-vibrancy', glass ? 'on' : 'off');
   }
 
   async function boot() {
@@ -129,8 +133,9 @@
     }
 
     const [settings, info] = await Promise.all([window.ships.getSettings(), window.ships.getInfo()]);
-    applySettings(settings);
     state.version = (info && info.version) || window.ShipsConstants.FALLBACK_VERSION;
+    state.platform = (info && info.platform) || null;
+    applySettings(settings);
 
     renderTabs();
     renderFooter();

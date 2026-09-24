@@ -2,7 +2,7 @@
 
 const path = require('path');
 const { BrowserWindow, screen } = require('electron');
-const { WINDOW, SETTINGS_WINDOW, IPC } = require('../shared/constants');
+const { WINDOW, SETTINGS_WINDOW, VIBRANCY, IPC } = require('../shared/constants');
 const settings = require('./services/settings-service');
 const logger = require('./utils/logger');
 
@@ -19,6 +19,13 @@ function setTray(tray) {
   trayRef = tray;
 }
 
+// Native frosted glass is macOS-only and only meaningful for the transparent
+// popover. Returns creation-time options (empty when disabled/unsupported).
+function vibrancyOptions() {
+  if (process.platform !== 'darwin' || !settings.get('vibrancy')) return {};
+  return { vibrancy: VIBRANCY.type, visualEffectState: VIBRANCY.state };
+}
+
 function createMainWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
 
@@ -28,6 +35,7 @@ function createMainWindow() {
     show: false,
     frame: false,
     transparent: true,
+    ...vibrancyOptions(),
     resizable: false,
     movable: false,
     minimizable: false,
@@ -119,6 +127,19 @@ function applyPin(pinned) {
   }
 }
 
+// Toggle the native frosted glass on the (transparent) popover at runtime.
+function applyVibrancy(enabled) {
+  if (process.platform !== 'darwin') return;
+  const win = getMainWindow();
+  if (!win || typeof win.setVibrancy !== 'function') return;
+  if (enabled) {
+    win.setVibrancy(VIBRANCY.type);
+    if (typeof win.setVisualEffectState === 'function') win.setVisualEffectState(VIBRANCY.state);
+  } else {
+    win.setVibrancy(null);
+  }
+}
+
 function hideMainWindow() {
   const win = getMainWindow();
   if (win && win.isVisible()) win.hide();
@@ -207,4 +228,5 @@ module.exports = {
   broadcast,
   setBlurSuppressed,
   applyPin,
+  applyVibrancy,
 };
