@@ -12,9 +12,9 @@
     'Liberation Mono', monospace;
 
   /* 圆角 */
-  --radius-window: 10px;
-  --radius-card: 5px;
-  --radius-control: 5px;
+  --radius-window: 12px;
+  --radius-card: 8px;
+  --radius-control: 8px;
   --radius-xs: 2px;
   --radius-pill: 999px;
 
