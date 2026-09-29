@@ -8,7 +8,6 @@ const { registerWindowIpc } = require('./ipc/window-ipc');
 const { registerSettingsIpc } = require('./ipc/settings-ipc');
 const { registerSshIpc } = require('./ipc/ssh-ipc');
 const { registerGeoIpc } = require('./ipc/geo-ipc');
-const { registerStateIpc } = require('./ipc/state-ipc');
 const { registerClipboardIpc } = require('./ipc/clipboard-ipc');
 const { registerHashIpc } = require('./ipc/hash-ipc');
 const logger = require('./utils/logger');
@@ -33,7 +32,6 @@ function onReady() {
   registerSettingsIpc(ipcMain);
   registerSshIpc(ipcMain);
   registerGeoIpc(ipcMain);
-  registerStateIpc(ipcMain);
   registerClipboardIpc(ipcMain);
   registerHashIpc(ipcMain);
 

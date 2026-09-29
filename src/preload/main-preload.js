@@ -22,9 +22,6 @@ const api = {
   openDataFolder: () => ipcRenderer.invoke(IPC.OPEN_DATA_FOLDER),
   openExternal: (url) => ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url),
   geoLookup: (ip) => ipcRenderer.invoke(IPC.GEO_LOOKUP, ip),
-  getState: (key) => ipcRenderer.invoke(IPC.STATE_GET, key),
-  setState: (key, value) => ipcRenderer.invoke(IPC.STATE_SET, key, value),
-  clearState: (key) => ipcRenderer.invoke(IPC.STATE_CLEAR, key),
   clipboard: {
     list: () => ipcRenderer.invoke(IPC.CLIPBOARD_LIST),
     copy: (id) => ipcRenderer.invoke(IPC.CLIPBOARD_COPY, id),

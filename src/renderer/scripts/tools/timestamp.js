@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerTimestampTool() {
-  const { el, section, field, resultRow, persistState } = window.ShipsUI;
+  const { el, section, field, resultRow } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -282,10 +282,7 @@
     const tsRow = el('div', { class: 'flex items-end gap-2' });
     tsField.wrapper.classList.add('min-w-0', 'flex-1');
     tsField.wrapper.style.marginBottom = '0';
-    const tsOffset = offsetField(() => {
-      updateFromTimestamp();
-      saveState();
-    });
+    const tsOffset = offsetField(updateFromTimestamp);
     tsRow.append(tsField.wrapper, tsOffset.wrapper);
     const detected = el('div', { class: 'text-[11px] text-fg-muted' }, '');
     toDateSection.append(tsRow, detected);
@@ -305,10 +302,7 @@
     const dateRow = el('div', { class: 'flex items-end gap-2' });
     dateField.wrapper.classList.add('min-w-0', 'flex-1');
     dateField.wrapper.style.marginBottom = '0';
-    const dateOffset = offsetField(() => {
-      updateFromDate();
-      saveState();
-    });
+    const dateOffset = offsetField(updateFromDate);
     dateRow.append(dateField.wrapper, dateOffset.wrapper);
     toTsSection.appendChild(dateRow);
     const tsRows = {
@@ -411,37 +405,13 @@
       diffRows.human.set(formatDuration(ns));
     }
 
-    const store = persistState('timestamp');
-    function saveState() {
-      store.save({
-        ts: tsField.input.value,
-        date: dateField.input.value,
-        tsOffset: tsOffset.input.value,
-        dateOffset: dateOffset.input.value,
-        diffA: diffA.input.value,
-        diffB: diffB.input.value,
-      });
-    }
-
-    tsField.input.addEventListener('input', () => {
-      updateFromTimestamp();
-      saveState();
-    });
+    tsField.input.addEventListener('input', updateFromTimestamp);
     tsField.input.addEventListener('blur', updateFromTimestamp);
-    dateField.input.addEventListener('input', () => {
-      updateFromDate();
-      saveState();
-    });
+    dateField.input.addEventListener('input', updateFromDate);
     dateField.input.addEventListener('blur', updateFromDate);
-    diffA.input.addEventListener('input', () => {
-      updateDiff();
-      saveState();
-    });
+    diffA.input.addEventListener('input', updateDiff);
     diffA.input.addEventListener('blur', updateDiff);
-    diffB.input.addEventListener('input', () => {
-      updateDiff();
-      saveState();
-    });
+    diffB.input.addEventListener('input', updateDiff);
     diffB.input.addEventListener('blur', updateDiff);
 
     container.append(nowSection, toDateSection, toTsSection, diffSection);
@@ -450,18 +420,6 @@
     updateFromTimestamp();
     updateFromDate();
     updateDiff();
-
-    store.load((saved) => {
-      if (saved.ts != null) tsField.input.value = saved.ts;
-      if (saved.date != null) dateField.input.value = saved.date;
-      if (saved.tsOffset != null) tsOffset.input.value = saved.tsOffset;
-      if (saved.dateOffset != null) dateOffset.input.value = saved.dateOffset;
-      if (saved.diffA != null) diffA.input.value = saved.diffA;
-      if (saved.diffB != null) diffB.input.value = saved.diffB;
-      updateFromTimestamp();
-      updateFromDate();
-      updateDiff();
-    });
 
     const timer = setInterval(updateNow, 50);
     return () => clearInterval(timer);

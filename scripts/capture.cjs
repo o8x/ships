@@ -21,7 +21,6 @@ app.whenReady().then(async () => {
   const { registerSettingsIpc } = require('../src/main/ipc/settings-ipc');
   const { registerSshIpc } = require('../src/main/ipc/ssh-ipc');
   const { registerGeoIpc } = require('../src/main/ipc/geo-ipc');
-  const { registerStateIpc } = require('../src/main/ipc/state-ipc');
   const { registerClipboardIpc } = require('../src/main/ipc/clipboard-ipc');
   const { registerHashIpc } = require('../src/main/ipc/hash-ipc');
   const wm = require('../src/main/window-manager');
@@ -31,7 +30,6 @@ app.whenReady().then(async () => {
   registerSettingsIpc(ipcMain);
   registerSshIpc(ipcMain);
   registerGeoIpc(ipcMain);
-  registerStateIpc(ipcMain);
   registerClipboardIpc(ipcMain);
   registerHashIpc(ipcMain);
 

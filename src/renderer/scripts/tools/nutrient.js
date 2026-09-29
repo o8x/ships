@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerNutrientTool() {
-  const { el, section, inputField, persistState, copyText, Icons } = window.ShipsUI;
+  const { el, section, inputField, copyText, Icons } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -77,8 +77,6 @@
   ];
 
   function mount(container) {
-    const store = persistState('nutrient');
-
     const nameInput = el('input', {
       class: 'field',
       type: 'text',
@@ -188,12 +186,6 @@
       ];
     }
 
-    function saveState() {
-      const state = { label: nameInput.value };
-      for (const field of FIELDS) state[field.key] = inputs[field.key].value;
-      store.save(state);
-    }
-
     function flash(button) {
       const original = button.textContent;
       button.textContent = i18n.t('nutrient.copied');
@@ -207,7 +199,6 @@
     clearBtn.addEventListener('click', () => {
       nameInput.value = '';
       for (const field of FIELDS) inputs[field.key].value = String(field.def);
-      store.clear();
       compute();
     });
 
@@ -222,24 +213,11 @@
       if (await copyText(lines.join('\n'))) flash(copyBtn);
     });
 
-    nameInput.addEventListener('input', saveState);
     for (const field of FIELDS) {
-      inputs[field.key].addEventListener('input', () => {
-        compute();
-        saveState();
-      });
+      inputs[field.key].addEventListener('input', compute);
     }
 
     compute();
-
-    store.load((saved) => {
-      if (!saved) return;
-      if (saved.label != null) nameInput.value = saved.label;
-      for (const field of FIELDS) {
-        if (saved[field.key] != null) inputs[field.key].value = String(saved[field.key]);
-      }
-      compute();
-    });
   }
 
   window.ShipsToolRegistry.register({ id: 'nutrient', icon: 'nutrition', mount });

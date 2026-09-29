@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerHashTool() {
-  const { el, section, inputField, resultRow, segmented, persistState, debounce, Icons } = window.ShipsUI;
+  const { el, section, inputField, resultRow, segmented, debounce, Icons } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -59,7 +59,6 @@
           chooseBtn.querySelector('.choose-label').textContent = i18n.t('hash.chooseFile');
           delete textarea.dataset.file;
         }
-        saveState();
       }
     );
 
@@ -90,9 +89,6 @@
     };
     const outSection = section();
     for (const key of Object.keys(rows)) outSection.appendChild(rows[key].root);
-
-    const store = persistState('hash');
-    let mode = 'string';
 
     function setHashes(hashes) {
       rows.md5.set(hashes ? hashes.md5 : null);
@@ -131,34 +127,13 @@
       }
     }
 
-    function saveState() {
-      const active = modeSegment.root.querySelector('button.active');
-      mode = active ? active.dataset.value : 'string';
-      store.save({ mode, text: textarea.value });
-    }
-
-    textarea.addEventListener('input', () => {
-      computeText();
-      saveState();
-    });
+    textarea.addEventListener('input', computeText);
     chooseBtn.addEventListener('click', chooseFile);
 
     const modeSection = section();
     modeSection.appendChild(modeSegment.root);
 
     container.append(modeSection, stringPanel, filePanel, outSection);
-
-    store.load((saved) => {
-      if (saved && saved.mode) {
-        modeSegment.set(saved.mode);
-        stringPanel.classList.toggle('hidden', saved.mode !== 'string');
-        filePanel.classList.toggle('hidden', saved.mode !== 'file');
-      }
-      if (saved && saved.text) {
-        textarea.value = saved.text;
-        computeText();
-      }
-    });
   }
 
   window.ShipsToolRegistry.register({ id: 'hash', icon: 'fingerprint', mount });
