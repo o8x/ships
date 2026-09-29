@@ -25,7 +25,7 @@
         detected: '识别单位：{unit}',
         offset: '时间偏移',
         offsetPlaceholder: '如 -30m / +2h',
-        offsetTip: '偏移表达式：-30m / +2h / 90（纯数字按秒），单位 s/m/h/d/w/mo',
+        offsetTip: '偏移表达式：-30m / +2h / 90（纯数字按秒），单位 s/m/h/d/w/mo；默认 +0s 表示时间不变',
         diffTitle: '时间戳差值',
         diffA: '时间戳 A',
         diffB: '时间戳 B',
@@ -61,7 +61,7 @@
         detected: 'Detected unit: {unit}',
         offset: 'Offset',
         offsetPlaceholder: 'e.g. -30m / +2h',
-        offsetTip: 'Offset expression: -30m / +2h / 90 (bare number = seconds); units s/m/h/d/w/mo',
+        offsetTip: 'Offset expression: -30m / +2h / 90 (bare number = seconds); units s/m/h/d/w/mo; default +0s means no change',
         diffTitle: 'Timestamp difference',
         diffA: 'Timestamp A',
         diffB: 'Timestamp B',
@@ -90,6 +90,9 @@
   const MS_PER_MINUTE = 60 * MS_PER_SECOND;
   const MS_PER_HOUR = 60 * MS_PER_MINUTE;
   const MS_PER_DAY = 24 * MS_PER_HOUR;
+
+  // Default offset shown in the two offset inputs: +0s means "no change".
+  const DEFAULT_OFFSET = '+0s';
 
   // "mo"/"M" both mean a month, approximated as 30 days (same as relativeTime).
   const OFFSET_FACTORS = {
@@ -217,6 +220,7 @@
       class: 'field w-[112px] shrink-0',
       placeholder: i18n.t('timestamp.offsetPlaceholder'),
       autocomplete: 'off',
+      value: DEFAULT_OFFSET,
     });
     offset.wrapper.classList.add('shrink-0');
     offset.wrapper.style.marginBottom = '0';
