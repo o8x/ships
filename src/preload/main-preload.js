@@ -36,6 +36,8 @@ const api = {
     connect: (payload) => ipcRenderer.invoke(IPC.SSH_CONNECT, payload),
     detect: (payload) => ipcRenderer.invoke(IPC.SSH_DETECT, payload),
     onDetected: (cb) => on(IPC.SSH_DETECTED, cb),
+    listDir: (payload) => ipcRenderer.invoke(IPC.SSH_LIST_DIR, payload),
+    openDir: (payload) => ipcRenderer.invoke(IPC.SSH_OPEN_DIR, payload),
   },
 };
 

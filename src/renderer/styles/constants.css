@@ -32,6 +32,13 @@
   /* 强调色（可被设置覆盖，脚本会写到 documentElement.style） */
   --color-accent: #2e6bfc;
   --color-accent-fg: #ffffff;
+
+  /* 目录浏览：上次打开的目录高亮（强调色淡底 + 淡描边） */
+  --color-last-bg: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface));
+  --color-last-border: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
+
+  /* 目录浏览：文件夹行底色（比文件行略深/略亮一点点） */
+  --color-row-dir-bg: color-mix(in srgb, var(--color-fg) 4%, var(--color-surface));
 }
 
 /* 白天模式 */

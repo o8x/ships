@@ -86,6 +86,20 @@
   .row-card {
     @apply flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-2;
   }
+  /* Directory browser entries are denser than the host rows. */
+  .row-card.row-compact {
+    @apply gap-2 px-2.5 py-1;
+  }
+  /* Folders sit on a slightly different row background than files. */
+  .row-card.row-dir {
+    background: var(--color-row-dir-bg);
+  }
+  /* Directory browser: the directory opened in the previous session stands out
+     by a tinted background/border (accent is intentionally used here). */
+  .row-card.row-last {
+    background: var(--color-last-bg);
+    border-color: var(--color-last-border);
+  }
   .tab {
     @apply icon-btn h-9 w-9;
   }
@@ -464,6 +478,24 @@ input[type='color'].swatch::-webkit-color-swatch {
 .tool-head {
   margin-bottom: 10px;
 }
+
+/* Fixed-header tools (SSH directory browser): the content area becomes a column,
+   the tool header and the tool's own top bar stay put, and only the inner list
+   scrolls inside the remaining panel space. Toggled by the tool itself. */
+#content.tool-fixed {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#content.tool-fixed > .tool-head {
+  flex: none;
+}
+#content.tool-fixed > * + * {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
 .tool-head-title {
   font-size: 16px;
   font-weight: 600;
@@ -518,6 +550,22 @@ input[type='color'].swatch::-webkit-color-swatch {
   to {
     opacity: 1;
   }
+}
+
+/* Error feedback without text or reflow: flash a control red a few times. */
+@keyframes ships-blink-error {
+  0%,
+  100% {
+    border-color: var(--color-border);
+    background: var(--color-surface-2);
+  }
+  50% {
+    border-color: var(--color-danger);
+    background: color-mix(in srgb, var(--color-danger) 14%, var(--color-surface-2));
+  }
+}
+.blink-error {
+  animation: ships-blink-error 0.24s ease-in-out 3;
 }
 
 /* Tool / settings section content enters with a soft rise. */

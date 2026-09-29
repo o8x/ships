@@ -13,4 +13,44 @@ window.ShipsConstants = {
   ANSI_COLORS: {
     reset: '\u001b[0m',
   },
+  // SSH 目录浏览：文件按扩展名 / 文件名映射到 assets/icons 里的图标。
+  // 目录固定用 folder，未命中的文件用 DEFAULT_FILE_ICON。
+  FILE_TYPE_ICONS: {
+    // 代码
+    js: 'code', mjs: 'code', cjs: 'code', ts: 'code', jsx: 'code', tsx: 'code', vue: 'code',
+    py: 'code', rb: 'code', go: 'code', rs: 'code', c: 'code', h: 'code', cc: 'code',
+    cpp: 'code', hpp: 'code', cs: 'code', java: 'code', kt: 'code', swift: 'code',
+    php: 'code', pl: 'code', lua: 'code', html: 'code', htm: 'code', css: 'code',
+    scss: 'code', less: 'code', sql: 'code',
+    // 脚本
+    sh: 'terminal', bash: 'terminal', zsh: 'terminal', fish: 'terminal', ps1: 'terminal', bat: 'terminal',
+    // 结构化数据 / 配置
+    json: 'braces', jsonc: 'braces', yml: 'braces', yaml: 'braces', toml: 'braces', ini: 'braces',
+    conf: 'braces', cfg: 'braces', env: 'braces', properties: 'braces', xml: 'braces',
+    // 文本 / 文档
+    md: 'doc', markdown: 'doc', txt: 'doc', log: 'doc', rst: 'doc', csv: 'doc', tsv: 'doc',
+    doc: 'doc', docx: 'doc', pdf: 'doc', rtf: 'doc',
+    // 图片
+    png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', webp: 'image', bmp: 'image',
+    svg: 'image', ico: 'image', tif: 'image', tiff: 'image', heic: 'image', avif: 'image',
+    // 音视频
+    mp3: 'play', wav: 'play', flac: 'play', aac: 'play', m4a: 'play', ogg: 'play',
+    mp4: 'play', mov: 'play', mkv: 'play', avi: 'play', webm: 'play', mpg: 'play',
+    // 压缩包 / 镜像
+    zip: 'archive', gz: 'archive', tgz: 'archive', bz2: 'archive', xz: 'archive', zst: 'archive',
+    tar: 'archive', '7z': 'archive', rar: 'archive', dmg: 'archive', iso: 'archive',
+  },
+  FILE_NAME_ICONS: {
+    makefile: 'code',
+    dockerfile: 'code',
+    license: 'doc',
+    readme: 'doc',
+  },
+  DEFAULT_FILE_ICON: 'file',
+  // SSH 目录浏览顶栏的快捷入口（按顺序显示为图标按钮，点击直接进入）；
+  // icon 为 assets/icons 下的文件名（camelCase）。
+  SSH_QUICK_PATHS: [
+    { path: '/root', icon: 'home' },
+    { path: '/tmp', icon: 'tempFile' },
+  ],
 };

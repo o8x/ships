@@ -5,6 +5,7 @@ const { IPC } = require('../../shared/constants');
 const { Notification, dialog, BrowserWindow } = require('electron');
 const configService = require('../services/ssh-config-service');
 const sshService = require('../services/ssh-service');
+const browseService = require('../services/ssh-browse-service');
 const { broadcast, getMainWindow } = require('../window-manager');
 
 function findHost(alias) {
@@ -49,6 +50,26 @@ function registerSshIpc(ipcMain) {
   });
 
   ipcMain.handle(IPC.SSH_GET_DETECTED, () => sshService.getDetected());
+
+  // Directory browser. `path` omitted → start at the parent of the remembered
+  // directory (or the home directory). `remember: true` records the path — but only
+  // after it actually listed, so a typo in the path bar is never remembered.
+  ipcMain.handle(IPC.SSH_LIST_DIR, async (_event, payload) => {
+    const host = findHost(payload && payload.alias);
+    if (!host) return { ok: false, code: 'host', error: 'host not found' };
+    const dir = (payload && payload.path) || '';
+    const result = await browseService.listDir(host, dir);
+    if (result && result.ok && result.path && payload && payload.remember) {
+      browseService.rememberDir(host.alias, result.path);
+    }
+    return result;
+  });
+
+  ipcMain.handle(IPC.SSH_OPEN_DIR, async (_event, payload) => {
+    const host = findHost(payload && payload.alias);
+    if (!host) return { ok: false, code: 'host', error: 'host not found' };
+    return browseService.openAt(host, (payload && payload.path) || '');
+  });
 
   ipcMain.handle(IPC.SSH_CONFIG_READ, () => configService.list());
   ipcMain.handle(IPC.SSH_CONFIG_UPSERT, (_event, host) => configService.upsert(host));

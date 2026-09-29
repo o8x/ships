@@ -93,6 +93,28 @@ function labelFor(id) {
   return OS_LABELS[id] || capitalize(id);
 }
 
+// Shared ssh2 connection options (agent socket + IdentityFile), reused by probes
+// and by the directory browser.
+function connectionOptions(host, overrides) {
+  const options = {
+    host: host.hostName,
+    port: Number(host.port) || 22,
+    username: host.user || undefined,
+    readyTimeout: 8000,
+    keepaliveInterval: 0,
+  };
+  const agentSocket = getAgentSocket();
+  if (agentSocket) options.agent = agentSocket;
+  if (host.identityFile) {
+    try {
+      options.privateKey = fs.readFileSync(expandHome(host.identityFile));
+    } catch (err) {
+      logger.error(`[ssh] read identity file failed (${host.identityFile}): ${err.message}`);
+    }
+  }
+  return Object.assign(options, overrides || {});
+}
+
 // Parses combined `uname -s` + `/etc/os-release` output into an OS descriptor.
 function parseOsInfo(output) {
   const text = String(output || '');
@@ -143,20 +165,22 @@ class SshService extends EventEmitter {
     this.emit('detected', { alias, ...this.detected[alias] });
   }
 
-  buildCommand(host) {
+  /* `ssh [选项] 目标主机 [远端命令]` —— 选项必须排在主机之前，命令必须排在主机之后。 */
+  buildCommand(host, options) {
+    const opts = options || {};
     const parts = ['ssh'];
     if (host.port && Number(host.port) !== 22) parts.push('-p', String(host.port));
     if (host.identityFile && !isDefaultIdentity(host.identityFile)) {
       parts.push('-i', shellQuote(host.identityFile));
     }
     if (host.proxyJump) parts.push('-J', host.proxyJump);
+    if (opts.forceTty) parts.push('-t');
     parts.push(host.user ? `${host.user}@${host.hostName}` : host.hostName);
+    if (opts.command) parts.push(opts.command);
     return parts.join(' ');
   }
 
-  connect(host) {
-    const command = this.buildCommand(host);
-    logger.file(`[ssh] connect(alias=${host.alias}) command: ${command}`);
+  openInIterm(command, tag) {
     const script =
       'tell application "iTerm"\n' +
       '  activate\n' +
@@ -169,13 +193,29 @@ class SshService extends EventEmitter {
     return new Promise((resolve) => {
       execFile('osascript', ['-e', script], (err) => {
         if (err) {
-          logger.error(`[ssh] connect(alias=${host.alias}) failed: ${err.message}`);
+          logger.error(`[ssh] ${tag} failed: ${err.message}`);
           resolve({ ok: false, error: err.message, command });
           return;
         }
         resolve({ ok: true, command });
       });
     });
+  }
+
+  connect(host) {
+    const command = this.buildCommand(host);
+    logger.file(`[ssh] connect(alias=${host.alias}) command: ${command}`);
+    return this.openInIterm(command, `connect(alias=${host.alias})`);
+  }
+
+  /* Opens iTerm on the host with an interactive login shell already inside dir,
+     i.e. the same state as typing `ssh <host>` and then `cd <dir>` by hand.
+     `;` (not `&&`) keeps the shell alive even if the directory disappeared. */
+  openAt(host, dir) {
+    const remote = 'cd ' + shellQuote(dir || '~') + '; exec ${SHELL:-/bin/sh} -l';
+    const command = this.buildCommand(host, { forceTty: true, command: shellQuote(remote) });
+    logger.file(`[ssh] open-at(alias=${host.alias}) dir=${dir || '~'} command: ${command}`);
+    return this.openInIterm(command, `open-at(alias=${host.alias})`);
   }
 
   detect(host) {
@@ -197,26 +237,11 @@ class SshService extends EventEmitter {
   runDetect(host) {
     return new Promise((resolve) => {
       const client = new Client();
-      const agentSocket = getAgentSocket();
-      const options = {
-        host: host.hostName,
-        port: Number(host.port) || 22,
-        username: host.user || undefined,
-        readyTimeout: 8000,
-        keepaliveInterval: 0,
-      };
-      if (agentSocket) options.agent = agentSocket;
-      if (host.identityFile) {
-        try {
-          options.privateKey = fs.readFileSync(expandHome(host.identityFile));
-        } catch (err) {
-          logger.error(`[ssh] read identity file failed (${host.identityFile}): ${err.message}`);
-        }
-      }
+      const options = connectionOptions(host);
 
       logger.file(
         `[ssh] connecting ${host.alias} -> ${options.host}:${options.port} ` +
-          `user=${options.username || '-'} agent=${agentSocket || '-'} ` +
+          `user=${options.username || '-'} agent=${options.agent || '-'} ` +
           `privateKey=${options.privateKey ? 'yes' : 'no'}`
       );
 
@@ -292,3 +317,5 @@ class SshService extends EventEmitter {
 module.exports = new SshService();
 module.exports.parseOsInfo = parseOsInfo;
 module.exports.OS_LABELS = OS_LABELS;
+module.exports.connectionOptions = connectionOptions;
+module.exports.shellQuote = shellQuote;

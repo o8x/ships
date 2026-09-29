@@ -38,6 +38,8 @@ const IPC = {
   SSH_DETECT_HOST: 'ssh:detect-host',
   SSH_GET_DETECTED: 'ssh:get-detected',
   SSH_DETECTED: 'ssh:detected',
+  SSH_LIST_DIR: 'ssh:list-dir',
+  SSH_OPEN_DIR: 'ssh:open-dir',
   SSH_CONFIG_READ: 'ssh-config:read',
   SSH_CONFIG_UPSERT: 'ssh-config:upsert',
   SSH_CONFIG_REMOVE: 'ssh-config:remove',

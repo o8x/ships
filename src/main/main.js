@@ -58,4 +58,5 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   require('./services/clipboard-service').stop();
+  require('./services/ssh-browse-service').closeAll();
 });
