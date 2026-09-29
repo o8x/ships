@@ -2,21 +2,18 @@
 
 const fs = require('fs');
 const os = require('os');
-const { execFile, execFileSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const { EventEmitter } = require('events');
 const { Client } = require('ssh2');
 const { SSH_DETECTED_FILE } = require('../utils/paths');
 const { readJson, writeJson } = require('../utils/json-store');
+const iterm = require('./iterm-service');
 const logger = require('../utils/logger');
 
 function shellQuote(value) {
   const text = String(value);
   if (/^[A-Za-z0-9_@%+=:,./~-]+$/.test(text)) return text;
   return `'${text.replace(/'/g, `'\\''`)}'`;
-}
-
-function appleScriptString(value) {
-  return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
 function expandHome(filePath) {
@@ -180,32 +177,10 @@ class SshService extends EventEmitter {
     return parts.join(' ');
   }
 
-  openInIterm(command, tag) {
-    const script =
-      'tell application "iTerm"\n' +
-      '  activate\n' +
-      '  set newWindow to (create window with default profile)\n' +
-      '  tell current session of newWindow\n' +
-      `    write text ${appleScriptString(command)}\n` +
-      '  end tell\n' +
-      'end tell';
-
-    return new Promise((resolve) => {
-      execFile('osascript', ['-e', script], (err) => {
-        if (err) {
-          logger.error(`[ssh] ${tag} failed: ${err.message}`);
-          resolve({ ok: false, error: err.message, command });
-          return;
-        }
-        resolve({ ok: true, command });
-      });
-    });
-  }
-
   connect(host) {
     const command = this.buildCommand(host);
     logger.file(`[ssh] connect(alias=${host.alias}) command: ${command}`);
-    return this.openInIterm(command, `connect(alias=${host.alias})`);
+    return iterm.openCommand(command, `ssh connect(alias=${host.alias})`);
   }
 
   /* Opens iTerm on the host with an interactive login shell already inside dir,
@@ -215,7 +190,7 @@ class SshService extends EventEmitter {
     const remote = 'cd ' + shellQuote(dir || '~') + '; exec ${SHELL:-/bin/sh} -l';
     const command = this.buildCommand(host, { forceTty: true, command: shellQuote(remote) });
     logger.file(`[ssh] open-at(alias=${host.alias}) dir=${dir || '~'} command: ${command}`);
-    return this.openInIterm(command, `open-at(alias=${host.alias})`);
+    return iterm.openCommand(command, `ssh open-at(alias=${host.alias})`);
   }
 
   detect(host) {
