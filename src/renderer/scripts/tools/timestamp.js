@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerTimestampTool() {
-  const { el, section, field, resultRow, createCombo, persistState } = window.ShipsUI;
+  const { el, section, field, resultRow, persistState } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -24,16 +24,19 @@
         nanoseconds: '纳秒',
         detected: '识别单位：{unit}',
         offset: '时间偏移',
-        offsetNone: '无偏移',
         offsetPlaceholder: '如 -30m / +2h',
-        offsetSecond: '秒',
-        offsetMinute: '分钟',
-        offsetHour: '小时',
-        offsetDay: '天',
-        offsetWeek: '周',
-        offsetMonth: '个月',
-        offsetBefore: '{n} {unit}前',
-        offsetAfter: '{n} {unit}后',
+        offsetTip: '偏移表达式：-30m / +2h / 90（纯数字按秒），单位 s/m/h/d/w/mo',
+        diffTitle: '时间戳差值',
+        diffA: '时间戳 A',
+        diffB: '时间戳 B',
+        diffSeconds: '时间差（秒）',
+        diffHuman: '人类可读',
+        durDay: '天',
+        durHour: '小时',
+        durMinute: '分钟',
+        durSecond: '秒',
+        durMs: '毫秒',
+        durZero: '0 秒',
         placeholderTs: '输入时间戳，如 1700000000',
         placeholderDate: '输入日期，如 2024-01-01 12:00:00',
       },
@@ -57,16 +60,19 @@
         nanoseconds: 'Nanoseconds',
         detected: 'Detected unit: {unit}',
         offset: 'Offset',
-        offsetNone: 'No offset',
         offsetPlaceholder: 'e.g. -30m / +2h',
-        offsetSecond: 'sec',
-        offsetMinute: 'min',
-        offsetHour: 'hour',
-        offsetDay: 'day',
-        offsetWeek: 'week',
-        offsetMonth: 'month',
-        offsetBefore: '{n} {unit} ago',
-        offsetAfter: 'in {n} {unit}',
+        offsetTip: 'Offset expression: -30m / +2h / 90 (bare number = seconds); units s/m/h/d/w/mo',
+        diffTitle: 'Timestamp difference',
+        diffA: 'Timestamp A',
+        diffB: 'Timestamp B',
+        diffSeconds: 'Difference (seconds)',
+        diffHuman: 'Human readable',
+        durDay: 'day',
+        durHour: 'hour',
+        durMinute: 'minute',
+        durSecond: 'second',
+        durMs: 'ms',
+        durZero: '0 seconds',
         placeholderTs: 'e.g. 1700000000',
         placeholderDate: 'e.g. 2024-01-01 12:00:00',
       },
@@ -76,6 +82,9 @@
   const NS_PER_MS = 1000000n;
   const NS_PER_S = 1000000000n;
   const NS_PER_MS_NUMBER = 1e6;
+  const NS_PER_MIN = 60n * NS_PER_S;
+  const NS_PER_HOUR = 60n * NS_PER_MIN;
+  const NS_PER_DAY = 24n * NS_PER_HOUR;
 
   const MS_PER_SECOND = 1000;
   const MS_PER_MINUTE = 60 * MS_PER_SECOND;
@@ -92,14 +101,15 @@
     mo: 30 * MS_PER_DAY,
     M: 30 * MS_PER_DAY,
   };
-  const OFFSET_UNIT_LABEL = {
-    s: 'offsetSecond',
-    m: 'offsetMinute',
-    h: 'offsetHour',
-    d: 'offsetDay',
-    w: 'offsetWeek',
-    mo: 'offsetMonth',
-  };
+
+  // Human-readable duration decomposition, largest unit first.
+  const DURATION_UNITS = [
+    ['durDay', NS_PER_DAY, true],
+    ['durHour', NS_PER_HOUR, true],
+    ['durMinute', NS_PER_MIN, true],
+    ['durSecond', NS_PER_S, true],
+    ['durMs', NS_PER_MS, false],
+  ];
 
   function pad(value, width) {
     return String(value).padStart(width || 2, '0');
@@ -201,41 +211,51 @@
     return '—';
   }
 
-  function offsetPresets() {
-    const list = [{ value: '', label: i18n.t('timestamp.offsetNone') }];
-    const specs = [
-      ['-', 30, 'm'],
-      ['+', 30, 'm'],
-      ['-', 1, 'm'],
-      ['+', 1, 'm'],
-      ['-', 1, 'h'],
-      ['+', 1, 'h'],
-      ['-', 1, 'd'],
-      ['+', 1, 'd'],
-      ['-', 1, 'w'],
-      ['+', 1, 'w'],
-      ['-', 1, 'mo'],
-      ['+', 1, 'mo'],
-    ];
-    for (const [sign, amount, unit] of specs) {
-      const label = i18n.t(sign === '-' ? 'timestamp.offsetBefore' : 'timestamp.offsetAfter', {
-        n: amount,
-        unit: i18n.t(`timestamp.${OFFSET_UNIT_LABEL[unit]}`),
-      });
-      list.push({ value: `${sign}${amount}${unit}`, label });
-    }
-    return list;
+  /* Free-text offset input; the expression syntax is unchanged (see parseOffset). */
+  function offsetField(onChange) {
+    const offset = field(i18n.t('timestamp.offset'), {
+      class: 'field w-[112px] shrink-0',
+      placeholder: i18n.t('timestamp.offsetPlaceholder'),
+      autocomplete: 'off',
+    });
+    offset.wrapper.classList.add('shrink-0');
+    offset.wrapper.style.marginBottom = '0';
+    offset.input.dataset.tip = i18n.t('timestamp.offsetTip');
+    offset.input.addEventListener('input', onChange);
+    offset.input.addEventListener('blur', onChange);
+    return offset;
   }
 
-  function offsetCombo(onChange) {
-    return createCombo({
-      options: offsetPresets(),
-      value: '',
-      align: 'right',
-      className: 'w-[112px] shrink-0',
-      placeholder: i18n.t('timestamp.offsetPlaceholder'),
-      onChange,
-    });
+  /* Signed seconds with up to 9 decimals, trailing zeros trimmed. */
+  function formatSeconds(ns) {
+    const negative = ns < 0n;
+    const abs = negative ? -ns : ns;
+    const whole = abs / NS_PER_S;
+    const fraction = abs % NS_PER_S;
+    if (fraction === 0n) return `${negative ? '-' : ''}${whole}`;
+    const digits = fraction.toString().padStart(9, '0').replace(/0+$/, '');
+    return `${negative ? '-' : ''}${whole}.${digits}`;
+  }
+
+  function durationUnitLabel(key, value, plural) {
+    const label = i18n.t(`timestamp.${key}`);
+    return plural && i18n.getLocale() === 'en' && value !== 1n ? `${label}s` : label;
+  }
+
+  /* Human-readable duration, e.g. "1 天 2 小时 3 分钟"; keeps the sign of ns. */
+  function formatDuration(ns) {
+    const negative = ns < 0n;
+    let rest = negative ? -ns : ns;
+    const parts = [];
+    for (const [key, size, plural] of DURATION_UNITS) {
+      const value = rest / size;
+      if (value > 0n) {
+        parts.push(`${value} ${durationUnitLabel(key, value, plural)}`);
+        rest -= value * size;
+      }
+    }
+    const text = parts.length ? parts.join(' ') : i18n.t('timestamp.durZero');
+    return negative ? `-${text}` : text;
   }
 
   function mount(container) {
@@ -258,11 +278,11 @@
     const tsRow = el('div', { class: 'flex items-end gap-2' });
     tsField.wrapper.classList.add('min-w-0', 'flex-1');
     tsField.wrapper.style.marginBottom = '0';
-    const tsOffset = offsetCombo(() => {
+    const tsOffset = offsetField(() => {
       updateFromTimestamp();
       saveState();
     });
-    tsRow.append(tsField.wrapper, tsOffset.root);
+    tsRow.append(tsField.wrapper, tsOffset.wrapper);
     const detected = el('div', { class: 'text-[11px] text-fg-muted' }, '');
     toDateSection.append(tsRow, detected);
 
@@ -281,11 +301,11 @@
     const dateRow = el('div', { class: 'flex items-end gap-2' });
     dateField.wrapper.classList.add('min-w-0', 'flex-1');
     dateField.wrapper.style.marginBottom = '0';
-    const dateOffset = offsetCombo(() => {
+    const dateOffset = offsetField(() => {
       updateFromDate();
       saveState();
     });
-    dateRow.append(dateField.wrapper, dateOffset.root);
+    dateRow.append(dateField.wrapper, dateOffset.wrapper);
     toTsSection.appendChild(dateRow);
     const tsRows = {
       s: resultRow(i18n.t('timestamp.seconds')),
@@ -293,6 +313,27 @@
       ns: resultRow(i18n.t('timestamp.nanoseconds')),
     };
     toTsSection.append(tsRows.s.root, tsRows.ms.root, tsRows.ns.root);
+
+    const diffSection = section(i18n.t('timestamp.diffTitle'));
+    const diffA = field(i18n.t('timestamp.diffA'), {
+      placeholder: i18n.t('timestamp.placeholderTs'),
+      inputmode: 'numeric',
+    });
+    const diffB = field(i18n.t('timestamp.diffB'), {
+      placeholder: i18n.t('timestamp.placeholderTs'),
+      inputmode: 'numeric',
+    });
+    const diffRow = el('div', { class: 'flex items-end gap-2' });
+    for (const entry of [diffA, diffB]) {
+      entry.wrapper.classList.add('min-w-0', 'flex-1');
+      entry.wrapper.style.marginBottom = '0';
+    }
+    diffRow.append(diffA.wrapper, diffB.wrapper);
+    const diffRows = {
+      seconds: resultRow(i18n.t('timestamp.diffSeconds')),
+      human: resultRow(i18n.t('timestamp.diffHuman')),
+    };
+    diffSection.append(diffRow, diffRows.seconds.root, diffRows.human.root);
 
     // High-resolution current time: performance.timeOrigin + performance.now()
     // gives sub-millisecond precision so ns isn't always ...000000.
@@ -322,8 +363,8 @@
     }
 
     function updateFromTimestamp() {
-      const offset = parseOffset(tsOffset.getValue());
-      tsOffset.root.classList.toggle('invalid', !offset.valid);
+      const offset = parseOffset(tsOffset.input.value);
+      tsOffset.input.classList.toggle('invalid', !offset.valid);
       const parsed = parseTimestamp(tsField.input.value);
       if (!parsed) {
         detected.textContent = tsField.input.value.trim() ? i18n.t('timestamp.detected', { unit: '—' }) : '';
@@ -339,8 +380,8 @@
     }
 
     function updateFromDate() {
-      const offset = parseOffset(dateOffset.getValue());
-      dateOffset.root.classList.toggle('invalid', !offset.valid);
+      const offset = parseOffset(dateOffset.input.value);
+      dateOffset.input.classList.toggle('invalid', !offset.valid);
       const date = parseDate(dateField.input.value);
       if (!date) {
         for (const key of Object.keys(tsRows)) tsRows[key].set(null);
@@ -352,13 +393,29 @@
       tsRows.ns.set((BigInt(Math.round(ms)) * NS_PER_MS).toString());
     }
 
+    /* B − A, both sides auto-detected (s / ms / ns), so mixed units compare correctly. */
+    function updateDiff() {
+      const a = parseTimestamp(diffA.input.value);
+      const b = parseTimestamp(diffB.input.value);
+      if (!a || !b) {
+        diffRows.seconds.set(null);
+        diffRows.human.set(null);
+        return;
+      }
+      const ns = b.ns - a.ns;
+      diffRows.seconds.set(formatSeconds(ns));
+      diffRows.human.set(formatDuration(ns));
+    }
+
     const store = persistState('timestamp');
     function saveState() {
       store.save({
         ts: tsField.input.value,
         date: dateField.input.value,
-        tsOffset: tsOffset.getValue(),
-        dateOffset: dateOffset.getValue(),
+        tsOffset: tsOffset.input.value,
+        dateOffset: dateOffset.input.value,
+        diffA: diffA.input.value,
+        diffB: diffB.input.value,
       });
     }
 
@@ -372,20 +429,34 @@
       saveState();
     });
     dateField.input.addEventListener('blur', updateFromDate);
+    diffA.input.addEventListener('input', () => {
+      updateDiff();
+      saveState();
+    });
+    diffA.input.addEventListener('blur', updateDiff);
+    diffB.input.addEventListener('input', () => {
+      updateDiff();
+      saveState();
+    });
+    diffB.input.addEventListener('blur', updateDiff);
 
-    container.append(nowSection, toDateSection, toTsSection);
+    container.append(nowSection, toDateSection, toTsSection, diffSection);
 
     updateNow();
     updateFromTimestamp();
     updateFromDate();
+    updateDiff();
 
     store.load((saved) => {
       if (saved.ts != null) tsField.input.value = saved.ts;
       if (saved.date != null) dateField.input.value = saved.date;
-      if (saved.tsOffset != null) tsOffset.setValue(saved.tsOffset);
-      if (saved.dateOffset != null) dateOffset.setValue(saved.dateOffset);
+      if (saved.tsOffset != null) tsOffset.input.value = saved.tsOffset;
+      if (saved.dateOffset != null) dateOffset.input.value = saved.dateOffset;
+      if (saved.diffA != null) diffA.input.value = saved.diffA;
+      if (saved.diffB != null) diffB.input.value = saved.diffB;
       updateFromTimestamp();
       updateFromDate();
+      updateDiff();
     });
 
     const timer = setInterval(updateNow, 50);
