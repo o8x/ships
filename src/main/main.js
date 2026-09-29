@@ -10,6 +10,7 @@ const { registerSshIpc } = require('./ipc/ssh-ipc');
 const { registerGeoIpc } = require('./ipc/geo-ipc');
 const { registerClipboardIpc } = require('./ipc/clipboard-ipc');
 const { registerHashIpc } = require('./ipc/hash-ipc');
+const { registerNetTestIpc } = require('./ipc/net-test-ipc');
 const logger = require('./utils/logger');
 const { DATA_FILES } = require('./utils/paths');
 const { APP_NAME, VERSION, ships } = require('../shared/constants');
@@ -34,6 +35,7 @@ function onReady() {
   registerGeoIpc(ipcMain);
   registerClipboardIpc(ipcMain);
   registerHashIpc(ipcMain);
+  registerNetTestIpc(ipcMain);
 
   wm.createMainWindow();
 

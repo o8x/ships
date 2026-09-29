@@ -37,7 +37,7 @@ window.ShipsI18n = (function createI18n() {
       },
       toolDesc: {
         timestamp: '秒 / 毫秒 / 纳秒与日期互转',
-        subnet: 'IP 进制与网段 / 掩码计算，含归属地',
+        subnet: 'IP 进制与网段 / 掩码计算，含归属地与网络测试',
         radix: '2–36 进制之间实时换算',
         json: '粘贴 JSON 自动原地格式化与结构查看',
         ssh: '读取 ~/.ssh/config，点击或双击在 iTerm 连接',
@@ -82,7 +82,7 @@ window.ShipsI18n = (function createI18n() {
       },
       toolDesc: {
         timestamp: 'Convert between s / ms / ns and dates',
-        subnet: 'IP bases and subnet / mask, with location',
+        subnet: 'IP bases and subnet / mask, with location and network test',
         radix: 'Live conversion across bases 2–36',
         json: 'Paste JSON to format in place and view its structure',
         ssh: 'Read ~/.ssh/config; click or double-click to open in iTerm',

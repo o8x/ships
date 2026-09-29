@@ -53,4 +53,20 @@ window.ShipsConstants = {
     { path: '/root', icon: 'home' },
     { path: '/tmp', icon: 'tempFile' },
   ],
+  // IP 工具：端口测试可选协议（needsPort=false 时禁用端口输入）。
+  // 需与 src/main/utils/net-test.js 的 PROTOCOLS 保持一致。
+  NET_TEST_PROTOCOLS: [
+    { value: 'tcp', label: 'TCP', tipKey: 'tipTcp', port: 'required' },
+    { value: 'udp', label: 'UDP', tipKey: 'tipUdp', port: 'required' },
+    // 标签保持短（单行 TAB 放得下），完整含义见 tipKey 文案。
+    { value: 'http', label: 'HTTP', tipKey: 'tipHttp', port: 'required' },
+    { value: 'icmp', label: 'ICMP', tipKey: 'tipIcmp', port: 'none' },
+    { value: 'arp', label: 'ARP', tipKey: 'tipArp', port: 'none' },
+    // 扫描应用单地址 / 网段都行，端口可留空（扫可用端口）；扫描主机需要网段。
+    { value: 'scan-app', labelKey: 'testScanApp', tipKey: 'tipScanApp', port: 'optional' },
+    { value: 'scan-host', labelKey: 'testScanHost', tipKey: 'tipScanHost', port: 'none', subnetOnly: true },
+  ],
+  NET_TEST_DEFAULT_PORT: 80,
+  NET_TEST_SCAN_PREFIX_MIN: 16,
+  NET_TEST_SCAN_PREFIX_MAX: 30,
 };

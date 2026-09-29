@@ -32,6 +32,8 @@ const IPC = {
   HASH_FILE: 'hash:file',
   DIALOG_OPEN_FILE: 'dialog:open-file',
 
+  NET_TEST_RUN: 'net-test:run',
+
   SSH_LIST: 'ssh:list',
   SSH_CONNECT: 'ssh:connect',
   SSH_DETECT: 'ssh:detect',

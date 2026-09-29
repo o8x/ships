@@ -31,6 +31,7 @@ const api = {
   hashText: (text) => ipcRenderer.invoke(IPC.HASH_TEXT, text),
   hashFile: (file) => ipcRenderer.invoke(IPC.HASH_FILE, file),
   openFile: () => ipcRenderer.invoke(IPC.DIALOG_OPEN_FILE),
+  netTest: (payload) => ipcRenderer.invoke(IPC.NET_TEST_RUN, payload),
   ssh: {
     list: () => ipcRenderer.invoke(IPC.SSH_LIST),
     connect: (payload) => ipcRenderer.invoke(IPC.SSH_CONNECT, payload),

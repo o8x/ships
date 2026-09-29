@@ -206,25 +206,56 @@ window.ShipsUI = (function createUI() {
     };
   }
 
-  /* Self-drawn segmented control. */
-  function segmented(options, value, onSelect) {
-    const root = el('div', { class: 'segment shrink-0' });
-    const buttons = (options || []).map((option) => {
-      const button = el('button', { type: 'button', dataset: { value: option.value } }, option.label);
-      button.addEventListener('click', () => {
-        set(option.value);
-        onSelect(option.value);
-      });
-      root.appendChild(button);
-      return button;
-    });
+  /* Self-drawn segmented control (single row TAB switch).
+     Options: { value, label, tip?, disabled? }; config: { className }.
+     `setOptions` re-renders in place so labels / disabled states can follow app state. */
+  function segmented(options, value, onSelect, config) {
+    const settings = Object.assign({ className: '' }, config || {});
+    const root = el('div', { class: `segment shrink-0 ${settings.className}`.trim() });
+    let items = (options || []).slice();
+    let buttons = [];
+    let current = value;
+
     function set(next) {
+      current = next;
       buttons.forEach((button) =>
         button.classList.toggle('active', String(button.dataset.value) === String(next))
       );
     }
-    set(value);
-    return { root, set };
+
+    function build() {
+      root.innerHTML = '';
+      buttons = items.map((option) => {
+        const button = el('button', {
+          type: 'button',
+          class: 'shrink-0',
+          dataset: { value: option.value },
+        }, option.label);
+        if (option.tip) button.setAttribute('data-tip', option.tip);
+        if (option.disabled) {
+          button.disabled = true;
+        } else {
+          button.addEventListener('click', () => {
+            set(option.value);
+            onSelect(option.value);
+          });
+        }
+        root.appendChild(button);
+        return button;
+      });
+      set(current);
+    }
+
+    build();
+    return {
+      root,
+      set,
+      getValue: () => current,
+      setOptions(next) {
+        items = (next || []).slice();
+        build();
+      },
+    };
   }
 
   /* Custom select (self-drawn, avoids native <select>). */

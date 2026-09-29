@@ -86,9 +86,9 @@ Ships/
     │   ├── main.js              # 应用入口：单实例、Dock 隐藏、注册 IPC、创建托盘
     │   ├── tray.js              # 托盘图标与右键菜单
     │   ├── window-manager.js    # 主面板 / 设置窗口创建、定位、显隐、广播
-    │   ├── ipc/                 # IPC 处理器（app / settings / window / ssh / geo / clipboard / hash）
-    │   ├── services/            # settings / ssh-config / ssh / ssh-browse / geo / clipboard / hash 服务
-    │   └── utils/               # logger / json-store / paths / ls-listing（远端 `ls -l` 解析）/ utf8（UTF-8 保真解码 + 非法字节转义）
+    │   ├── ipc/                 # IPC 处理器（app / settings / window / ssh / geo / clipboard / hash / net-test）
+    │   ├── services/            # settings / ssh-config / ssh / ssh-browse / iterm / net-test / geo / clipboard / hash 服务
+    │   └── utils/               # logger / json-store / paths / ls-listing（远端 `ls -l` 解析）/ utf8（UTF-8 保真解码 + 非法字节转义）/ net-test（网络测试命令与校验）
     ├── preload/                 # main-preload.js / settings-preload.js / icons.js（assets/icons/*.svg）/ flags.js（assets/flags/*.svg）
     └── renderer/
         ├── index.html           # 托盘主面板
@@ -176,12 +176,30 @@ Ships/
 
 ---
 
+### 3.8 网络测试（IP 工具，仅主面板）
+
+1. **入口**：IP / 网段 工具底部的「网络测试」区块；设置窗口无此入口。
+2. **IP**：默认取上方输入解析出的 **IPv4**（如 `192.168.1.10/24` → `192.168.1.10`）；选择**扫描主机**时默认改为该输入的**网段**（`192.168.1.0/24`），选择**扫描应用**时仍是该**主机地址**；上方为空 / 非法 / IPv6 时留空、按钮禁用；手动改过（包括直接填网段）之后不再跟随上方输入，清空并失焦会恢复为默认值。
+3. **类型与端口**：**单行 TAB 式分段控件**（`ShipsUI.segmented` + `.segment-compact`，整行宽、7 段实测约 353px 不用滚动，必要时可横向滚动）选择 **TCP / UDP / HTTP / ICMP / ARP / 扫描应用 / 扫描主机**（短标签，完整含义与命令放在悬浮提示；列表在 `src/renderer/scripts/constants.js` 的 `NET_TEST_PROTOCOLS`，需与主进程 `src/main/utils/net-test.js` 的 `PROTOCOLS` 一致）；**ICMP / ARP / 扫描主机不使用端口 → 端口输入框禁用**（`.field:disabled`）；**扫描应用的端口可留空**（留空 = nmap 扫描该目标的常用端口，填了 = 精确扫该端口的 TCP + UDP，端口为空时输入框显示提示「留空则扫描该目标的常用端口」）；端口默认 **80**，只接受 1–65535，输入时自动剔除非数字；IP / 端口**不做历史记录**。**扫描主机需要网段** —— 判定来源有两处：**上方输入**里显式带掩码的网段（如 `192.168.1.10/24`），或**直接填在测试目标栏里的网段**（如 `172.16.3.0/24`）；都不满足时该段置灰不可点选、按钮禁用并提示「需要网段才能扫描：请在上方或 IP 地址里填如 192.168.1.0/24」。**扫描应用不限制网段**：单地址（如 `172.16.3.155`）或网段（`172.16.3.0/24`）都可以；网段时前缀仍限 `16–30`，超范围时提示「网段前缀需在 16–30 之间（如 192.168.1.0/24）」。
+4. **执行**：点「测试」→ `net-test:run`（`{ protocol, ip, port }`）。主进程先校验（IPv4 正则 / 端口范围 / 协议白名单，非法直接拒绝、绝不拼接命令），再由 `iterm-service.openCommand()` 在新 iTerm 窗口执行：
+   - `tcp` → `nc -vz -w 3 <ip> <port>`
+   - `udp` → `nc -uzv -w 3 <ip> <port>`（UDP 无握手，只能证明报文可发出）
+   - `http` → 端口 443 用 `curl -Ikm8 https://<ip>:443/`，其它端口用 `curl -Im8 http://<ip>:<port>/`（短参数拼接：`-I` HEAD、`k` 忽略证书、`m8` 超时 8s）
+   - `icmp` → `ping -c 4 <ip>`
+   - `arp` → `arp -n <ip>`（仅同网段有意义）
+   - `scan-host`（扫描主机）→ `nmap -sn <网段>`（nmap ping 扫描，做主机发现）
+   - `scan-app`（扫描应用）→ **端口留空** 时 `nmap <目标>`（nmap 默认的常用端口，回答「哪些端口是开的」）；**填了端口** 时 `sudo nmap -sS -sU -p <port> <目标>`（该端口的 TCP + UDP 精确扫描；`-sS` / `-sU` 需要 root，故带 `sudo`，iTerm 会提示输入密码）；`<目标>` 可以是单个 IP，也可以是网段
+   主机类命令全部是 **macOS 自带**（`nc` / `curl` / `ping` / `arp`）；两个扫描类型依赖 **nmap**（非系统自带，未安装时先 `brew install nmap`，选中扫描类型时提示行会给出该提示）。iTerm 打开失败时区块底部红字提示 `无法打开 iTerm：…`。
+5. **提示行**：就绪时显示「点击测试会在 iTerm 新窗口执行对应命令…」，执行成功显示「已在 iTerm 中执行：<命令>」，缺 IP / 端口时显示「需要有效的 IPv4 地址与端口」；结果本身在 iTerm 窗口里查看。
+
+---
+
 ## 4. 主要功能清单
 
 | 功能 | 说明 | 默认值 / 条件 |
 | --- | --- | --- |
 | 时间戳转换 | 秒 / 毫秒 / 纳秒与日期互转；顶部实时当前时间，纳秒用 `performance.timeOrigin + performance.now()` 高精度计算（约 50ms 刷新，非固定 `000000`）；时间戳单位**自动识别**（≤11 位为秒、≤15 位为毫秒、否则纳秒），无单位选择框；**时间戳 → 日期**与**日期 → 时间戳**的输入框**同一行右侧**各有一个**偏移输入框**（普通文本输入，无下拉预设，见 §11），可输入 `-30m` / `+2h` / `90`（纯数字按秒；单位 `s`/`m`/`h`/`d`/`w`/`mo`，月按 30 天），带符号表示「前（-） / 后（+）」，输出结果叠加该偏移，**默认值为 `+0s`（时间不变）**，清空时同样按无偏移计算；偏移文本非法时输入框描红（`.invalid`）且按无偏移计算；**底部「时间戳差值」**输入两个时间戳 A / B（各自自动识别单位，可混用），实时输出「时间差（秒）」（带符号，最多 9 位小数、去尾零）与「时间差（格式化）」（`天 / 小时 / 分钟 / 秒 / 毫秒` 非零项拼接，负数前置 `-`），按 **B − A** 计算、纯数字运算不经过浮点 | 实时；不可识别的时间戳显示错误；输入与偏移不做历史记录、不落盘 |
-| IP / 网段与掩码 | 输入 `IP`、`IP/前缀`、`IP 掩码`、纯数字或 `0x` 十六进制；自上而下显示：**归属地** → **IP 进制（十进制 / 十六进制 / 二进制）** → 网段结果（网络地址、广播地址、可用范围、主机数、掩码、反掩码、前缀、掩码二进制、地址类型）；IPv6 仅显示 IP 进制 | 未给掩码时按 `/24` 计算并提示；IPv6 不查归属地；归属地卡片固定高度，无运营商显示 `-` |
+| IP / 网段与掩码 | 输入 `IP`、`IP/前缀`、`IP 掩码`、纯数字或 `0x` 十六进制；自上而下显示：**归属地** → **IP 进制（十进制 / 十六进制 / 二进制）** → 网段结果（网络地址、广播地址、可用范围、主机数、掩码、反掩码、前缀、掩码二进制、地址类型）；IPv6 仅显示 IP 进制；底部 **网络测试**：IP 默认取上方解析结果（可改；选扫描类类型时默认为该网段），类型 TCP / UDP / HTTP(S) / ICMP / ARP / 扫描应用 / 扫描主机（扫描主机需输入网段、16–30 位才可选；扫描应用单地址或网段都行、端口可留空扫可用端口），选 ICMP / ARP / 扫描主机时禁用端口，点「测试」在 iTerm 执行 `nc -vz -w 3` / `nc -uzv -w 3` / `curl -Ikm8` / `ping -c 4` / `arp -n` / `nmap -sn` / `nmap`（可用端口）/ `sudo nmap -sS -sU -p`（主机类命令系统自带，扫描依赖 nmap，见 §3.8） | 未给掩码时按 `/24` 计算并提示；IPv6 不查归属地；归属地卡片固定高度，无运营商显示 `-`；网络测试默认端口 80、扫描默认目标为网段，IPv6 / 非法 IP 时按钮禁用、输入不落盘 |
 | 进制转换 | 2/8/10/16 进制四行双向实时同步；另有 2–36 自定义进制（自绘下拉）；“位宽/字节”统计 | 任一行输入即联动其余 |
 | JSON 格式化 | 粘贴/失焦后**原地格式化**（固定 4 空格缩进）并语法高亮；工具栏单行：文本/结构切换、键排序、复制、压缩、清空；错误定位（行列）；**结构查看**（可折叠树） | 超过 1MB 仅格式化不高亮；输入改变仅重高亮；编辑器高度 180px |
 | SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示系统图标、`user@host(:port)`（22 不显示端口）、别名与**连接按钮**；**双击条目（按钮除外）等同于连接**；列表在打开面板时自动刷新（无手动刷新按钮）；系统图标来自缓存的探测结果（品牌彩色图标，探测在「设置 · SSH 管理」进行）；行内 `folder` 图标进入**目录浏览**（见 §3.7）：列出该主机目录、双击目录进入下一级、悬浮目录条目用 iTerm 打开并 `cd`（文件仅显示体积、无操作）、顶栏可返回上一级 / 返回主机列表 | 忽略通配符主机（如 `Host *`）；未探测显示通用主机图标 |
@@ -230,6 +248,7 @@ Ships/
 | `ssh:detect` | `{ alias }` | `{ queued }` | 异步，结果经 `ssh:detected` 回传（兼容保留） |
 | `ssh:detect-host` | `{ alias?, hostName, user?, port?, identityFile?, proxyJump? }` | `{ ok, alias, info }` | 对任意主机（可尚未保存）同步探测，结果写入缓存并广播 |
 | `ssh:get-detected` | — | `{ [alias]: { os, family, label, at } }` | 读取探测缓存 |
+| `net-test:run` | `{ protocol, ip, port }` | `{ ok, command?, error? }` | 校验后在新 iTerm 窗口执行端口 / 连通性 / 扫描命令（`nc` / `curl` / `ping` / `arp` / `nmap`，见 §3.8）；协议白名单 `tcp`/`udp`/`http`/`icmp`/`arp`/`scan-host`/`scan-app`；扫描主机要求 `<ipv4>/<prefix>` 且前缀 16–30；扫描应用接受单地址或网段（网段同样限 16–30），端口可省略（省略即 `nmap <目标>`）；非法 IP / 端口 / 网段直接拒绝 |
 | `ssh:list-dir` | `{ alias, path?, remember? }` | `{ ok, path?, parent?, entries?, truncated?, lastDir?, code?, error? }` | 列出远端目录：`path` 省略时取「上次目录的父目录」或 `~`；`remember: true` 时**仅在列出成功后**把实际路径记入 `ssh-browse.json`（输错路径不会被记住）；`code` ∈ `noDir`/`noPath`/`listFailed`/`timeout`/`connect` |
 | `ssh:open-dir` | `{ alias, path }` | `{ ok, command?, error? }` | iTerm 打开并 `cd` 进该目录（副作用：记录该目录） |
 | `ssh-config:read` | — | `hosts` | |
@@ -448,7 +467,8 @@ flowchart TD
 
 ## 10. 连接测试
 
-- 面板本身无独立“连接测试”流程；SSH 的可用性通过 **SSH 管理 → 探测操作系统** 隐式验证：
+- **IP 工具 · 网络测试**（§3.8）：在 iTerm 中执行 `nc` / `curl` / `ping` / `arp` 完成 TCP / UDP / HTTP(S) / ICMP / ARP 测试，或用 `nmap` 做网段主机发现与端口扫描；校验与命令映射见 §3.8。
+- **SSH 的可用性**通过 **SSH 管理 → 探测操作系统** 隐式验证（同时也是目录浏览所用连接）：
   - 步骤：点击探测 → 后台 `ssh2` 连接 → 读取 `uname -s` 与 `/etc/os-release`，识别到具体发行版。
   - 成功判定：连接建立且命令返回可识别系统。
   - 超时：`readyTimeout = 8000ms`；失败归类为 `unknown`。
@@ -505,7 +525,8 @@ flowchart TD
 - **纵向间距统一 10px**：工具/设置分区用 `.section`（`gap: 10px`、`margin-bottom: 10px`）；结果行、输入、区块之间的间距均为 10px（不再混用 8/12/16px）。
 - **统一标题**：每个工具内容区顶部由 `app.js` 渲染统一头部 `.tool-head`（标题取 `tools.<id>`、说明取 `toolDesc.<id>`）；切换 TAB 时内容区自动滚动回顶部。
 - 自绘控件：下拉框 `select-trigger` / `select-menu` / `select-option`（`ShipsUI.createSelect`，替代系统 `<select>`）；悬浮提示 `ships-tip`（`ShipsUI.initTooltips`，元素加 `data-tip`，时间戳工具的偏移输入框用 `data-tip` 说明表达式语法）；JSON 覆盖式高亮编辑器 `json-editor` 与结构树 `json-tree`。
-- 输入校验态：普通输入框加 `.invalid` 时描红（`border-color: var(--color-danger)`），时间戳工具的两个偏移输入框即用它表示偏移表达式非法。
+- 输入校验态：普通输入框加 `.invalid` 时描红（`border-color: var(--color-danger)`），时间戳工具的两个偏移输入框即用它表示偏移表达式非法；`.field:disabled` 半透明 + `not-allowed` 光标（IP 工具网络测试在 ICMP / ARP / 扫描主机下禁用端口输入）。
+- 分段控件：`ShipsUI.segmented(options, value, onSelect, { className })` 支持选项 `disabled`（置灰不可点选，`.segment button:disabled` 透明 0.4）、`tip`（悬浮提示，配合 `data-tip`）与 `setOptions()`（原地重建，用于跟随状态变化）；`.segment-compact` 为单行多段变体（内边距 4px / 6px），IP 工具的网络测试类型切换即用它。
 - 悬浮操作图标：目录浏览中**只有目录条目**用 `group` + `invisible group-hover:visible`（未悬浮时不可见，且不产生布局跳动；文件条目不加该图标）；「上次」标记用 `.chip`。
 - 固定头部布局：`.tool-fixed`（由工具加在 `#content` 上）把内容区改为列方向 flex + `overflow: hidden`，`.tool-head` 不收缩、其后工具容器 `flex: 1 1 auto; min-height: 0`，工具自身再让列表 `flex: 1 1 0%; min-height: 0; overflow-y: auto` —— 顶部标题与工具顶栏固定，只有列表滚动。目前仅 SSH 目录浏览使用。
 - 视觉点缀：不使用 emoji；SSH 探测结果直接使用 `assets/icons` 中的品牌彩色图标（Ubuntu/Fedora/Arch/CentOS/… 及 Windows），macOS 用灰色 command 图标；IP 归属地展示彩色国旗。
