@@ -56,6 +56,15 @@ function find_index(items, addr) {
   return null;
 }
 
+/* First key of `entries` whose ranges contain addr (entries: name -> ranges). */
+function find_match(entries, addr) {
+  if (!entries) return null;
+  for (const [name, items] of Object.entries(entries)) {
+    if (find_index(items, addr)) return name;
+  }
+  return null;
+}
+
 function base_strip_dot(s) {
   if (!s) return '';
   const idx = s.lastIndexOf('/');
@@ -104,36 +113,29 @@ function lookup(addr) {
     return buildInfo({ isp: '保留地址' });
   }
 
-  for (const [code, items] of Object.entries(index_table[INDEX_COUNTRY])) {
+  // Province / city data only exists for China and Taiwan in this database, so a
+  // missing province must not hide the country (and a missing city must not hide the
+  // province): resolve every level that matches and fall back to the level above.
+  const country = find_match(index_table[INDEX_COUNTRY], ip);
+  const isp = find_match(index_table[INDEX_ISP], ip);
+  if (!country && !isp) return null;
+  if (!country) return buildInfo({ isp });
+
+  const raw = { country, isp };
+  for (const [province, items] of Object.entries(index_table[INDEX_PROVINCE])) {
+    if (!province.startsWith(country)) continue;
     if (!find_index(items, ip)) continue;
-
-    const raw = { country: code };
-
-    for (const [province, p_items] of Object.entries(index_table[INDEX_PROVINCE])) {
-      if (!province.startsWith(code)) continue;
-      if (!find_index(p_items, ip)) continue;
-
-      raw.province = province;
-
-      for (const [isp, isp_items] of Object.entries(index_table[INDEX_ISP])) {
-        if (find_index(isp_items, ip)) {
-          raw.isp = isp;
-          break;
-        }
-      }
-
-      if (code !== 'country/CN') return buildInfo(raw);
-
-      for (const [city, c_items] of Object.entries(index_table[INDEX_CITY])) {
-        if (find_index(c_items, ip)) {
-          raw.city = city;
-          return buildInfo(raw);
-        }
-      }
+    raw.province = province;
+    break;
+  }
+  if (country === 'country/CN') {
+    for (const [city, items] of Object.entries(index_table[INDEX_CITY])) {
+      if (!find_index(items, ip)) continue;
+      raw.city = city;
+      break;
     }
   }
-
-  return null;
+  return buildInfo(raw);
 }
 
 module.exports = { lookup, parse_ipv4, parse_cidr_to_range };
