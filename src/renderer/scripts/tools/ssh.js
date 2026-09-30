@@ -23,7 +23,7 @@
         browse: '浏览目录',
         backHosts: '返回主机列表',
         parentDir: '上一级',
-        openHere: '在 iTerm 中打开并进入该目录',
+        openHere: '在终端中打开并进入该目录',
         openFailed: '打开失败：{error}',
         dirFailed: '无法打开目录：{error}',
         errNoDir: '目录不存在或没有权限',
@@ -58,7 +58,7 @@
         browse: 'Browse files',
         backHosts: 'Back to hosts',
         parentDir: 'Parent',
-        openHere: 'Open in iTerm inside this directory',
+        openHere: 'Open in the terminal inside this directory',
         openFailed: 'Open failed: {error}',
         dirFailed: 'Cannot open directory: {error}',
         errNoDir: 'Directory not found or permission denied',
@@ -376,8 +376,9 @@
         row.appendChild(size);
       }
 
-      // Folders: hover shows the terminal icon (opens iTerm inside it), double-click
-      // drills in. Files are display-only — no hover action, no double-click action.
+      // Folders: hover shows the terminal icon (opens a session inside it — built-in
+      // terminal window or iTerm, per 设置 → 终端 → SSH 使用内置终端连接), double-click
+      // drills in. Files are display-only, same as before.
       if (isDir) {
         const openBtn = el('button', {
           class: 'icon-btn invisible h-6 w-6 shrink-0 group-hover:visible',
@@ -387,7 +388,7 @@
         openBtn.innerHTML = Icons.terminal(13);
         openBtn.addEventListener('click', (event) => {
           event.stopPropagation();
-          openInIterm(joinPath(state.path, entry.name));
+          openInTerminal(joinPath(state.path, entry.name));
         });
         row.appendChild(openBtn);
         row.addEventListener('dblclick', () => enterDir(entry.name));
@@ -490,7 +491,8 @@
       loadDir('', false);
     }
 
-    async function openInIterm(dir) {
+    /* 打开方式由主进程决定（设置 → 终端 → SSH 使用内置终端连接），这里只关心成败。 */
+    async function openInTerminal(dir) {
       const result = await window.ships.ssh.openDir({ alias: state.alias, path: dir });
       if (!result || !result.ok) {
         showStatus(i18n.t('ssh.openFailed', { error: (result && result.error) || 'error' }), true);

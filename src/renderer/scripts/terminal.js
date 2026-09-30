@@ -44,7 +44,12 @@
   const FONT_MIN = 8;
   const FONT_MAX = 24;
 
-  const host = document.getElementById('term-host');
+  /* xterm 挂在 #term-fit（无内边距）里，留白由外层 #term-host 提供：FitAddon 用
+     「父元素的 border box 高度」算行数，父元素带内边距会把可用高度多算一份内边距，
+     于是一行被挤出可视区 —— 最后一行只露大半行，页面还会多出几像素可滚动高度
+     （滚轮时标题跟着上下动）。父元素无内边距时测量值即真实可用区。 */
+  const host = document.getElementById('term-fit');
+  const hostBox = document.getElementById('term-host');
   const titleEl = document.getElementById('term-title');
   const topBtn = document.getElementById('btn-top');
   const itermBtn = document.getElementById('btn-iterm');
@@ -193,7 +198,7 @@
       fitIfNeeded();
     }
     observer = new ResizeObserver(() => scheduleResize());
-    observer.observe(host);
+    observer.observe(hostBox || host);
     term.onData((data) => {
       if (sessionId) window.ships.terminal.input(sessionId, data);
       else startSession();

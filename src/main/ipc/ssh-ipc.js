@@ -77,10 +77,21 @@ function registerSshIpc(ipcMain) {
     return result;
   });
 
+  /* 目录浏览里的「打开」与 SSH_CONNECT 同一套开关：内置终端开着就在置顶终端窗口
+     里执行同一条命令，关掉才退回 iTerm（否则这里会无视设置总是弹出 iTerm）。 */
   ipcMain.handle(IPC.SSH_OPEN_DIR, async (_event, payload) => {
     const host = findHost(payload && payload.alias);
     if (!host) return { ok: false, code: 'host', error: 'host not found' };
-    return browseService.openAt(host, (payload && payload.path) || '');
+    const dir = (payload && payload.path) || '';
+    const settingsService = require('../services/settings-service');
+    if (settingsService.get('sshBuiltinTerminal') === false) {
+      return browseService.openAt(host, dir);
+    }
+    const command = sshService.buildOpenAtCommand(host, dir);
+    if (dir) browseService.rememberDir(host.alias, dir);
+    logger.file(`[ssh] open-at(alias=${host.alias}) -> terminal`);
+    if (!runInTerminal(command)) return { ok: false, error: 'terminal unavailable', command };
+    return { ok: true, command };
   });
 
   ipcMain.handle(IPC.SSH_CONFIG_READ, () => configService.list());
