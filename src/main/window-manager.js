@@ -4,6 +4,9 @@ const path = require('path');
 const { BrowserWindow, screen } = require('electron');
 const { WINDOW, SETTINGS_WINDOW, TERMINAL_WINDOW, VIBRANCY, IPC } = require('../shared/constants');
 const settings = require('./services/settings-service');
+const { TERMINAL_WINDOW_FILE } = require('./utils/paths');
+const { readJson, writeJson } = require('./utils/json-store');
+const { clampNumber, displaySignature, displayBySignature, clampBounds } = require('./utils/window-geometry');
 const logger = require('./utils/logger');
 
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
@@ -15,14 +18,8 @@ let terminalWindow = null;
 let trayRef = null;
 let blurSuppressed = false;
 let pinnedPositioned = false;
-let terminalSizeSaving = null;
+let terminalGeometryTimer = null;
 let suppressTerminalSizeSave = false;
-
-function clampNumber(value, min, max, fallback) {
-  const number = Number(value);
-  if (!Number.isFinite(number)) return fallback;
-  return Math.max(min, Math.min(max, Math.trunc(number)));
-}
 
 /* The terminal window size is a user setting (设置 → 终端 → 窗口大小); the value is
    also written back when the window is resized by hand, so the next open matches. */
@@ -33,10 +30,35 @@ function terminalWindowSize() {
   };
 }
 
+/* 终端窗口几何记忆（单槽，terminal-window.json）：最近一次的屏幕 + 位置 + 尺寸。
+   下次打开时那块屏幕还在（id / 分辨率 / 缩放一致）就沿用，否则用设置里的默认尺寸
+   在该屏幕上居中显示。 */
+let terminalState = readJson(TERMINAL_WINDOW_FILE, null);
+
+/* 没有记忆（或记忆的屏幕已不在）时取鼠标所在屏幕：拉起终端的托盘 / 面板就在那上面。 */
+function anchorDisplay() {
+  try {
+    return screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  } catch (err) {
+    return screen.getPrimaryDisplay();
+  }
+}
+
+function terminalBoundsForOpen() {
+  const size = terminalWindowSize();
+  const saved = terminalState && terminalState.bounds ? terminalState : null;
+  const min = { width: TERMINAL_WINDOW.minWidth, height: TERMINAL_WINDOW.minHeight };
+  // 同一块屏幕还在 -> 沿用记忆；换屏 / 拔屏 / 无数据 -> 默认尺寸在当前屏幕居中。
+  const matched = saved ? displayBySignature(screen.getAllDisplays(), saved.display) : null;
+  if (matched) return clampBounds(saved.bounds, matched, size, min);
+  return clampBounds(null, anchorDisplay(), size, min);
+}
+
 function applyTerminalWindowSize() {
+  const size = terminalWindowSize();
+  rememberTerminalSize(size);
   const win = getTerminalWindow();
   if (!win || win.isMaximized() || win.isFullScreen()) return;
-  const size = terminalWindowSize();
   const [width, height] = win.getSize();
   if (width === size.width && height === size.height) return;
   suppressTerminalSizeSave = true;
@@ -46,12 +68,51 @@ function applyTerminalWindowSize() {
   }, 500);
 }
 
+/* 改设置里的窗口大小后，记忆里的尺寸也要跟上，否则下次在同一块屏幕上打开会沿用旧尺寸。 */
+function rememberTerminalSize(size) {
+  if (!terminalState || !terminalState.bounds) return;
+  if (terminalState.bounds.width === size.width && terminalState.bounds.height === size.height) return;
+  terminalState = Object.assign({}, terminalState, {
+    bounds: Object.assign({}, terminalState.bounds, { width: size.width, height: size.height }),
+  });
+  writeJson(TERMINAL_WINDOW_FILE, terminalState);
+}
+
 function saveTerminalWindowSize() {
   const win = getTerminalWindow();
   if (!win || suppressTerminalSizeSave || win.isMaximized() || win.isFullScreen()) return;
   const [width, height] = win.getSize();
   if (settings.get('terminalWindowWidth') === width && settings.get('terminalWindowHeight') === height) return;
   settings.set({ terminalWindowWidth: width, terminalWindowHeight: height });
+}
+
+/* 把窗口此刻的真实几何（位置 + 尺寸 + 所在屏幕）落盘；顺带把尺寸写回设置（既有行为）。
+   落盘时读窗口当前值，而不是早先捕获的快照 —— 否则「刚拖动完又改了窗口大小」会被
+   旧快照覆盖。 */
+function saveTerminalGeometry() {
+  const win = getTerminalWindow();
+  if (!win || win.isMaximized() || win.isFullScreen()) return;
+  // 设置写回自带 suppress 保护（避免程序化 setSize 触发回写循环），
+  // 几何记忆不受影响：位置 / 尺寸总是记窗口此刻的真实值。
+  saveTerminalWindowSize();
+  const bounds = win.getBounds();
+  const next = {
+    display: displaySignature(screen.getDisplayMatching(bounds)),
+    bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
+  };
+  if (!next.display) return;
+  if (JSON.stringify(next) === JSON.stringify(terminalState)) return;
+  terminalState = next;
+  writeJson(TERMINAL_WINDOW_FILE, terminalState);
+}
+
+/* 拖动 / 缩放：停顿 400ms 落盘；窗口关闭时立刻落盘（见 openTerminalWindow 的 close）。 */
+function scheduleTerminalGeometrySave() {
+  if (terminalGeometryTimer) clearTimeout(terminalGeometryTimer);
+  terminalGeometryTimer = setTimeout(() => {
+    terminalGeometryTimer = null;
+    saveTerminalGeometry();
+  }, 400);
 }
 
 /* 终端窗口的置顶开关（头部图钉按钮 / settings.json 的 terminalAlwaysOnTop）。 */
@@ -310,10 +371,13 @@ function openTerminalWindow() {
     return terminalWindow;
   }
 
-  const size = terminalWindowSize();
+  // 有同屏记忆就用记忆里的屏幕 / 位置 / 尺寸，否则默认尺寸居中（见 terminalBoundsForOpen）。
+  const bounds = terminalBoundsForOpen();
   terminalWindow = new BrowserWindow({
-    width: size.width,
-    height: size.height,
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
     minWidth: TERMINAL_WINDOW.minWidth,
     minHeight: TERMINAL_WINDOW.minHeight,
     title: 'Ships Terminal',
@@ -345,22 +409,21 @@ function openTerminalWindow() {
   // (false = no NSWindowCollectionBehaviorCanJoinAllSpaces, true = FullScreenAuxiliary)
   terminalWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true });
   terminalWindow.loadFile(path.join(RENDERER_DIR, 'terminal.html'));
-  terminalWindow.on('resize', () => {
-    if (terminalSizeSaving) clearTimeout(terminalSizeSaving);
-    terminalSizeSaving = setTimeout(() => {
-      terminalSizeSaving = null;
-      saveTerminalWindowSize();
-    }, 400);
-  });
+  terminalWindow.on('resize', scheduleTerminalGeometrySave);
+  terminalWindow.on('move', scheduleTerminalGeometrySave);
+  // 实际生效的几何（恢复时可能被夹取过）也记下来，保证记忆与窗口一致。
+  scheduleTerminalGeometrySave();
   terminalWindow.once('ready-to-show', () => {
     terminalWindow.show();
     terminalWindow.focus();
   });
+  // 关闭前落盘：拖动后立刻关窗（或直接点 iTerm 交接）也不会丢掉位置。
+  terminalWindow.on('close', saveTerminalGeometry);
   terminalWindow.on('closed', () => {
     terminalWindow = null;
-    if (terminalSizeSaving) {
-      clearTimeout(terminalSizeSaving);
-      terminalSizeSaving = null;
+    if (terminalGeometryTimer) {
+      clearTimeout(terminalGeometryTimer);
+      terminalGeometryTimer = null;
     }
   });
   return terminalWindow;
