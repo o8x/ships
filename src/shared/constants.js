@@ -9,6 +9,7 @@ const IPC = {
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
   SETTINGS_CHANGED: 'settings:changed',
+  SETTINGS_OPEN_SECTION: 'settings:open-section',
 
   APP_INFO: 'app:info',
   OPEN_DATA_FOLDER: 'app:open-data-folder',
@@ -32,7 +33,20 @@ const IPC = {
   HASH_FILE: 'hash:file',
   DIALOG_OPEN_FILE: 'dialog:open-file',
 
-  NET_TEST_RUN: 'net-test:run',
+  NET_TEST_COMMAND: 'net-test:command',
+
+  TERMINAL_OPEN: 'terminal:open',
+  TERMINAL_START: 'terminal:start',
+  TERMINAL_INPUT: 'terminal:input',
+  TERMINAL_RESIZE: 'terminal:resize',
+  TERMINAL_INTERRUPT: 'terminal:interrupt',
+  TERMINAL_KILL: 'terminal:kill',
+  TERMINAL_EXPORT: 'terminal:export',
+  TERMINAL_OPEN_ITERM: 'terminal:open-iterm',
+  TERMINAL_SET_TOP: 'terminal:set-top',
+  TERMINAL_ZOOM: 'terminal:zoom',
+  TERMINAL_DATA: 'terminal:data',
+  TERMINAL_EXIT: 'terminal:exit',
 
   SSH_LIST: 'ssh:list',
   SSH_CONNECT: 'ssh:connect',
@@ -60,10 +74,23 @@ const WINDOW = Object.assign(
 
 const SETTINGS_WINDOW = Object.assign(
   {
-    width: 720,
-    height: 520,
+    width: 800,
+    height: 600,
   },
   ships.settingsWindow || {}
+);
+
+// Always-on-top terminal window (floats above full-screen apps, Steam-style).
+const TERMINAL_WINDOW = Object.assign(
+  {
+    width: 1024,
+    height: 768,
+    minWidth: 480,
+    minHeight: 320,
+    alwaysOnTop: true,
+    scrollback: 10000,
+  },
+  ships.terminalWindow || {}
 );
 
 // macOS only: NSVisualEffectMaterial used when the native frosted glass is on.
@@ -83,6 +110,14 @@ const DEFAULT_SETTINGS = {
   vibrancy: false,
   clipboardLimit: 3,
   clipboardPollMs: 1200,
+  // terminal window / network test terminal
+  terminalShell: (ships.terminalWindow && ships.terminalWindow.shell) || '',
+  terminalFontSize: (ships.terminalWindow && ships.terminalWindow.fontSize) || 12,
+  terminalScrollback: (ships.terminalWindow && ships.terminalWindow.scrollback) || 10000,
+  terminalWindowWidth: TERMINAL_WINDOW.width,
+  terminalWindowHeight: TERMINAL_WINDOW.height,
+  terminalAlwaysOnTop: TERMINAL_WINDOW.alwaysOnTop !== false,
+  sshBuiltinTerminal: ships.sshBuiltinTerminal !== false,
 };
 
 module.exports = {
@@ -92,6 +127,7 @@ module.exports = {
   IPC,
   WINDOW,
   SETTINGS_WINDOW,
+  TERMINAL_WINDOW,
   VIBRANCY,
   DEFAULT_SETTINGS,
 };

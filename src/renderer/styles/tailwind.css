@@ -175,7 +175,7 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 52px;
+  height: 28px;
   -webkit-app-region: drag;
   z-index: 10;
 }
@@ -362,6 +362,29 @@ input[type='color'].swatch::-webkit-color-swatch {
 /* Popovers need a touch more fill than in-flow cards to stand out from the glass. */
 [data-vibrancy='on'] .select-menu {
   background: var(--color-surface-3);
+}
+
+/* Embedded terminals never show a scrollbar (iTerm-like): the wheel / trackpad
+   scrolls the buffer itself, and nothing else in the page scrolls. */
+.xterm .xterm-viewport,
+.xterm-viewport {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overflow-y: scroll;
+}
+.xterm-viewport::-webkit-scrollbar,
+.xterm-viewport::-webkit-scrollbar-track,
+.xterm-viewport::-webkit-scrollbar-thumb {
+  display: none;
+  width: 0;
+  height: 0;
+  background: transparent;
+}
+
+/* xterm.js draws its own scrollbar element; hide it completely (the wheel and
+   trackpad still scroll the buffer, there is simply nothing drawn). */
+.xterm .xterm-scrollable-element > .scrollbar {
+  display: none !important;
 }
 
 /* Tooltip */

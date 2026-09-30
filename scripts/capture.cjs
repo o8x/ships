@@ -24,6 +24,7 @@ app.whenReady().then(async () => {
   const { registerClipboardIpc } = require('../src/main/ipc/clipboard-ipc');
   const { registerHashIpc } = require('../src/main/ipc/hash-ipc');
   const { registerNetTestIpc } = require('../src/main/ipc/net-test-ipc');
+  const { registerTerminalIpc } = require('../src/main/ipc/terminal-ipc');
   const wm = require('../src/main/window-manager');
 
   registerAppIpc(ipcMain);
@@ -34,7 +35,9 @@ app.whenReady().then(async () => {
   registerClipboardIpc(ipcMain);
   registerHashIpc(ipcMain);
   registerNetTestIpc(ipcMain);
+  registerTerminalIpc(ipcMain);
 
+  require('../src/main/menu').installApplicationMenu();
   const win = wm.createMainWindow();
   win.webContents.setBackgroundThrottling(false);
   await waitLoad(win);

@@ -7,6 +7,7 @@
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
     />
     <title>Ships</title>
+    <link rel="stylesheet" href="../../node_modules/@xterm/xterm/css/xterm.css" />
     <link rel="stylesheet" href="./styles/constants.css" />
     <link rel="stylesheet" href="./styles/tailwind.build.css" />
   </head>
@@ -15,12 +16,12 @@
       <div class="drag-region"></div>
       <aside
         class="flex w-[190px] shrink-0 flex-col border-r border-border px-3"
-        style="padding-top: 52px; background: var(--color-surface)"
+        style="padding-top: 32px; background: var(--color-surface)"
       >
         <nav id="settings-nav" class="flex flex-col"></nav>
       </aside>
       <div class="flex min-w-0 flex-1 flex-col">
-        <header class="shrink-0 px-6 pb-2" style="padding-top: 52px">
+        <header class="shrink-0 px-6 pb-2" style="padding-top: 12px">
           <h1 id="settings-title" class="text-[17px] font-semibold text-fg"></h1>
         </header>
         <main id="settings-pane" class="flex-1 overflow-y-auto px-6 pb-6"></main>
@@ -32,8 +33,12 @@
     <script src="./scripts/i18n.js"></script>
     <script src="./scripts/ui.js"></script>
     <script src="./scripts/settings-registry.js"></script>
+    <script src="../../node_modules/@xterm/xterm/lib/xterm.js"></script>
+    <script src="../../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
     <script src="./scripts/settings/ships-settings.js"></script>
     <script src="./scripts/settings/ssh-settings.js"></script>
+    <script src="./scripts/settings/terminal-settings.js"></script>
+    <script src="./scripts/settings/network-settings.js"></script>
     <script src="./scripts/settings.js"></script>
   </body>
 </html>

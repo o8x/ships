@@ -2,7 +2,7 @@
 
 const path = require('path');
 const { BrowserWindow, screen } = require('electron');
-const { WINDOW, SETTINGS_WINDOW, VIBRANCY, IPC } = require('../shared/constants');
+const { WINDOW, SETTINGS_WINDOW, TERMINAL_WINDOW, VIBRANCY, IPC } = require('../shared/constants');
 const settings = require('./services/settings-service');
 const logger = require('./utils/logger');
 
@@ -11,9 +11,61 @@ const PRELOAD_DIR = path.join(__dirname, '..', 'preload');
 
 let mainWindow = null;
 let settingsWindow = null;
+let terminalWindow = null;
 let trayRef = null;
 let blurSuppressed = false;
 let pinnedPositioned = false;
+let terminalSizeSaving = null;
+let suppressTerminalSizeSave = false;
+
+function clampNumber(value, min, max, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(min, Math.min(max, Math.trunc(number)));
+}
+
+/* The terminal window size is a user setting (设置 → 终端 → 窗口大小); the value is
+   also written back when the window is resized by hand, so the next open matches. */
+function terminalWindowSize() {
+  return {
+    width: clampNumber(settings.get('terminalWindowWidth'), TERMINAL_WINDOW.minWidth, 10000, TERMINAL_WINDOW.width),
+    height: clampNumber(settings.get('terminalWindowHeight'), TERMINAL_WINDOW.minHeight, 10000, TERMINAL_WINDOW.height),
+  };
+}
+
+function applyTerminalWindowSize() {
+  const win = getTerminalWindow();
+  if (!win || win.isMaximized() || win.isFullScreen()) return;
+  const size = terminalWindowSize();
+  const [width, height] = win.getSize();
+  if (width === size.width && height === size.height) return;
+  suppressTerminalSizeSave = true;
+  win.setSize(size.width, size.height);
+  setTimeout(() => {
+    suppressTerminalSizeSave = false;
+  }, 500);
+}
+
+function saveTerminalWindowSize() {
+  const win = getTerminalWindow();
+  if (!win || suppressTerminalSizeSave || win.isMaximized() || win.isFullScreen()) return;
+  const [width, height] = win.getSize();
+  if (settings.get('terminalWindowWidth') === width && settings.get('terminalWindowHeight') === height) return;
+  settings.set({ terminalWindowWidth: width, terminalWindowHeight: height });
+}
+
+/* 终端窗口的置顶开关（头部图钉按钮 / settings.json 的 terminalAlwaysOnTop）。 */
+function terminalAlwaysOnTop() {
+  return settings.get('terminalAlwaysOnTop') !== false;
+}
+
+function applyTerminalAlwaysOnTop() {
+  const win = getTerminalWindow();
+  if (!win) return terminalAlwaysOnTop();
+  if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
+  else win.setAlwaysOnTop(false);
+  return terminalAlwaysOnTop();
+}
 
 // electron-liquid-glass is a macOS-only native addon (NSGlassEffectView, macOS
 // 26+); load it lazily so non-macOS builds never touch it.
@@ -83,7 +135,7 @@ function createMainWindow() {
     maximizable: false,
     fullscreenable: false,
     skipTaskbar: true,
-    alwaysOnTop: true,
+    alwaysOnTop: terminalAlwaysOnTop(),
     hasShadow: true,
     // Liquid Glass rounds itself; hud vibrancy needs the native rounded frame;
     // otherwise the CSS radius shapes the panel.
@@ -202,10 +254,11 @@ function toggleMainWindow() {
   }
 }
 
-function openSettingsWindow() {
+function openSettingsWindow(section) {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.show();
     settingsWindow.focus();
+    if (section) settingsWindow.webContents.send(IPC.SETTINGS_OPEN_SECTION, section);
     return settingsWindow;
   }
 
@@ -235,12 +288,87 @@ function openSettingsWindow() {
   settingsWindow.once('ready-to-show', () => {
     settingsWindow.show();
     settingsWindow.focus();
+    if (section) settingsWindow.webContents.send(IPC.SETTINGS_OPEN_SECTION, section);
   });
   settingsWindow.on('closed', () => {
     settingsWindow = null;
   });
 
   return settingsWindow;
+}
+
+/* Always-on-top terminal: floats above other apps and above full-screen spaces
+   (Steam-overlay style), so it can be used without leaving a full-screen app. */
+function openTerminalWindow() {
+  if (terminalWindow && !terminalWindow.isDestroyed()) {
+    // Re-opening: pull the window to the space the user is on now. Toggling
+    // canJoinAllSpaces off again keeps it from following later space switches.
+    terminalWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    terminalWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true });
+    terminalWindow.show();
+    terminalWindow.focus();
+    return terminalWindow;
+  }
+
+  const size = terminalWindowSize();
+  terminalWindow = new BrowserWindow({
+    width: size.width,
+    height: size.height,
+    minWidth: TERMINAL_WINDOW.minWidth,
+    minHeight: TERMINAL_WINDOW.minHeight,
+    title: 'Ships Terminal',
+    titleBarStyle: 'hiddenInset',
+    show: false,
+    resizable: true,
+    minimizable: true,
+    maximizable: true,
+    fullscreenable: false,
+    alwaysOnTop: true,
+    webPreferences: {
+      preload: path.join(PRELOAD_DIR, 'main-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      spellcheck: false,
+    },
+  });
+  // Pinching / Cmd+wheel must not scale the page (title bar + icons); the terminal
+  // font is zoomed instead (see menu.js and the renderer's terminal:zoom handler).
+  terminalWindow.webContents.setVisualZoomLevelLimits(1, 1);
+  terminalWindow.webContents.on('zoom-changed', (event, zoomDirection) => {
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+    terminalWindow.webContents.send(IPC.TERMINAL_ZOOM, zoomDirection === 'in' ? 'in' : 'out');
+  });
+  applyTerminalAlwaysOnTop();
+  // Steam-like: the window is pinned on top and may float above a full-screen app,
+  // but it must NOT join every space — it stays on the desktop it was opened on.
+  // (false = no NSWindowCollectionBehaviorCanJoinAllSpaces, true = FullScreenAuxiliary)
+  terminalWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true });
+  terminalWindow.loadFile(path.join(RENDERER_DIR, 'terminal.html'));
+  terminalWindow.on('resize', () => {
+    if (terminalSizeSaving) clearTimeout(terminalSizeSaving);
+    terminalSizeSaving = setTimeout(() => {
+      terminalSizeSaving = null;
+      saveTerminalWindowSize();
+    }, 400);
+  });
+  terminalWindow.once('ready-to-show', () => {
+    terminalWindow.show();
+    terminalWindow.focus();
+  });
+  terminalWindow.on('closed', () => {
+    terminalWindow = null;
+    if (terminalSizeSaving) {
+      clearTimeout(terminalSizeSaving);
+      terminalSizeSaving = null;
+    }
+  });
+  return terminalWindow;
+}
+
+function getTerminalWindow() {
+  if (!terminalWindow || terminalWindow.isDestroyed()) return null;
+  return terminalWindow;
 }
 
 function closeSettingsWindow() {
@@ -253,7 +381,9 @@ function getSettingsWindow() {
 }
 
 function broadcast(channel, payload) {
-  const wins = [getMainWindow(), getSettingsWindow()];
+  // The always-on-top terminal window mirrors settings too (font size / scrollback /
+  // theme / locale), so it must receive settings-changed broadcasts as well.
+  const wins = [getMainWindow(), getSettingsWindow(), getTerminalWindow()];
   for (const win of wins) {
     if (win) win.webContents.send(channel, payload);
   }
@@ -262,6 +392,18 @@ function broadcast(channel, payload) {
 function setBlurSuppressed(value) {
   blurSuppressed = Boolean(value);
 }
+
+// 设置 → 终端 → 窗口大小：改完立即作用到已打开的终端窗口。
+settings.on('changed', (_data, keys) => {
+  if (!Array.isArray(keys)) {
+    applyTerminalWindowSize();
+    return;
+  }
+  if (keys.includes('terminalWindowWidth') || keys.includes('terminalWindowHeight')) {
+    applyTerminalWindowSize();
+  }
+  if (keys.includes('terminalAlwaysOnTop')) applyTerminalAlwaysOnTop();
+});
 
 module.exports = {
   setTray,
@@ -273,6 +415,8 @@ module.exports = {
   openSettingsWindow,
   closeSettingsWindow,
   getSettingsWindow,
+  openTerminalWindow,
+  getTerminalWindow,
   broadcast,
   setBlurSuppressed,
   applyPin,

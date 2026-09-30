@@ -71,6 +71,10 @@
     const sections = registry.all();
     if (sections.length) setActive(sections[0].id);
 
+    window.ships.onOpenSection((id) => {
+      if (id && registry.get(id)) setActive(id);
+    });
+
     window.ships.onSettingsChanged((next) => {
       const localeChanged = next.locale !== state.settings.locale;
       state.settings = next;

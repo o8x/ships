@@ -67,16 +67,17 @@ function buildCommand(payload) {
     if (!isValidHostOrCidr(target)) return null;
     const port = String((payload && payload.port) || '').trim();
     // No port → nmap's default port set ("which ports are open").
-    if (!port) return `nmap ${target}`;
-    if (!isValidPort(port)) return null;
-    // -sS (SYN) and -sU both need raw sockets, hence sudo; -p applies to both scans.
-    return `sudo nmap -sS -sU -p ${Number(port)} ${target}`;
+    // -sT (connect scan) needs no root, so it also works in the embedded terminal
+    // (which runs without a PTY and therefore cannot answer a sudo prompt).
+    const ports = port ? `-p ${Number(port)} ` : '';
+    if (port && !isValidPort(port)) return null;
+    return `nmap -sT ${ports}${target}`.replace(/ $/, '');
   }
 
   if (!isValidIpv4(target)) return null;
   const ip = target;
 
-  if (!spec.needsPort) {
+  if (spec.port === 'none') {
     if (protocol === 'icmp') return `ping -c 4 ${ip}`;
     return `arp -n ${ip}`;
   }
@@ -98,6 +99,19 @@ function buildCommand(payload) {
   return `curl -I${insecure}m${CURL_TIMEOUT_SEC} ${scheme}://${ip}:${portNumber}/`;
 }
 
+/* Manual line, or the command for the selected type (null when invalid). */
+function resolveCommand(payload) {
+  const manual = String((payload && payload.command) || '').trim();
+  if (manual) return manual;
+  const protocol = String((payload && payload.protocol) || '').toLowerCase();
+  if (!PROTOCOLS[protocol]) return null;
+  return buildCommand({
+    protocol,
+    ip: (payload && payload.target) || '',
+    port: (payload && payload.port) || '',
+  });
+}
+
 module.exports = {
   PROTOCOLS,
   NET_TIMEOUT_SEC,
@@ -109,4 +123,5 @@ module.exports = {
   isValidCidr,
   isValidHostOrCidr,
   buildCommand,
+  resolveCommand,
 };

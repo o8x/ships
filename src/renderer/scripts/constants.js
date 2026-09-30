@@ -63,8 +63,8 @@ window.ShipsConstants = {
     { value: 'icmp', label: 'ICMP', tipKey: 'tipIcmp', port: 'none' },
     { value: 'arp', label: 'ARP', tipKey: 'tipArp', port: 'none' },
     // 扫描应用单地址 / 网段都行，端口可留空（扫可用端口）；扫描主机需要网段。
-    { value: 'scan-app', labelKey: 'testScanApp', tipKey: 'tipScanApp', port: 'optional' },
-    { value: 'scan-host', labelKey: 'testScanHost', tipKey: 'tipScanHost', port: 'none', subnetOnly: true },
+    { value: 'scan-app', labelKey: 'scanApp', tipKey: 'tipScanApp', port: 'optional' },
+    { value: 'scan-host', labelKey: 'scanHost', tipKey: 'tipScanHost', port: 'none', subnetOnly: true },
   ],
   NET_TEST_DEFAULT_PORT: 80,
   NET_TEST_SCAN_PREFIX_MIN: 16,

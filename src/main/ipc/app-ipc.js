@@ -1,7 +1,7 @@
 'use strict';
 
 const { app, shell } = require('electron');
-const { IPC, VERSION } = require('../../shared/constants');
+const { IPC, VERSION, TERMINAL_WINDOW } = require('../../shared/constants');
 const { DATA_DIR, LOG_FILE, describeDataFiles } = require('../utils/paths');
 
 function registerAppIpc(ipcMain) {
@@ -12,6 +12,7 @@ function registerAppIpc(ipcMain) {
     systemLocale: app.getLocale(),
     dataDir: DATA_DIR,
     dataFiles: describeDataFiles(),
+    terminalScrollback: TERMINAL_WINDOW.scrollback,
   }));
 
   ipcMain.handle(IPC.OPEN_DATA_FOLDER, async () => {

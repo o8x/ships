@@ -11,6 +11,8 @@ const { registerGeoIpc } = require('./ipc/geo-ipc');
 const { registerClipboardIpc } = require('./ipc/clipboard-ipc');
 const { registerHashIpc } = require('./ipc/hash-ipc');
 const { registerNetTestIpc } = require('./ipc/net-test-ipc');
+const { registerTerminalIpc } = require('./ipc/terminal-ipc');
+const { installApplicationMenu } = require('./menu');
 const logger = require('./utils/logger');
 const { DATA_FILES } = require('./utils/paths');
 const { APP_NAME, VERSION, ships } = require('../shared/constants');
@@ -36,7 +38,9 @@ function onReady() {
   registerClipboardIpc(ipcMain);
   registerHashIpc(ipcMain);
   registerNetTestIpc(ipcMain);
+  registerTerminalIpc(ipcMain);
 
+  installApplicationMenu();
   wm.createMainWindow();
 
   const tray = createTray({
@@ -61,4 +65,5 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   require('./services/clipboard-service').stop();
   require('./services/ssh-browse-service').closeAll();
+  require('./services/terminal-service').killAll();
 });

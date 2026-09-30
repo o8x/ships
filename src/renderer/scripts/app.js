@@ -11,6 +11,8 @@
     brandName: document.getElementById('brand-name'),
     content: document.getElementById('content'),
     version: document.getElementById('footer-version'),
+    terminal: document.getElementById('btn-terminal'),
+    networkTest: document.getElementById('btn-network-test'),
     pin: document.getElementById('btn-pin'),
     settings: document.getElementById('btn-settings'),
   };
@@ -115,6 +117,10 @@
     dom.version.textContent = `v${state.version}`;
     dom.settings.innerHTML = Icons.gear(18);
     dom.settings.setAttribute('data-tip', i18n.t('settings'));
+    dom.networkTest.innerHTML = Icons.wifi(15);
+    dom.networkTest.setAttribute('data-tip', i18n.t('networkTest'));
+    dom.terminal.innerHTML = Icons.terminal(15);
+    dom.terminal.setAttribute('data-tip', i18n.t('terminal'));
   }
 
   function applySettings(settings) {
@@ -147,6 +153,8 @@
     else dom.content.innerHTML = emptyState(i18n.t('emptyTools'));
 
     dom.settings.addEventListener('click', () => window.ships.openSettings());
+    dom.networkTest.addEventListener('click', () => window.ships.openSettings('network'));
+    dom.terminal.addEventListener('click', () => window.ships.openTerminal());
     dom.pin.addEventListener('click', () => {
       window.ships.setSettings({ pinWindow: !state.settings.pinWindow });
     });

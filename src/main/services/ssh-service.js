@@ -294,3 +294,4 @@ module.exports.parseOsInfo = parseOsInfo;
 module.exports.OS_LABELS = OS_LABELS;
 module.exports.connectionOptions = connectionOptions;
 module.exports.shellQuote = shellQuote;
+module.exports.getAgentSocket = getAgentSocket;

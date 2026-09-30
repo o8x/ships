@@ -5,6 +5,8 @@ window.ShipsI18n = (function createI18n() {
     zh: {
       appName: 'Ships',
       settings: '设置',
+      networkTest: '网络测试',
+      terminal: '终端（置顶）',
       emptyTools: '暂无可用工具',
       common: {
         copy: '复制',
@@ -50,6 +52,8 @@ window.ShipsI18n = (function createI18n() {
     en: {
       appName: 'Ships',
       settings: 'Settings',
+      networkTest: 'Network test',
+      terminal: 'Terminal (on top)',
       emptyTools: 'No tools available',
       common: {
         copy: 'Copy',

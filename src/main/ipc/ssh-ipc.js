@@ -7,6 +7,8 @@ const configService = require('../services/ssh-config-service');
 const sshService = require('../services/ssh-service');
 const browseService = require('../services/ssh-browse-service');
 const { broadcast, getMainWindow } = require('../window-manager');
+const { runInTerminal } = require('./terminal-ipc');
+const logger = require('../utils/logger');
 
 function findHost(alias) {
   if (!alias) return null;
@@ -19,10 +21,20 @@ function registerSshIpc(ipcMain) {
     detected: sshService.getDetected(),
   }));
 
+  // Connect inside the always-on-top terminal window (it can float above full-screen
+  // apps, unlike iTerm which switches desktops).
   ipcMain.handle(IPC.SSH_CONNECT, (_event, payload) => {
     const host = findHost(payload && payload.alias);
     if (!host) return { ok: false, error: 'host not found' };
-    return sshService.connect(host);
+    const command = sshService.buildCommand(host);
+    const settingsService = require('../services/settings-service');
+    if (settingsService.get('sshBuiltinTerminal') === false) {
+      logger.file(`[ssh] connect(alias=${host.alias}) -> iTerm: ${command}`);
+      return sshService.connect(host);
+    }
+    logger.file(`[ssh] connect(alias=${host.alias}) -> terminal: ${command}`);
+    if (!runInTerminal(command)) return { ok: false, error: 'terminal unavailable', command };
+    return { ok: true, command };
   });
 
   ipcMain.handle(IPC.SSH_DETECT, (_event, payload) => {

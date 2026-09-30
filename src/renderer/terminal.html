@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    />
+    <title>Ships Terminal</title>
+    <link rel="stylesheet" href="../../node_modules/@xterm/xterm/css/xterm.css" />
+    <link rel="stylesheet" href="./styles/constants.css" />
+    <link rel="stylesheet" href="./styles/tailwind.build.css" />
+  </head>
+  <body class="bg-transparent">
+    <div class="flex h-full w-full flex-col" style="background: var(--color-bg)">
+      <header
+        class="flex shrink-0 items-center justify-between gap-2 px-3"
+        style="height: 30px; border-bottom: 1px solid var(--color-border); -webkit-app-region: drag"
+      >
+        <span class="w-[70px] shrink-0"></span>
+        <span id="term-title" class="truncate text-[12px] font-medium text-fg-muted"></span>
+        <div class="flex shrink-0 items-center gap-3" style="-webkit-app-region: no-drag">
+          <button id="btn-top" class="icon-btn h-6 w-6" type="button"></button>
+          <button id="btn-iterm" class="icon-btn h-6 w-6" type="button"></button>
+          <button id="btn-export" class="icon-btn h-6 w-6" type="button"></button>
+        </div>
+      </header>
+      <main id="term-host" class="min-h-0 flex-1 px-2 pb-4 pt-2"></main>
+    </div>
+
+    <script src="./scripts/theme.js"></script>
+    <script src="./scripts/constants.js"></script>
+    <script src="./scripts/i18n.js"></script>
+    <script src="./scripts/ui.js"></script>
+    <script src="../../node_modules/@xterm/xterm/lib/xterm.js"></script>
+    <script src="../../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+    <script src="./scripts/terminal.js"></script>
+  </body>
+</html>

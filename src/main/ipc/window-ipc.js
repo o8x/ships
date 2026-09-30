@@ -11,9 +11,9 @@ const {
 
 function registerWindowIpc(ipcMain) {
   ipcMain.on(IPC.WINDOW_HIDE, () => hideMainWindow());
-  ipcMain.on(IPC.WINDOW_OPEN_SETTINGS, () => {
+  ipcMain.on(IPC.WINDOW_OPEN_SETTINGS, (_event, section) => {
     hideMainWindow();
-    openSettingsWindow();
+    openSettingsWindow(typeof section === 'string' ? section : '');
   });
   ipcMain.on(IPC.WINDOW_CLOSE_SETTINGS, () => closeSettingsWindow());
 
