@@ -196,7 +196,9 @@ function createMainWindow() {
     maximizable: false,
     fullscreenable: false,
     skipTaskbar: true,
-    alwaysOnTop: terminalAlwaysOnTop(),
+    // 面板自身永远置顶（§8.1）：它必须浮在全屏应用之上，否则点托盘时系统只能
+    // 切回普通桌面才显示得出来。与终端窗口的「置顶」开关无关。
+    alwaysOnTop: true,
     hasShadow: true,
     // Liquid Glass rounds itself; hud vibrancy needs the native rounded frame;
     // otherwise the CSS radius shapes the panel.
@@ -211,7 +213,8 @@ function createMainWindow() {
     },
   });
 
-  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // 加入所有桌面 + 全屏辅助：面板是菜单栏弹出层，要在任何桌面（含全屏应用之上）直接浮出。
+  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   if (mainWindow.setMovable) mainWindow.setMovable(Boolean(settings.get('pinWindow')));
   mainWindow.loadFile(path.join(RENDERER_DIR, 'index.html'));
 
@@ -269,6 +272,11 @@ function showMainWindow() {
   const win = getMainWindow() || createMainWindow();
   const pinned = Boolean(settings.get('pinWindow'));
   if (!pinned || !pinnedPositioned) positionUnderTray();
+  // 每次弹出都重新声明一次「所有桌面 + 全屏辅助 + 置顶」：窗口层级 / 桌面归属可能被
+  // 系统或其它窗口影响，重新声明才能保证在当前界面（含全屏应用之上）直接浮出，
+  // 而不是被系统切到别的桌面去显示。
+  win.setAlwaysOnTop(true);
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   win.show();
   win.focus();
   if (pinned) pinnedPositioned = true;
@@ -364,8 +372,8 @@ function openTerminalWindow() {
   if (terminalWindow && !terminalWindow.isDestroyed()) {
     // Re-opening: pull the window to the space the user is on now. Toggling
     // canJoinAllSpaces off again keeps it from following later space switches.
-    terminalWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    terminalWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true });
+    terminalWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+    terminalWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
     terminalWindow.show();
     terminalWindow.focus();
     return terminalWindow;
@@ -407,7 +415,7 @@ function openTerminalWindow() {
   // Steam-like: the window is pinned on top and may float above a full-screen app,
   // but it must NOT join every space — it stays on the desktop it was opened on.
   // (false = no NSWindowCollectionBehaviorCanJoinAllSpaces, true = FullScreenAuxiliary)
-  terminalWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true });
+  terminalWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
   terminalWindow.loadFile(path.join(RENDERER_DIR, 'terminal.html'));
   terminalWindow.on('resize', scheduleTerminalGeometrySave);
   terminalWindow.on('move', scheduleTerminalGeometrySave);
