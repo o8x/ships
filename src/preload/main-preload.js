@@ -39,6 +39,7 @@ const api = {
     resize: (id, cols, rows) => ipcRenderer.invoke(IPC.TERMINAL_RESIZE, { id, cols, rows }),
     interrupt: (id) => ipcRenderer.invoke(IPC.TERMINAL_INTERRUPT, { id }),
     kill: (id) => ipcRenderer.invoke(IPC.TERMINAL_KILL, { id }),
+    destroy: () => ipcRenderer.invoke(IPC.TERMINAL_DESTROY),
     export: (payload) => ipcRenderer.invoke(IPC.TERMINAL_EXPORT, payload),
     openIterm: () => ipcRenderer.invoke(IPC.TERMINAL_OPEN_ITERM),
     setAlwaysOnTop: (value) => ipcRenderer.invoke(IPC.TERMINAL_SET_TOP, { value }),

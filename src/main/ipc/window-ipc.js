@@ -10,6 +10,7 @@ const {
   getSettingsWindow,
   getTerminalWindow,
   openTerminalWindow,
+  closeTerminalWindow,
 } = require('../window-manager');
 
 function registerWindowIpc(ipcMain) {
@@ -19,7 +20,9 @@ function registerWindowIpc(ipcMain) {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win || win.isDestroyed()) return { ok: false, action };
     if (action === 'close') {
-      win.close();
+      // 终端窗口：按「关闭按钮行为」隐藏或销毁；其它窗口照旧关闭
+      if (getTerminalWindow() === win) closeTerminalWindow();
+      else win.close();
       return { ok: true, action };
     }
     if (action === 'minimize') {

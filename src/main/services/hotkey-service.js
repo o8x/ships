@@ -10,9 +10,9 @@ const logger = require('../utils/logger');
 
 let registered = '';
 
-function openTerminalWindow() {
+function toggleTerminalWindow() {
   // 延迟 require：避免加载期与 window-manager 形成循环依赖。
-  require('../window-manager').openTerminalWindow();
+  require('../window-manager').toggleTerminalWindow();
 }
 
 /* 注册（或注销）快捷键；返回 { ok, hotkey, error? }。hotkey 为空字符串表示不注册。 */
@@ -28,7 +28,7 @@ function apply(accelerator) {
 
   let ok = false;
   try {
-    ok = globalShortcut.register(wanted, openTerminalWindow);
+    ok = globalShortcut.register(wanted, toggleTerminalWindow);
   } catch (err) {
     logger.warn(`[hotkey] register "${wanted}" failed:`, err.message);
     return { ok: false, hotkey: '', error: err.message };

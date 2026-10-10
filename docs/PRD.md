@@ -196,7 +196,7 @@ Ships/
 
 ### 3.9 置顶终端窗口（Steam 式悬浮）
 
-1. **入口**：主面板底部栏最左侧的**终端图标**（`terminal`），或由 **SSH 连接**（§3.4）自动拉起。
+1. **入口**：主面板底部栏最左侧的**终端图标**（`terminal`，始终打开 / 聚焦）、**全局快捷键**（§3.9-8，已展示且在前台时按 = **隐藏**，再按 = 重新显示，会话不丢）、或由 **SSH 连接**（§3.4）自动拉起。
 2. **窗口**：默认 **1024 × 768**（`ships.terminalWindow.width/height`，**可在 设置 → 终端 → 窗口大小 调整**，见 §5.1；`terminalWindowWidth` / `terminalWindowHeight`），可缩放、最小 `ships.terminalWindow.minWidth × minHeight` = 480×320；改设置立即 `setSize`，手动拖动窗口（非最大化 / 全屏）防抖 400ms 写回设置。`titleBarStyle: hiddenInset`，但**系统红绿灯由主进程 `setWindowButtonVisibility(false)` 隐藏**，头栏左侧改为**自绘小红绿灯**；终端内容**四边不留边距**（`--term-padding-y: 0`，终端铺满整个窗口 —— `vim` 之类的全屏程序四周不会出现白边）；窗口可自由拉伸，**拖动过程中不干预**（下边框严格跟手、绝不中途改尺寸），松手后按实测余量把窗口对齐到整格（见下条）。
    - **头栏（`#term-header`，默认 22px）**：左侧自绘小红绿灯（9px 圆点 ×3，**左边距 12px** = 第一个圆点到窗口左边缘的距离；悬浮符号 `×` / `−` / `⤢`，颜色取 `--traffic-*`；悬浮任意一个时三个都显示符号，窗口失焦时整体变灰并隐藏符号 —— 与系统观感一致），点击分别调 `window:control` 的 `close` / `minimize` / `zoom`（只作用于发起窗口）；**不显示标题文字**，右侧图标区（**SSH 主机下拉** + **置顶开关** `pin` / `pin-off`、**在 iTerm 中打开并关闭此窗口**、**导出终端文本**，距右边缘 12px）。头部不挂 `data-tip` 悬浮提示，为拖拽区（红绿灯与图标区为 `no-drag`）。
    - **头栏尺寸随终端字号缩放**：字号取 CSS 变量 `--term-header-font-size`（`styles/constants.css` 定义、`terminal.js` 的 `applyFontSize()` 在改设置 / `Cmd +`/`Cmd -`/`Cmd 0` 缩放时写入）；头栏高 `max(22px, 字号 + 6px)`、图标按钮 `字号 + 6px`（符号 `字号`）、SSH 下拉宽 **180px** / 字号 `字号` / 高 `max(18px, 字号 + 6px)` 且在头栏内**上下居中**。默认 12px → 头栏 22px、按钮 18px、下拉 180×18px；24px → 30px / 30px / 180×30px。下拉菜单（挂在 `body` 上）同宽 180px、**条目高度与下拉本体一致**且**条目之间留 2px**，字号同样跟随。
@@ -219,7 +219,11 @@ Ships/
 5. **导出**：头部导出图标把 xterm 缓冲区文本（含回滚）写入本地文件 —— 系统保存对话框，默认文件名 `ships-terminal-<时间戳>.txt`，成功后在终端里回显路径。
 6. **iTerm 交接**：头部终端图标调用 `iterm-service.openCommand()` 在 iTerm 中重放**最后一次由外部注入的命令**（例如 SSH 连接 / 网络测试命令；没有则开一个登录 shell），成功后关闭当前终端窗口。
 7. **SSH 连接与目录浏览都改走这里**：`ssh:connect`（§3.4）与 `ssh:open-dir`（§3.7）默认都不打开 iTerm，而是打开/聚焦该终端窗口并把 `ssh …` 命令注入其中，失败时才提示错误；两者都受 设置 → 终端 →「SSH 使用内置终端连接」（`settings.sshBuiltinTerminal`）控制，关掉后各自退回 iTerm（头部 SSH 下拉传 `inTerminal: true`，明确要求在**当前终端**执行，不受该开关影响，见第 2 条）。
-8. **全局快捷键**：设置 → 终端 →「打开终端的全局快捷键」（`settings.terminalHotkey`，默认 `CommandOrControl+Shift+Z`，来自 `ships.terminalWindow.hotkey`）用 `globalShortcut` 注册：任意界面按下即打开/聚焦本窗口（等价于点托盘底部栏的终端图标）。改绑 / 重置 / 取消时先注销旧值再注册新值；**注册失败（被其它 App 占用、格式非法）不写入设置**，设置界面红字提示并把原值留在设置里；空字符串 = 不注册（界面显示「未设置」）。应用退出（`before-quit`）时 `unregisterAll()`。
+8. **全局快捷键**：设置 → 终端 →「打开终端的全局快捷键」（`settings.terminalHotkey`，默认 `CommandOrControl+Shift+Z`，来自 `ships.terminalWindow.hotkey`）用 `globalShortcut` 注册：任意界面按下即打开 / 聚焦本窗口；**窗口已展示且在前台时按下 = 隐藏**（不销毁、会话与 shell 都留着），再按一次重新显示 —— 即「快速终端」开关（`window-manager.toggleTerminalWindow()`）。改绑 / 重置 / 取消时先注销旧值再注册新值；**注册失败（被其它 App 占用、格式非法）不写入设置**，设置界面红字提示并把原值留在设置里；空字符串 = 不注册（界面显示「未设置」）。应用退出（`before-quit`）时 `unregisterAll()`。
+9. **关闭按钮行为**（设置 → 终端 →「关闭按钮行为」，`settings.terminalCloseAction`，默认 `destroy`，来自 `ships.terminalWindow.closeAction`）：
+   - `destroy`：点自绘红绿灯的关闭按钮 / `Cmd-W` 直接**销毁窗口**（结束会话），与旧行为一致。
+   - `hide`：同样操作**只隐藏窗口**（会话与 shell 保留，快捷键或终端图标再打开即回来），窗口 `close` 事件被 `preventDefault()` 拦下。
+   - **例外**：在终端里 `exit`（会话结束）与「iTerm 交接」走 `terminal:destroy` → **始终销毁窗口**，不受 `hide` 影响 —— 否则会留下一个已结束的会话挂在后台。
 
 ---
 
@@ -239,7 +243,7 @@ Ships/
 | 营养成分 | 输入商品名与每 100g 的能量(kJ)/蛋白质/脂肪/碳水/钠及商品总重，实时换算：盐、千卡、千焦（含每日推荐 2250kcal / 9410kJ 对比与超出量）、慢跑与步行消耗（公里 / 分钟 / 步数）；底部提供**清空（图标）**与**一个复制按钮（复制输入与结果）** | 输入不做历史记录、不落盘，每次打开为默认值；不做历史列表与商品保存 |
 | 设置 · Ships | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、固定悬浮（置顶常驻、失焦不隐藏）、**Liquid Glass**（主界面启用系统玻璃背景：macOS 26+ 用原生 Liquid Glass，旧系统回退 hud 毛玻璃，见 §8.1）、剪贴板条数、剪贴板轮询间隔、打开数据文件夹、关于、开发者（打开悬浮界面 / 设置界面 / **终端界面** DevTools，`devtools:open` 的 `main` / `settings` / `terminal`） | 见 §5.1 |
 | 设置 · SSH 管理 | `~/.ssh/config` 主机的增删改（别名/HostName/User/Port/IdentityFile/ProxyJump）；列表左侧显示系统图标；新增时自动预填 **用户 root / 端口 22 / 私钥 `~/.ssh/id_ed25519`**，**私钥支持手动选择文件**（对话框默认 `~/.ssh`，选后转为 `~` 路径），保存时别名默认取主机地址；表单内含「探测系统」，**探测成功后才允许保存**，探测失败**保留表单内容**；支持**导出 config** | 别名与主机地址至少填一项；删除二次确认 |
-| 设置 · 终端 | 配置置顶终端窗口：**默认 shell**（留空 = 系统默认 `$SHELL`，可手填或用「选择文件」挑，写入前校验文件存在）、**字体大小**（8–24px，默认 12）、**窗口大小**（宽 × 高，最小 480 × 320，默认 1024 × 768；改完立即作用到已打开的终端窗口，手动拖动窗口也会写回；这是「换屏 / 无记忆」时的默认尺寸，同屏则优先沿用终端窗口自己的位置与尺寸）、**缓冲区大小**（默认 10000 行）、**打开终端的全局快捷键**（默认 `⌘⇧Z`；点按钮后按新组合键改绑，`Backspace` 清除、`Esc` 取消，至少含 Command / Control / Alt 之一，被占用 / 非法时红字提示且不落盘）、**SSH 使用内置终端连接**（开关：开 = 点连接、以及目录浏览里「打开」都在置顶终端执行 `ssh`，关 = 两者都改用 iTerm）、**重置**（二次确认后把以上终端设置恢复默认值，并清掉 `terminal-window.json` 里记住的屏幕 / 位置 / 大小） | 对应 `settings.json` 的 `terminalShell`/`terminalFontSize`/`terminalWindowWidth`/`terminalWindowHeight`/`terminalScrollback`/`terminalHotkey`/`sshBuiltinTerminal`；默认值来自 `package.json` 的 `ships.terminalWindow`/`ships.sshBuiltinTerminal`；窗口位置 / 屏幕在 `terminal-window.json`（见 §5.1、§3.9） |
+| 设置 · 终端 | 配置置顶终端窗口：**默认 shell**（留空 = 系统默认 `$SHELL`，可手填或用「选择文件」挑，写入前校验文件存在）、**字体大小**（8–24px，默认 12）、**窗口大小**（宽 × 高，最小 480 × 320，默认 1024 × 768；改完立即作用到已打开的终端窗口，手动拖动窗口也会写回；这是「换屏 / 无记忆」时的默认尺寸，同屏则优先沿用终端窗口自己的位置与尺寸）、**缓冲区大小**（默认 10000 行）、**打开终端的全局快捷键**（默认 `⌘⇧Z`；点按钮后按新组合键改绑，`Backspace` 清除、`Esc` 取消，至少含 Command / Control / Alt 之一，被占用 / 非法时红字提示且不落盘）、**SSH 使用内置终端连接**（开关：开 = 点连接、以及目录浏览里「打开」都在置顶终端执行 `ssh`，关 = 两者都改用 iTerm）、**关闭按钮行为**（分段控件：隐藏窗口 / 销毁窗口，默认销毁）、**重置**（二次确认后把以上终端设置恢复默认值，并清掉 `terminal-window.json` 里记住的屏幕 / 位置 / 大小） | 对应 `settings.json` 的 `terminalShell`/`terminalFontSize`/`terminalWindowWidth`/`terminalWindowHeight`/`terminalScrollback`/`terminalHotkey`/`terminalCloseAction`/`sshBuiltinTerminal`；默认值来自 `package.json` 的 `ships.terminalWindow`/`ships.sshBuiltinTerminal`；窗口位置 / 屏幕在 `terminal-window.json`（见 §5.1、§3.9） |
 | 设置 · 网络测试 | 在本地或通过 `~/.ssh/config` 里的主机执行测试命令（TCP / UDP / HTTP(S) / ICMP / ARP / 扫描应用 / 扫描主机）；下方是**可直接输入命令的交互终端**（真实 PTY + 默认登录 shell + xterm.js），「测试」把校验过的命令送进终端执行（选主机时包一层 `ssh`）、「停止」发送 Ctrl-C；详见 §3.8 | 端口默认 80；扫描主机需网段（前缀 16–30）；扫描应用端口可留空；输入不落盘 |
 | 底部栏 | 左显示版本号；右侧依次为**终端图标**（打开置顶终端窗口，见 §3.9）、**网络测试图标**（打开设置 → 网络测试分区）、**图钉（固定悬浮）**与设置入口 | 图钉状态取 `settings.pinWindow`；版本取 `package.json` |
 | 通用交互 | 顶部栏左侧为 App 彩色图标 + 名称、右侧 TAB 右对齐；所有下拉框为 Tailwind 自绘（非系统 `<select>`）；TAB 与图标按钮悬浮显示提示；切换类组件均带过渡 / 入场动画；各工具输入不做历史记录、不落盘，面板切换 / 重启后不保留 | 见 §11 |
@@ -252,7 +256,7 @@ Ships/
 
 | 文件 | 位置 | 结构 | 生命周期 |
 | --- | --- | --- | --- |
-| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/ships/settings.json`） | `{ locale, theme, accent, launchAtLogin, pinWindow, vibrancy, clipboardLimit, clipboardPollMs, terminalShell, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, terminalHotkey, sshBuiltinTerminal }` | 持久；重启保留 |
+| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/ships/settings.json`） | `{ locale, theme, accent, launchAtLogin, pinWindow, vibrancy, clipboardLimit, clipboardPollMs, terminalShell, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, terminalHotkey, terminalCloseAction, sshBuiltinTerminal }` | 持久；重启保留 |
 | `ships.log` | 同上目录 | 追加写入的文本日志（启动信息、SSH 探测过程 / 命令 / 输出 / 报错等） | 持久；用于排查本地网络与权限问题 |
 | `ssh-detected.json` | 同上目录 | `{ [alias]: { os, family, label, at } }` | 持久；缓存探测结果 |
 | `ssh-browse.json` | 同上目录 | `{ [alias]: "/abs/dir" }`（每台主机最近打开的目录） | 持久；由目录浏览写入，下次进入时列出其父目录 |
@@ -292,8 +296,9 @@ Ships/
 | `terminal:set-top` | `{ value: boolean }` | `{ ok, alwaysOnTop }` | 终端窗口头部图钉：写 `settings.terminalAlwaysOnTop`，由 `window-manager` 的 settings 监听调 `setAlwaysOnTop(true, 'screen-saver')` / `setAlwaysOnTop(false)`；持久，下次打开沿用 |
 | `terminal:set-hotkey` | `{ hotkey: string }` | `{ ok, hotkey, error? }` | 设置界面改绑全局快捷键：先试注册（空串 = 注销），**成功才写 `settings.terminalHotkey`**；失败返回 `{ ok: false, error }`（`unavailable` = 已被占用）并保持原值 |
 | `terminal:reset` | — | `{ ok, settings }` | 设置 → 终端 →「重置」：把终端相关设置（`terminalShell`/`terminalFontSize`/`terminalScrollback`/`terminalWindowWidth`/`terminalWindowHeight`/`terminalAlwaysOnTop`/`terminalHotkey`/`sshBuiltinTerminal`）恢复为 `package.json` 里的默认值，并删除 `terminal-window.json`（记住的屏幕 / 位置 / 大小）；返回重置后的完整设置 |
+| `terminal:destroy` | — | `{ ok }` | 会话结束后销毁终端窗口（渲染层在 shell `exit` 时调用）：**始终销毁，不受「关闭按钮行为=隐藏」影响**；只接受来自终端窗口本身的请求 |
 | `terminal:snap-size` | `{ width?, height? }` | `{ ok, size?, deferred? }` | 渲染层按**实测余量**请求把窗口收到「整行 / 整列」：**拖动期间只挂起**（`deferred: true`），松手后由渲染层重新测量再对齐；偏差 > 60px 视为状态异常、不做。只接受来自终端窗口本身的请求 |
-| `window:control` | `{ action: 'close' \| 'minimize' \| 'zoom' }` | `{ ok, action }` | 终端窗口自绘小红绿灯的窗口控制：只作用于**发起请求的那个窗口**（`BrowserWindow.fromWebContents(event.sender)`），未知 action 返回 `{ ok: false }` |
+| `window:control` | `{ action: 'close' \| 'minimize' \| 'zoom' }` | `{ ok, action }` | 终端窗口自绘小红绿灯的窗口控制：只作用于**发起请求的那个窗口**（`BrowserWindow.fromWebContents(event.sender)`），未知 action 返回 `{ ok: false }`；`close` 在终端窗口上按「关闭按钮行为」隐藏或销毁（见 §3.9-9） |
 | `net-test:command` | `{ id, protocol, target, port, host? }` | `{ ok, command?, error? }` | 校验后把测试命令注入指定终端会话；`host` 为 SSH 别名时整条命令包一层 `ssh` |
 | `ssh:list-dir` | `{ alias, path?, remember? }` | `{ ok, path?, parent?, entries?, truncated?, lastDir?, code?, error? }` | 列出远端目录：`path` 省略时取「上次目录的父目录」或 `~`；`remember: true` 时**仅在列出成功后**把实际路径记入 `ssh-browse.json`（输错路径不会被记住）；`code` ∈ `noDir`/`noPath`/`listFailed`/`timeout`/`connect` |
 | `ssh:open-dir` | `{ alias, path }` | `{ ok, command?, error? }` | 打开终端并 `cd` 进该目录（副作用：记录该目录为「上次打开的目录」）；默认注入置顶终端窗口，`settings.sshBuiltinTerminal` 为 `false` 时改用 iTerm |

@@ -332,8 +332,11 @@
       write(`\r\n${ANSI.error}${i18n.t('terminalWin.failed', { error: message.message })}${ANSI.reset}\r\n`);
       return;
     }
-    // shell 结束（输入 exit / Ctrl-D 等）：直接关窗，不留「会话已结束」这类提示。
-    window.close();
+    // shell 结束（输入 exit / Ctrl-D 等）：直接销毁窗口（即使设置了「关闭按钮=隐藏」，
+    // 已结束的会话也不该留在后台），不留「会话已结束」这类提示。
+    const destroy = window.ships && window.ships.terminal && window.ships.terminal.destroy;
+    if (typeof destroy === 'function') destroy();
+    else window.close();
   });
 
   const offZoom = window.ships.terminal.onZoom((direction) => zoomFont(direction));

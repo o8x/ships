@@ -195,6 +195,43 @@ function forgetTerminalGeometry() {
   logger.file('[terminal] window geometry memory cleared');
 }
 
+/* 关闭按钮行为：'hide' 只隐藏窗口（会话与 shell 都留着，快捷键再按即回），
+   'destroy' 直接销毁（结束会话）。见 设置 → 终端 → 关闭按钮行为。 */
+function terminalCloseAction() {
+  return settings.get('terminalCloseAction') === 'hide' ? 'hide' : 'destroy';
+}
+
+/* 关闭按钮 / Cmd-W：按设置隐藏或销毁。 */
+function closeTerminalWindow() {
+  const win = getTerminalWindow();
+  if (!win) return null;
+  if (terminalCloseAction() === 'hide') {
+    win.hide();
+    return win;
+  }
+  destroyTerminalWindow();
+  return null;
+}
+
+/* 强制销毁（会话结束 exit / iTerm 交接 / 关闭行为=destroy）：先落盘几何再 destroy，
+   destroy 不触发 close 事件，因此不会被「隐藏」行为拦下。 */
+function destroyTerminalWindow() {
+  const win = getTerminalWindow();
+  if (!win) return;
+  saveTerminalGeometry();
+  win.destroy();
+}
+
+/* 全局快捷键：已展示且在前台 → 隐藏；否则打开 / 聚焦（Steam 式悬浮 + 快速开关）。 */
+function toggleTerminalWindow() {
+  const win = getTerminalWindow();
+  if (win && win.isVisible() && win.isFocused()) {
+    win.hide();
+    return win;
+  }
+  return openTerminalWindow();
+}
+
 /* 终端窗口的置顶开关（头部图钉按钮 / settings.json 的 terminalAlwaysOnTop）。 */
 function terminalAlwaysOnTop() {
   return settings.get('terminalAlwaysOnTop') !== false;
@@ -511,8 +548,17 @@ function openTerminalWindow() {
     terminalWindow.show();
     terminalWindow.focus();
   });
-  // 关闭前落盘：拖动后立刻关窗（或直接点 iTerm 交接）也不会丢掉位置。
-  terminalWindow.on('close', saveTerminalGeometry);
+  // 关闭按钮 / Cmd-W：按「关闭按钮行为」隐藏或销毁；隐藏时窗口还活着（会话保留），
+  // 会话结束（exit）与 iTerm 交接走 destroyTerminalWindow()，不受这里拦截。
+  terminalWindow.on('close', (event) => {
+    if (terminalCloseAction() === 'hide') {
+      event.preventDefault();
+      saveTerminalGeometry();
+      terminalWindow.hide();
+      return;
+    }
+    saveTerminalGeometry();
+  });
   terminalWindow.on('closed', () => {
     terminalWindow = null;
     if (terminalGeometryTimer) {
@@ -576,6 +622,10 @@ module.exports = {
   getTerminalWindow,
   forgetTerminalGeometry,
   requestTerminalSnap,
+  terminalCloseAction,
+  closeTerminalWindow,
+  destroyTerminalWindow,
+  toggleTerminalWindow,
   broadcast,
   setBlurSuppressed,
   applyPin,

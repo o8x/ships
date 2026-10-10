@@ -21,6 +21,7 @@ const TERMINAL_SETTING_KEYS = [
   'terminalWindowHeight',
   'terminalAlwaysOnTop',
   'terminalHotkey',
+  'terminalCloseAction',
   'sshBuiltinTerminal',
 ];
 
@@ -87,6 +88,15 @@ function registerTerminalIpc(ipcMain) {
   ipcMain.handle(IPC.TERMINAL_INTERRUPT, (_event, payload) => ({ ok: terminal.interrupt(payload && payload.id) }));
   ipcMain.handle(IPC.TERMINAL_KILL, (_event, payload) => ({ ok: terminal.kill(payload && payload.id) }));
 
+  /* 会话结束（用户在终端里 exit）→ 渲染层请求销毁窗口：这条路强制销毁，不受
+     「关闭按钮行为=隐藏」影响（隐藏会让一个已结束的会话挂在后台）。 */
+  ipcMain.handle(IPC.TERMINAL_DESTROY, (event) => {
+    if (!isOverlaySender(event)) return { ok: false };
+    // 先回包再销毁：销毁窗口会让渲染层收不到 IPC 回复
+    setImmediate(() => wm.destroyTerminalWindow());
+    return { ok: true };
+  });
+
   /* Header pin button: toggle / persist always-on-top for the terminal window.
      window-manager applies the new value through its settings listener. */
   ipcMain.handle(IPC.TERMINAL_SET_TOP, (_event, payload) => {
@@ -148,8 +158,8 @@ function registerTerminalIpc(ipcMain) {
     const command = overlayLastCommand || `${terminal.loginShell()} -l`;
     const result = await iterm.openCommand(command, 'terminal:handoff');
     if (result && result.ok) {
-      const win = wm.getTerminalWindow();
-      if (win && !win.isDestroyed()) win.close();
+      // 交接成功 = 会话交给 iTerm：这里必须销毁（而不是按关闭行为隐藏）
+      wm.destroyTerminalWindow();
     }
     return result && result.ok
       ? { ok: true, command }

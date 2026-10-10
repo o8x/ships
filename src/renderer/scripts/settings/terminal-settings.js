@@ -29,6 +29,10 @@
         hotkeyFailed: '设置失败：{error}',
         builtinSsh: 'SSH 使用内置终端连接',
         builtinSshHint: '开启后点「连接」、以及目录浏览里「在终端中打开」都在置顶终端里执行 ssh；关闭则改用 iTerm',
+        closeAction: '关闭按钮行为',
+        closeActionHint: '点终端窗口左上角关闭按钮（或 Cmd-W）时：隐藏窗口保留会话，或直接销毁结束会话；在终端里输入 exit 结束 shell 时始终销毁窗口',
+        closeActionHide: '隐藏窗口',
+        closeActionDestroy: '销毁窗口',
         reset: '重置',
         resetHint: '恢复终端相关设置为默认值，并清除记住的窗口屏幕 / 位置 / 大小',
         resetConfirm: '确认重置？',
@@ -61,6 +65,10 @@
         hotkeyFailed: 'Cannot set: {error}',
         builtinSsh: 'Connect SSH in the built-in terminal',
         builtinSshHint: 'On: Connect and the directory browser open ssh in the always-on-top terminal. Off: use iTerm',
+        closeAction: 'Close button action',
+        closeActionHint: 'When the close button (or Cmd-W) is used: hide the window and keep the session, or destroy it. Ending the shell with exit always destroys the window',
+        closeActionHide: 'Hide window',
+        closeActionDestroy: 'Destroy window',
         reset: 'Reset',
         resetHint: 'Restore the terminal settings to their defaults and forget the remembered screen / position / size',
         resetConfirm: 'Reset everything?',
@@ -251,6 +259,23 @@
     });
     wrap.appendChild(
       row(i18n.t('terminalSettings.builtinSsh'), i18n.t('terminalSettings.builtinSshHint'), sshSwitch)
+    );
+
+    /* 关闭按钮行为：隐藏（保留会话）或销毁 */
+    const closeActionSwitch = window.ShipsUI.segmented(
+      [
+        { value: 'hide', label: i18n.t('terminalSettings.closeActionHide') },
+        { value: 'destroy', label: i18n.t('terminalSettings.closeActionDestroy') },
+      ],
+      ctx.settings.terminalCloseAction === 'hide' ? 'hide' : 'destroy',
+      (value) => ctx.patch({ terminalCloseAction: value }),
+      { className: 'segment-compact' }
+    );
+    syncers.push((next) => {
+      closeActionSwitch.set(next.terminalCloseAction === 'hide' ? 'hide' : 'destroy');
+    });
+    wrap.appendChild(
+      row(i18n.t('terminalSettings.closeAction'), i18n.t('terminalSettings.closeActionHint'), closeActionSwitch.root)
     );
 
     /* 全局快捷键：在任意界面按下即可拉起置顶终端窗口 */

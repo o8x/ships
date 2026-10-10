@@ -46,6 +46,7 @@ const IPC = {
   TERMINAL_OPEN_ITERM: 'terminal:open-iterm',
   TERMINAL_SET_TOP: 'terminal:set-top',
   TERMINAL_SET_HOTKEY: 'terminal:set-hotkey',
+  TERMINAL_DESTROY: 'terminal:destroy',
   TERMINAL_RESET: 'terminal:reset',
   TERMINAL_SNAP_SIZE: 'terminal:snap-size',
   TERMINAL_RECALIBRATE: 'terminal:recalibrate',
@@ -123,6 +124,8 @@ const DEFAULT_SETTINGS = {
   terminalWindowWidth: TERMINAL_WINDOW.width,
   terminalWindowHeight: TERMINAL_WINDOW.height,
   terminalAlwaysOnTop: TERMINAL_WINDOW.alwaysOnTop !== false,
+  // 终端窗口关闭按钮的行为：'hide' 只隐藏窗口（会话保留），'destroy' 直接销毁（结束会话）
+  terminalCloseAction: TERMINAL_WINDOW.closeAction === 'hide' ? 'hide' : 'destroy',
   // 打开置顶终端窗口的全局快捷键（Electron accelerator，空字符串 = 不注册）
   terminalHotkey: TERMINAL_WINDOW.hotkey || 'CommandOrControl+Shift+Z',
   sshBuiltinTerminal: ships.sshBuiltinTerminal !== false,
