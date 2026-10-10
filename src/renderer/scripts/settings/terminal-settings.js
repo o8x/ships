@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerTerminalSettings() {
-  const { el, field, section } = window.ShipsUI;
+  const { Icons, el, field, section } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -19,8 +19,20 @@
         windowSizeHint: '宽 × 高，最小 480 × 320，默认 1024 × 768；拖动窗口也会写回这里。终端会记住所在屏幕与位置：同一块屏幕沿用记忆，换屏或没有记录时按这里居中显示',
         scrollback: '缓冲区大小',
         scrollbackHint: '保留的历史行数，默认 10000',
+        hotkey: '打开终端的全局快捷键',
+        hotkeyHint: '在任意界面按下即可拉起置顶终端窗口；点一下右侧按钮再按新的组合键即可改绑（Backspace 清除、Esc 取消，至少含 Command / Control / Alt 之一）',
+        hotkeyEmpty: '未设置（点击后按组合键）',
+        hotkeyPress: '请按下组合键…',
+        hotkeyNeedModifier: '至少要含 Command / Control / Alt 之一',
+        hotkeyUnsupported: '不支持这个按键',
+        hotkeyTaken: '该组合键已被占用，换一个试试',
+        hotkeyFailed: '设置失败：{error}',
         builtinSsh: 'SSH 使用内置终端连接',
         builtinSshHint: '开启后点「连接」、以及目录浏览里「在终端中打开」都在置顶终端里执行 ssh；关闭则改用 iTerm',
+        reset: '重置',
+        resetHint: '恢复终端相关设置为默认值，并清除记住的窗口屏幕 / 位置 / 大小',
+        resetConfirm: '确认重置？',
+        resetDone: '已恢复默认',
         saveFailed: '保存失败：{error}',
         chooseFailed: '无法选择文件：{error}',
       },
@@ -39,8 +51,20 @@
         windowSizeHint: 'width × height, min 480 × 320, default 1024 × 768; resizing the window writes back here. The terminal remembers its screen and position: the same screen restores it, otherwise this size is used, centered',
         scrollback: 'Scrollback',
         scrollbackHint: 'History lines to keep, default 10000',
+        hotkey: 'Global shortcut to open the terminal',
+        hotkeyHint: 'Works from any app; click the button and press a new combo to rebind (Backspace clears, Esc cancels, needs Command / Control / Alt)',
+        hotkeyEmpty: 'Not set (click, then press a combo)',
+        hotkeyPress: 'Press the shortcut…',
+        hotkeyNeedModifier: 'Include at least one of Command / Control / Alt',
+        hotkeyUnsupported: 'Unsupported key',
+        hotkeyTaken: 'That shortcut is already taken, try another',
+        hotkeyFailed: 'Cannot set: {error}',
         builtinSsh: 'Connect SSH in the built-in terminal',
         builtinSshHint: 'On: Connect and the directory browser open ssh in the always-on-top terminal. Off: use iTerm',
+        reset: 'Reset',
+        resetHint: 'Restore the terminal settings to their defaults and forget the remembered screen / position / size',
+        resetConfirm: 'Reset everything?',
+        resetDone: 'Defaults restored',
         saveFailed: 'Save failed: {error}',
         chooseFailed: 'Cannot choose file: {error}',
       },
@@ -69,8 +93,78 @@
     return wrap;
   }
 
+  /* ---------- 全局快捷键：按键 → Electron accelerator ---------- */
+  // Electron 的 accelerator 只认它自己的键名（字母 / 数字 / F1-F24 / Up / Space / …），
+  // 用 event.code（与键盘布局无关）查表；查不到就当作不支持的键。
+  const ACCEL_KEYS = {
+    Backquote: '`',
+    Minus: '-',
+    Equal: '=',
+    BracketLeft: '[',
+    BracketRight: ']',
+    Backslash: '\\',
+    Semicolon: ';',
+    Quote: "'",
+    Comma: ',',
+    Period: '.',
+    Slash: '/',
+    Space: 'Space',
+    Enter: 'Return',
+    NumpadEnter: 'Return',
+    Tab: 'Tab',
+    Delete: 'Delete',
+    Insert: 'Insert',
+    Home: 'Home',
+    End: 'End',
+    PageUp: 'PageUp',
+    PageDown: 'PageDown',
+    ArrowUp: 'Up',
+    ArrowDown: 'Down',
+    ArrowLeft: 'Left',
+    ArrowRight: 'Right',
+  };
+
+  function keyNameFromEvent(event) {
+    const code = event.code || '';
+    if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+    if (/^Digit[0-9]$/.test(code)) return code.slice(5);
+    if (/^F([1-9]|1[0-9]|2[0-4])$/.test(code)) return code;
+    return ACCEL_KEYS[code] || '';
+  }
+
+  /* 返回 accelerator 字符串；'' = 不支持的键；'need-modifier' = 只有 Shift 这种弱修饰键。 */
+  function acceleratorFromEvent(event) {
+    const isMac = navigator.platform.toUpperCase().includes('MAC');
+    const parts = [];
+    if (event.metaKey) parts.push(isMac ? 'Command' : 'Super');
+    if (event.ctrlKey) parts.push('Control');
+    if (event.altKey) parts.push('Alt');
+    if (event.shiftKey) parts.push('Shift');
+    const key = keyNameFromEvent(event);
+    if (!key) return '';
+    if (!event.metaKey && !event.ctrlKey && !event.altKey) return 'need-modifier';
+    parts.push(key);
+    return parts.join('+');
+  }
+
+  const MAC_SYMBOLS = { CommandOrControl: '⌘', Command: '⌘', Cmd: '⌘', Control: '⌃', Ctrl: '⌃', Alt: '⌥', Option: '⌥', Shift: '⇧', Super: '⌘' };
+
+  /* 展示用：macOS 用 ⌘⇧Z 这样的符号，其它平台显示 CommandOrControl+Shift+Z 原样。 */
+  function prettyAccelerator(accelerator) {
+    const value = String(accelerator || '');
+    if (!value) return '';
+    const isMac = navigator.platform.toUpperCase().includes('MAC');
+    if (!isMac) return value.replace(/CommandOrControl/g, 'Ctrl');
+    return value
+      .split('+')
+      .map((part) => MAC_SYMBOLS[part] || (part.length === 1 ? part.toUpperCase() : part))
+      .join('');
+  }
+
   function mount(pane, ctx) {
     const wrap = section();
+    // 「重置」后要把每个控件的显示值同步回默认值（pane 不会自动重建）。
+    const syncers = [];
     wrap.appendChild(el('div', { class: 'text-[12px] text-fg-muted' }, i18n.t('terminalSettings.subtitle')));
 
     /* default shell */
@@ -81,6 +175,9 @@
     });
     shellField.input.value = ctx.settings.terminalShell || '';
     shellField.input.addEventListener('change', () => ctx.patch({ terminalShell: shellField.input.value.trim() }));
+    syncers.push((next) => {
+      shellField.input.value = next.terminalShell || '';
+    });
     const chooseBtn = el('button', { class: 'btn shrink-0 px-2 py-1.5 text-[12px]', type: 'button' }, i18n.t('terminalSettings.chooseShell'));
     chooseBtn.addEventListener('click', async () => {
       const info = await window.ships.openFile({ defaultPath: '/bin' });
@@ -100,6 +197,9 @@
       fontField.input.value = String(value);
       ctx.patch({ terminalFontSize: value });
     });
+    syncers.push((next) => {
+      fontField.input.value = String(next.terminalFontSize || 12);
+    });
     wrap.appendChild(row(i18n.t('terminalSettings.fontSize'), i18n.t('terminalSettings.fontSizeHint'), fontField.input));
 
     /* window size (applied immediately when the terminal window is open) */
@@ -108,6 +208,7 @@
       { key: 'terminalWindowHeight', min: 320, max: 10000, fallback: 768 },
     ];
     const sizeControls = el('div', { class: 'flex shrink-0 items-center gap-2' });
+    const sizeFields = [];
     sizeDefs.forEach((def, index) => {
       const sizeField = field(null, {
         class: 'field w-[86px] shrink-0 font-mono',
@@ -123,6 +224,10 @@
       });
       if (index) sizeControls.appendChild(el('span', { class: 'text-[11px] text-fg-muted' }, '×'));
       sizeControls.appendChild(sizeField.input);
+      sizeFields.push({ def, input: sizeField.input });
+    });
+    syncers.push((next) => {
+      for (const entry of sizeFields) entry.input.value = String(next[entry.def.key] || entry.def.fallback);
     });
     wrap.appendChild(row(i18n.t('terminalSettings.windowSize'), i18n.t('terminalSettings.windowSizeHint'), sizeControls));
 
@@ -134,16 +239,157 @@
       scrollField.input.value = String(value);
       ctx.patch({ terminalScrollback: value });
     });
+    syncers.push((next) => {
+      scrollField.input.value = String(next.terminalScrollback || 10000);
+    });
     wrap.appendChild(row(i18n.t('terminalSettings.scrollback'), i18n.t('terminalSettings.scrollbackHint'), scrollField.input));
 
     /* SSH in the built-in terminal */
+    const sshSwitch = switchControl(ctx.settings.sshBuiltinTerminal !== false, (value) => ctx.patch({ sshBuiltinTerminal: value }));
+    syncers.push((next) => {
+      sshSwitch.classList.toggle('on', next.sshBuiltinTerminal !== false);
+    });
     wrap.appendChild(
-      row(
-        i18n.t('terminalSettings.builtinSsh'),
-        i18n.t('terminalSettings.builtinSshHint'),
-        switchControl(ctx.settings.sshBuiltinTerminal !== false, (value) => ctx.patch({ sshBuiltinTerminal: value }))
-      )
+      row(i18n.t('terminalSettings.builtinSsh'), i18n.t('terminalSettings.builtinSshHint'), sshSwitch)
     );
+
+    /* 全局快捷键：在任意界面按下即可拉起置顶终端窗口 */
+    const hotkeyBtn = el('button', {
+      class: 'btn w-[170px] shrink-0 justify-center font-mono text-[12px]',
+      type: 'button',
+    });
+    const hotkeyNote = el('div', { class: 'text-[10px] text-danger' });
+    const hotkeyControls = el('div', { class: 'flex shrink-0 flex-col items-end gap-1' });
+    hotkeyControls.append(hotkeyBtn, hotkeyNote);
+
+    let hotkeyValue = ctx.settings.terminalHotkey || '';
+    let capturing = false;
+
+    function renderHotkey() {
+      hotkeyBtn.textContent = capturing
+        ? i18n.t('terminalSettings.hotkeyPress')
+        : hotkeyValue
+          ? prettyAccelerator(hotkeyValue)
+          : i18n.t('terminalSettings.hotkeyEmpty');
+      hotkeyBtn.classList.toggle('btn-accent', capturing);
+    }
+
+    async function saveHotkey(accelerator) {
+      const result = await window.ships.terminal.setHotkey(accelerator || '');
+      if (!result || !result.ok) {
+        const reason = result && result.error === 'unavailable' ? i18n.t('terminalSettings.hotkeyTaken') : (result && result.error) || 'error';
+        hotkeyNote.textContent =
+          result && result.error === 'unavailable'
+            ? i18n.t('terminalSettings.hotkeyTaken')
+            : i18n.t('terminalSettings.hotkeyFailed', { error: reason });
+        capturing = false;
+        renderHotkey();
+        return;
+      }
+      hotkeyValue = result.hotkey || '';
+      hotkeyNote.textContent = '';
+      capturing = false;
+      renderHotkey();
+    }
+
+    hotkeyBtn.addEventListener('click', () => {
+      capturing = true;
+      hotkeyNote.textContent = '';
+      renderHotkey();
+      hotkeyBtn.focus();
+    });
+    hotkeyBtn.addEventListener('keydown', (event) => {
+      if (!capturing) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === 'Escape') {
+        capturing = false;
+        hotkeyNote.textContent = '';
+        renderHotkey();
+        return;
+      }
+      if (event.code === 'Backspace' || event.code === 'Delete') {
+        saveHotkey('');
+        return;
+      }
+      const accelerator = acceleratorFromEvent(event);
+      if (accelerator === 'need-modifier') {
+        hotkeyNote.textContent = i18n.t('terminalSettings.hotkeyNeedModifier');
+        return;
+      }
+      if (!accelerator) {
+        hotkeyNote.textContent = i18n.t('terminalSettings.hotkeyUnsupported');
+        return;
+      }
+      saveHotkey(accelerator);
+    });
+    hotkeyBtn.addEventListener('blur', () => {
+      if (!capturing) return;
+      capturing = false;
+      renderHotkey();
+    });
+
+    renderHotkey();
+    syncers.push((next) => {
+      hotkeyValue = next.terminalHotkey || '';
+      capturing = false;
+      hotkeyNote.textContent = '';
+      renderHotkey();
+    });
+    wrap.appendChild(row(i18n.t('terminalSettings.hotkey'), i18n.t('terminalSettings.hotkeyHint'), hotkeyControls));
+
+    /* 重置：终端相关设置回默认 + 清掉记住的屏幕 / 位置 / 尺寸（二次确认） */
+    const resetControls = el('div', { class: 'flex shrink-0 flex-col items-end gap-1' });
+    const resetNote = el('div', { class: 'text-[10px] text-success' });
+    const resetBtn = el('button', { class: 'btn shrink-0 px-3 py-1.5 text-[12px]', type: 'button' }, i18n.t('terminalSettings.reset'));
+    let confirmingReset = false;
+
+    function renderReset() {
+      resetControls.innerHTML = '';
+      if (!confirmingReset) {
+        resetControls.append(resetBtn, resetNote);
+        return;
+      }
+      const warn = el('div', { class: 'flex items-center gap-1' });
+      warn.appendChild(el('span', { class: 'text-[11px] text-danger' }, i18n.t('terminalSettings.resetConfirm')));
+      const yes = el('button', { class: 'icon-btn h-7 w-7', type: 'button' });
+      yes.innerHTML = Icons.check(15);
+      yes.style.color = 'var(--color-danger)';
+      yes.addEventListener('click', async () => {
+        const result = await window.ships.terminal.reset();
+        confirmingReset = false;
+        if (!result || !result.ok) {
+          resetNote.textContent = i18n.t('terminalSettings.saveFailed', { error: (result && result.error) || 'error' });
+          resetNote.style.color = 'var(--color-danger)';
+          renderReset();
+          return;
+        }
+        for (const sync of syncers) sync(result.settings || {});
+        resetNote.style.color = 'var(--color-success)';
+        resetNote.textContent = i18n.t('terminalSettings.resetDone');
+        renderReset();
+        setTimeout(() => {
+          resetNote.textContent = '';
+        }, 2000);
+      });
+      const no = el('button', { class: 'icon-btn h-7 w-7', type: 'button' });
+      no.innerHTML = Icons.x(15);
+      no.addEventListener('click', () => {
+        confirmingReset = false;
+        renderReset();
+      });
+      warn.append(yes, no);
+      resetControls.append(warn, resetNote);
+    }
+
+    resetBtn.addEventListener('click', () => {
+      confirmingReset = true;
+      resetNote.textContent = '';
+      renderReset();
+    });
+
+    resetControls.append(resetBtn, resetNote);
+    wrap.appendChild(row(i18n.t('terminalSettings.reset'), i18n.t('terminalSettings.resetHint'), resetControls));
 
     pane.appendChild(wrap);
   }

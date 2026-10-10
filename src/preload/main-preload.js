@@ -18,6 +18,7 @@ const api = {
   onSettingsChanged: (cb) => on(IPC.SETTINGS_CHANGED, cb),
   onThemeChanged: (cb) => on(IPC.THEME_CHANGED, cb),
   hideWindow: () => ipcRenderer.send(IPC.WINDOW_HIDE),
+  windowControl: (action) => ipcRenderer.invoke(IPC.WINDOW_CONTROL, { action }),
   openSettings: (section) => ipcRenderer.send(IPC.WINDOW_OPEN_SETTINGS, section),
   openDataFolder: () => ipcRenderer.invoke(IPC.OPEN_DATA_FOLDER),
   openExternal: (url) => ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url),

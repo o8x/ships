@@ -23,12 +23,15 @@ function registerSshIpc(ipcMain) {
 
   // Connect inside the always-on-top terminal window (it can float above full-screen
   // apps, unlike iTerm which switches desktops).
+  // `inTerminal: true`（终端窗口头部的 SSH 下拉）明确要求在「当前终端」里执行，
+  // 不受「SSH 使用内置终端连接」开关影响。
   ipcMain.handle(IPC.SSH_CONNECT, (_event, payload) => {
     const host = findHost(payload && payload.alias);
     if (!host) return { ok: false, error: 'host not found' };
     const command = sshService.buildCommand(host);
     const settingsService = require('../services/settings-service');
-    if (settingsService.get('sshBuiltinTerminal') === false) {
+    const inTerminal = Boolean(payload && payload.inTerminal);
+    if (!inTerminal && settingsService.get('sshBuiltinTerminal') === false) {
       logger.file(`[ssh] connect(alias=${host.alias}) -> iTerm: ${command}`);
       return sshService.connect(host);
     }

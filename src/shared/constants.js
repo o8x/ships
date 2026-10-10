@@ -19,6 +19,7 @@ const IPC = {
   WINDOW_HIDE: 'window:hide',
   WINDOW_OPEN_SETTINGS: 'window:open-settings',
   WINDOW_CLOSE_SETTINGS: 'window:close-settings',
+  WINDOW_CONTROL: 'window:control',
   THEME_CHANGED: 'theme:changed',
 
   GEO_LOOKUP: 'geo:lookup',
@@ -44,6 +45,8 @@ const IPC = {
   TERMINAL_EXPORT: 'terminal:export',
   TERMINAL_OPEN_ITERM: 'terminal:open-iterm',
   TERMINAL_SET_TOP: 'terminal:set-top',
+  TERMINAL_SET_HOTKEY: 'terminal:set-hotkey',
+  TERMINAL_RESET: 'terminal:reset',
   TERMINAL_ZOOM: 'terminal:zoom',
   TERMINAL_DATA: 'terminal:data',
   TERMINAL_EXIT: 'terminal:exit',
@@ -117,6 +120,8 @@ const DEFAULT_SETTINGS = {
   terminalWindowWidth: TERMINAL_WINDOW.width,
   terminalWindowHeight: TERMINAL_WINDOW.height,
   terminalAlwaysOnTop: TERMINAL_WINDOW.alwaysOnTop !== false,
+  // 打开置顶终端窗口的全局快捷键（Electron accelerator，空字符串 = 不注册）
+  terminalHotkey: TERMINAL_WINDOW.hotkey || 'CommandOrControl+Shift+Z',
   sshBuiltinTerminal: ships.sshBuiltinTerminal !== false,
 };
 

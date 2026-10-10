@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 const { BrowserWindow, screen } = require('electron');
 const { WINDOW, SETTINGS_WINDOW, TERMINAL_WINDOW, VIBRANCY, IPC } = require('../shared/constants');
@@ -113,6 +114,22 @@ function scheduleTerminalGeometrySave() {
     terminalGeometryTimer = null;
     saveTerminalGeometry();
   }, 400);
+}
+
+/* 忘掉记住的屏幕 / 位置 / 尺寸（设置 → 终端 → 重置）：删掉数据文件并清空内存里的记忆，
+   下次打开就按设置里的默认尺寸居中。已打开的终端窗口保持原样，之后的移动 / 关闭会重新记录。 */
+function forgetTerminalGeometry() {
+  terminalState = null;
+  if (terminalGeometryTimer) {
+    clearTimeout(terminalGeometryTimer);
+    terminalGeometryTimer = null;
+  }
+  try {
+    fs.rmSync(TERMINAL_WINDOW_FILE, { force: true });
+  } catch (err) {
+    logger.warn('remove terminal-window.json failed:', err.message);
+  }
+  logger.file('[terminal] window geometry memory cleared');
 }
 
 /* 终端窗口的置顶开关（头部图钉按钮 / settings.json 的 terminalAlwaysOnTop）。 */
@@ -416,6 +433,10 @@ function openTerminalWindow() {
   // but it must NOT join every space — it stays on the desktop it was opened on.
   // (false = no NSWindowCollectionBehaviorCanJoinAllSpaces, true = FullScreenAuxiliary)
   terminalWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
+  // 系统红绿灯藏起来，改用头栏里自绘的小红绿灯（20px 头栏放不下系统的标准尺寸）。
+  if (typeof terminalWindow.setWindowButtonVisibility === 'function') {
+    terminalWindow.setWindowButtonVisibility(false);
+  }
   terminalWindow.loadFile(path.join(RENDERER_DIR, 'terminal.html'));
   terminalWindow.on('resize', scheduleTerminalGeometrySave);
   terminalWindow.on('move', scheduleTerminalGeometrySave);
@@ -488,6 +509,7 @@ module.exports = {
   getSettingsWindow,
   openTerminalWindow,
   getTerminalWindow,
+  forgetTerminalGeometry,
   broadcast,
   setBlurSuppressed,
   applyPin,

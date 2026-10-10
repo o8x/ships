@@ -10,28 +10,20 @@
   i18n.extend({
     zh: {
       terminalWin: {
-        title: '终端',
-        iterm: '在 iTerm 中打开并关闭此窗口',
-        export: '导出终端文本到本地文件',
-        pinTop: '取消置顶（不再浮在其他窗口上面）',
-        unpinTop: '置顶显示',
+        sshPlaceholder: 'SSH',
+        sshFailed: '连接失败：{error}',
         exported: '已导出到 {path}',
         exportFailed: '导出失败：{error}',
-        ended: '会话已结束（关闭窗口即可）',
         failed: '无法启动终端会话：{error}',
         noTerminal: 'xterm 未能加载，无法显示终端',
       },
     },
     en: {
       terminalWin: {
-        title: 'Terminal',
-        iterm: 'Open in iTerm and close this window',
-        export: 'Export terminal text to a file',
-        pinTop: 'Always on top: on (click to turn off)',
-        unpinTop: 'Always on top: off (click to turn on)',
+        sshPlaceholder: 'SSH',
+        sshFailed: 'Connect failed: {error}',
         exported: 'Exported to {path}',
         exportFailed: 'Export failed: {error}',
-        ended: 'Session ended (close the window)',
         failed: 'Cannot start the terminal session: {error}',
         noTerminal: 'xterm failed to load',
       },
@@ -44,16 +36,18 @@
   const FONT_MIN = 8;
   const FONT_MAX = 24;
 
-  /* xterm 挂在 #term-fit（无内边距）里，留白由外层 #term-host 提供：FitAddon 用
+  /* xterm 挂在 #term-fit（无内边距）里，留白由外层 #term-host（上 / 左右 6.5px、下 13px）提供：FitAddon 用
      「父元素的 border box 高度」算行数，父元素带内边距会把可用高度多算一份内边距，
      于是一行被挤出可视区 —— 最后一行只露大半行，页面还会多出几像素可滚动高度
      （滚轮时标题跟着上下动）。父元素无内边距时测量值即真实可用区。 */
   const host = document.getElementById('term-fit');
   const hostBox = document.getElementById('term-host');
-  const titleEl = document.getElementById('term-title');
   const topBtn = document.getElementById('btn-top');
   const itermBtn = document.getElementById('btn-iterm');
   const exportBtn = document.getElementById('btn-export');
+  const lightClose = document.getElementById('light-close');
+  const lightMinimize = document.getElementById('light-minimize');
+  const lightZoom = document.getElementById('light-zoom');
 
   let term = null;
   let fit = null;
@@ -67,6 +61,7 @@
   let settingsFontSize = FONT_DEFAULT;
   let alwaysOnTop = true;
   let shellPath = '';
+  let sshPicker = null;
 
   function themeColors() {
     // macOS-like overlay scrollbar (only a safety net: the scrollbar is hidden below)
@@ -112,8 +107,14 @@
   function applyFontSize(value) {
     if (!term) return;
     term.options.fontSize = value;
+    applyHeaderFontSize(value);
     fitIfNeeded(true);
     syncPtySize();
+  }
+
+  /* 头栏（SSH 下拉等）字号跟随终端字号；高度交给 CSS 的 max(32px, 字号 + …) 兜底。 */
+  function applyHeaderFontSize(value) {
+    document.documentElement.style.setProperty('--term-header-font-size', `${value}px`);
   }
 
   /* 字号来源有两处：设置 → 终端（写回设置，这里跟随）与 Cmd + / Cmd -（临时）。
@@ -166,14 +167,69 @@
   }
 
   function renderHeader() {
-    titleEl.textContent = i18n.t('terminalWin.title');
     topBtn.innerHTML = alwaysOnTop ? Icons.pin(15) : Icons.pinOff(15);
-    topBtn.setAttribute('data-tip', i18n.t(alwaysOnTop ? 'terminalWin.pinTop' : 'terminalWin.unpinTop'));
     topBtn.style.color = alwaysOnTop ? 'var(--color-accent)' : '';
     itermBtn.innerHTML = Icons.terminal(15);
-    itermBtn.setAttribute('data-tip', i18n.t('terminalWin.iterm'));
     exportBtn.innerHTML = Icons.download(15);
-    exportBtn.setAttribute('data-tip', i18n.t('terminalWin.export'));
+    // 自绘小红绿灯的符号（尺寸交给 CSS，见 #term-lights svg）
+    lightClose.innerHTML = Icons.trafficClose(6);
+    lightMinimize.innerHTML = Icons.trafficMinimize(6);
+    lightZoom.innerHTML = Icons.trafficZoom(6);
+  }
+
+  /* 窗口失焦时红绿灯变灰（与系统观感一致） */
+  function syncWindowFocus() {
+    document.documentElement.dataset.windowFocus = document.hasFocus() ? 'on' : 'off';
+  }
+
+  /* ---------------------------- 头部 SSH 下拉 ----------------------------
+     右侧图标区最左边：列出 ~/.ssh/config 的主机（用户名@主机地址），选中就在**当前终端**
+     里执行 `ssh …`（注入到正在运行的 shell，不会重建终端 / 不新开窗口）。可以重复选同一台
+     主机来重连 —— 每次选择都会重新执行。 */
+  function setupSshPicker() {
+    const actions = document.getElementById('term-actions');
+    if (!actions) return null;
+
+    const picker = window.ShipsUI.createSelect({
+      options: [{ value: '', label: i18n.t('terminalWin.sshPlaceholder') }],
+      value: '',
+      align: 'right',
+      className: 'select-compact shrink-0',
+      onChange: (alias) => {
+        void connectSshHost(alias);
+      },
+    });
+    actions.insertBefore(picker.el, actions.firstChild);
+    return picker;
+  }
+
+  async function connectSshHost(alias) {
+    if (!alias) return;
+    const result = await window.ships.ssh.connect({ alias, inTerminal: true });
+    if (!result || !result.ok) {
+      write(`\r\n${ANSI.error}${i18n.t('terminalWin.sshFailed', { error: (result && result.error) || 'error' })}${ANSI.reset}\r\n`);
+    }
+    if (term) term.focus();
+  }
+
+  async function refreshSshPicker() {
+    if (!sshPicker) return;
+    let hosts = [];
+    try {
+      const result = await window.ships.ssh.list();
+      hosts = (result && result.hosts) || [];
+    } catch (err) {
+      hosts = [];
+    }
+    const options = [{ value: '', label: i18n.t('terminalWin.sshPlaceholder') }];
+    for (const host of hosts) {
+      const address = host.user ? `${host.user}@${host.hostName}` : String(host.hostName || host.alias || '');
+      options.push({ value: host.alias, label: address });
+    }
+    sshPicker.setOptions(options);
+    if (!hosts.some((host) => host.alias === sshPicker.getValue())) sshPicker.setValue('');
+    sshPicker.el.disabled = hosts.length === 0;
+    sshPicker.el.style.opacity = hosts.length === 0 ? '0.5' : '';
   }
 
   function initTerminal(options) {
@@ -214,15 +270,23 @@
     if (!message || message.id !== sessionId) return;
     sessionId = '';
     if (message.type === 'error') {
+      // 启动失败：留在窗口里显示原因（否则用户看不到是为什么）。
       write(`\r\n${ANSI.error}${i18n.t('terminalWin.failed', { error: message.message })}${ANSI.reset}\r\n`);
-    } else {
-      write(`\r\n${ANSI.meta}${i18n.t('terminalWin.ended')}${ANSI.reset}\r\n`);
+      return;
     }
+    // shell 结束（输入 exit / Ctrl-D 等）：直接关窗，不留「会话已结束」这类提示。
+    window.close();
   });
 
   const offZoom = window.ships.terminal.onZoom((direction) => zoomFont(direction));
 
   itermBtn.addEventListener('click', () => window.ships.terminal.openIterm());
+  lightClose.addEventListener('click', () => window.ships.windowControl('close'));
+  lightMinimize.addEventListener('click', () => window.ships.windowControl('minimize'));
+  lightZoom.addEventListener('click', () => window.ships.windowControl('zoom'));
+  window.addEventListener('focus', syncWindowFocus);
+  window.addEventListener('blur', syncWindowFocus);
+  syncWindowFocus();
   topBtn.addEventListener('click', async () => {
     const result = await window.ships.terminal.setAlwaysOnTop(!alwaysOnTop);
     alwaysOnTop = Boolean(result && result.ok ? result.alwaysOnTop : !alwaysOnTop);
@@ -249,8 +313,11 @@
     window.ShipsTheme.set(settings || {});
     alwaysOnTop = !settings || settings.terminalAlwaysOnTop !== false;
     renderHeader();
+    sshPicker = setupSshPicker();
+    refreshSshPicker();
     settingsFontSize = Math.max(FONT_MIN, Math.min(FONT_MAX, (settings && settings.terminalFontSize) || FONT_DEFAULT));
     fontSize = settingsFontSize;
+    applyHeaderFontSize(fontSize);
     shellPath = (settings && settings.terminalShell) || '';
     initTerminal({
       scrollback: (settings && settings.terminalScrollback) || (info && info.terminalScrollback) || 10000,
@@ -261,6 +328,7 @@
       window.ShipsTheme.set(next || {});
       alwaysOnTop = !next || next.terminalAlwaysOnTop !== false;
       renderHeader();
+      refreshSshPicker();
       if (term) term.options.theme = themeColors();
       shellPath = (next && next.terminalShell) || ''; // applies to the next session
       if (term && next && next.terminalScrollback) term.options.scrollback = next.terminalScrollback;

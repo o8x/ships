@@ -31,6 +31,8 @@ const api = {
     resize: (id, cols, rows) => ipcRenderer.invoke(IPC.TERMINAL_RESIZE, { id, cols, rows }),
     interrupt: (id) => ipcRenderer.invoke(IPC.TERMINAL_INTERRUPT, { id }),
     kill: (id) => ipcRenderer.invoke(IPC.TERMINAL_KILL, { id }),
+    setHotkey: (hotkey) => ipcRenderer.invoke(IPC.TERMINAL_SET_HOTKEY, { hotkey }),
+    reset: () => ipcRenderer.invoke(IPC.TERMINAL_RESET),
     onData: (cb) => on(IPC.TERMINAL_DATA, cb),
     onExit: (cb) => on(IPC.TERMINAL_EXIT, cb),
   },

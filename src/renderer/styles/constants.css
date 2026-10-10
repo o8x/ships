@@ -29,6 +29,17 @@
   --footer-height: 34px;
   --tabbar-height: 46px;
 
+  /* 终端窗口头栏：高 22px（刚好放下自绘的小红绿灯），字号跟随终端字号
+     —— terminal.js 的 applyFontSize() 会改写 --term-header-font-size。 */
+  --term-header-height: 22px;
+  --term-header-font-size: 12px;
+  /* 头栏里自绘小红绿灯（macOS 观感，比系统标准尺寸小） */
+  --traffic-size: 9px;
+  --traffic-glyph-size: 6px;
+  --traffic-close: #ff5f57;
+  --traffic-minimize: #febc2e;
+  --traffic-zoom: #28c840;
+
   /* 强调色（可被设置覆盖，脚本会写到 documentElement.style） */
   --color-accent: #2e6bfc;
   --color-accent-fg: #ffffff;
@@ -60,6 +71,8 @@
   --color-json-bool: #8a3ffc;
   --color-json-null: #8a8a8f;
   --shadow-popover: 0 10px 34px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
+  /* 窗口失焦时自绘红绿灯的灰底 */
+  --traffic-inactive: rgba(0, 0, 0, 0.18);
 }
 
 /* 黑暗模式 */
@@ -80,6 +93,7 @@
   --color-json-bool: #d2a8ff;
   --color-json-null: #98989f;
   --shadow-popover: 0 12px 40px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --traffic-inactive: rgba(255, 255, 255, 0.28);
 }
 
 /*

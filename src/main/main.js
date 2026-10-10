@@ -66,4 +66,5 @@ app.on('before-quit', () => {
   require('./services/clipboard-service').stop();
   require('./services/ssh-browse-service').closeAll();
   require('./services/terminal-service').killAll();
+  require('./services/hotkey-service').unregisterAll();
 });

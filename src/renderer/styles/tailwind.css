@@ -310,6 +310,12 @@ input[type='color'].swatch::-webkit-color-swatch {
 .select-trigger:hover {
   background: var(--color-surface-3);
 }
+/* 头栏尺寸变体：终端窗口小头栏里的 SSH 下拉（字号 / 高度由 #term-actions 规则按头栏字号推） */
+.select-trigger.select-compact {
+  padding: 0 6px;
+  gap: 4px;
+  border-radius: var(--radius-control);
+}
 .select-trigger.open {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
@@ -366,6 +372,95 @@ input[type='color'].swatch::-webkit-color-swatch {
 
 /* Embedded terminals never show a scrollbar (iTerm-like): the wheel / trackpad
    scrolls the buffer itself, and nothing else in the page scrolls. */
+
+/* 终端窗口头栏（仅 terminal.html）：默认 24px 高，刚好放下自绘的小红绿灯；
+   字号跟着终端字号走（--term-header-font-size 由 scripts/terminal.js 在 applyFontSize 里写入）。
+   窗口内容本身没有上留白，所以「头栏高度」就是终端文字上方看到的整条高度。 */
+#term-header {
+  height: max(var(--term-header-height), calc(var(--term-header-font-size) + 6px));
+  gap: 6px;
+  /* 左留白交给红绿灯组（12px 左边距 = 第一个红绿灯到窗口左边缘的距离），右侧 12px */
+  padding: 0 12px 0 0;
+}
+/* 图标按钮与 SSH 下拉都随头栏字号一起缩放（默认 12px 字号下是 18px 高） */
+#term-actions {
+  gap: calc(var(--term-header-font-size) * 0.6);
+}
+#term-actions .icon-btn {
+  width: calc(var(--term-header-font-size) + 6px);
+  height: calc(var(--term-header-font-size) + 6px);
+}
+#term-actions .icon-btn svg {
+  width: var(--term-header-font-size);
+  height: var(--term-header-font-size);
+}
+#term-actions .select-trigger {
+  font-size: var(--term-header-font-size);
+  height: max(18px, calc(var(--term-header-font-size) + 6px));
+  width: 180px;
+}
+
+/* 自绘小红绿灯（系统红绿灯已由主进程隐藏，见 window-manager） */
+#term-lights {
+  gap: 5px;
+  padding-left: 12px;
+}
+.traffic-light {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--traffic-size);
+  height: var(--traffic-size);
+  padding: 0;
+  border-radius: 999px;
+  border: 0.5px solid rgba(0, 0, 0, 0.12);
+  cursor: default;
+}
+.traffic-close {
+  background: var(--traffic-close);
+}
+.traffic-minimize {
+  background: var(--traffic-minimize);
+}
+.traffic-zoom {
+  background: var(--traffic-zoom);
+}
+.traffic-light svg {
+  width: var(--traffic-glyph-size);
+  height: var(--traffic-glyph-size);
+  color: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+/* 悬浮任意一个时三个都显示符号（macOS 行为） */
+#term-lights:hover .traffic-light svg {
+  opacity: 1;
+}
+/* 窗口失焦时整体变灰（与系统一致） */
+[data-window-focus='off'] .traffic-light {
+  background: var(--traffic-inactive);
+  border-color: transparent;
+}
+[data-window-focus='off'] .traffic-light svg {
+  opacity: 0;
+}
+
+/* 终端窗口头栏下拉的菜单（菜单挂在 body 上，用 body.term-window 限定范围）：
+   条目高度与下拉本体一致（默认 20px），字号跟随头栏字号，宽度与下拉对齐。 */
+body.term-window .select-menu {
+  min-width: 180px;
+  padding: 3px;
+}
+body.term-window .select-menu .select-option {
+  height: max(18px, calc(var(--term-header-font-size) + 6px));
+  padding: 0 6px;
+  font-size: var(--term-header-font-size);
+}
+/* 条目之间留 2px 间距 */
+body.term-window .select-menu .select-option + .select-option {
+  margin-top: 2px;
+}
+
 .xterm .xterm-viewport,
 .xterm-viewport {
   scrollbar-width: none;

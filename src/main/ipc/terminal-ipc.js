@@ -4,12 +4,31 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { dialog } = require('electron');
-const { IPC } = require('../../shared/constants');
+const { IPC, DEFAULT_SETTINGS } = require('../../shared/constants');
 const terminal = require('../services/terminal-service');
 const settings = require('../services/settings-service');
 const iterm = require('../services/iterm-service');
+const hotkey = require('../services/hotkey-service');
 const wm = require('../window-manager');
 const logger = require('../utils/logger');
+
+// 设置 → 终端 里「重置」要恢复的设置项（都来自 package.json 的 ships 配置）。
+const TERMINAL_SETTING_KEYS = [
+  'terminalShell',
+  'terminalFontSize',
+  'terminalScrollback',
+  'terminalWindowWidth',
+  'terminalWindowHeight',
+  'terminalAlwaysOnTop',
+  'terminalHotkey',
+  'sshBuiltinTerminal',
+];
+
+function terminalDefaults() {
+  const patch = {};
+  for (const key of TERMINAL_SETTING_KEYS) patch[key] = DEFAULT_SETTINGS[key];
+  return patch;
+}
 
 // The always-on-top terminal window owns one session; other features (SSH connect,
 // network tests) can inject a command into it while it is open.
@@ -43,6 +62,7 @@ function runInTerminal(command) {
 }
 
 function registerTerminalIpc(ipcMain) {
+  hotkey.init();
   ipcMain.handle(IPC.TERMINAL_OPEN, () => ({ ok: Boolean(wm.openTerminalWindow()) }));
 
   ipcMain.handle(IPC.TERMINAL_START, (event, payload) => {
@@ -73,6 +93,25 @@ function registerTerminalIpc(ipcMain) {
     const value = Boolean(payload && payload.value);
     settings.set({ terminalAlwaysOnTop: value });
     return { ok: true, alwaysOnTop: value };
+  });
+
+  /* 全局快捷键：先试注册，成功了才写设置 —— 否则会存下一个按不出来（被占用 / 非法）的组合键。
+     写设置后 hotkey-service 的 settings 监听会再 apply 一次，同值直接返回。 */
+  ipcMain.handle(IPC.TERMINAL_SET_HOTKEY, (_event, payload) => {
+    const wanted = String((payload && payload.hotkey) || '').trim();
+    const result = hotkey.apply(wanted);
+    if (!result.ok) return result;
+    settings.set({ terminalHotkey: result.hotkey });
+    return { ok: true, hotkey: result.hotkey };
+  });
+
+  /* 重置：终端相关设置回到默认值（写设置即可让开着的终端窗口跟着变），并清掉记住的
+     屏幕 / 位置 / 尺寸。 */
+  ipcMain.handle(IPC.TERMINAL_RESET, () => {
+    const next = settings.set(terminalDefaults());
+    wm.forgetTerminalGeometry();
+    logger.file('[terminal] settings reset to defaults');
+    return { ok: true, settings: next };
   });
 
   /* Export: dump the xterm buffer text into a local file chosen by the user. */

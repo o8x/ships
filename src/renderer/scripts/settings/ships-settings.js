@@ -38,6 +38,7 @@
         developer: '开发者',
         devPopover: '悬浮界面开发者工具',
         devSettings: '设置界面开发者工具',
+        devTerminal: '终端界面开发者工具',
         logFile: '日志文件',
         logHint: 'SSH 探测等详细日志（ships.log）',
       },
@@ -74,6 +75,7 @@
         developer: 'Developer',
         devPopover: 'Popover DevTools',
         devSettings: 'Settings DevTools',
+        devTerminal: 'Terminal DevTools',
         logFile: 'Log file',
         logHint: 'Detailed logs e.g. SSH detection (ships.log)',
       },
@@ -230,6 +232,7 @@
     }
     devSection.appendChild(row(i18n.t('settingsPage.devPopover'), '', devButton('main')));
     devSection.appendChild(row(i18n.t('settingsPage.devSettings'), '', devButton('settings')));
+    devSection.appendChild(row(i18n.t('settingsPage.devTerminal'), '', devButton('terminal')));
 
     const logBtn = el('button', { class: 'btn shrink-0', type: 'button' }, i18n.t('settingsPage.open'));
     logBtn.addEventListener('click', () => window.ships.openLog());
