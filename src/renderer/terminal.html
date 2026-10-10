@@ -30,9 +30,11 @@
           <button id="btn-iterm" class="icon-btn" type="button"></button>
           <button id="btn-export" class="icon-btn" type="button"></button>
         </div>
+        <!-- 拖动 / 缩放期间在中间显示「列 × 行」（iTerm 式），停手后隐藏 -->
+        <span id="term-size" class="hidden"></span>
       </header>
       <!-- 留白放在外层 #term-host 上；xterm 挂在无内边距的 #term-fit 里，见 scripts/terminal.js -->
-      <main id="term-host" class="min-h-0 flex-1 overflow-hidden px-2 pb-4 pt-2">
+      <main id="term-host" class="min-h-0 flex-1 overflow-hidden">
         <div id="term-fit" class="h-full w-full"></div>
       </main>
     </div>

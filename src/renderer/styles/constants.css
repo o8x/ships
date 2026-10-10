@@ -33,6 +33,8 @@
      —— terminal.js 的 applyFontSize() 会改写 --term-header-font-size。 */
   --term-header-height: 22px;
   --term-header-font-size: 12px;
+  /* 终端内容与窗口四边的留白：0 = 终端铺满窗口（vim 等全屏程序四周不留白） */
+  --term-padding-y: 0px;
   /* 头栏里自绘小红绿灯（macOS 观感，比系统标准尺寸小） */
   --traffic-size: 9px;
   --traffic-glyph-size: 6px;

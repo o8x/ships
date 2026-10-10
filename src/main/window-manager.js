@@ -21,6 +21,69 @@ let blurSuppressed = false;
 let pinnedPositioned = false;
 let terminalGeometryTimer = null;
 let suppressTerminalSizeSave = false;
+/* 终端窗口是否正在被拖动缩放：will-resize 在拖拽的每一帧都会触发，用它当「拖动中」信号，
+   连续 350ms 没再收到就认为松手。**拖动期间一律不改窗口尺寸** —— 中途 setBounds 会打乱
+   macOS 的拖拽跟踪（表现为越拖越小 / 反复跳变），所以把对齐请求先记下来、松手后再执行。 */
+let terminalResizingUntil = 0;
+let terminalResizeIdleTimer = null;
+let terminalSnapPending = false;
+
+function applyTerminalSnap(size) {
+  const win = getTerminalWindow();
+  if (!win || win.isMaximized() || win.isFullScreen() || !size) return;
+  const [width, height] = win.getContentSize();
+  win.setContentSize(size.width || width, size.height || height);
+}
+
+function flushPendingTerminalSnap() {
+  terminalResizeIdleTimer = null;
+  if (!terminalSnapPending || Date.now() < terminalResizingUntil) return;
+  terminalSnapPending = false;
+  // 拖动期间挂起的请求可能已经过期（用户又拖了一段），交给渲染层重新测量再对齐。
+  const win = getTerminalWindow();
+  if (win && !win.isDestroyed()) win.webContents.send(IPC.TERMINAL_RECALIBRATE);
+}
+
+function markTerminalResizing() {
+  const first = Date.now() >= terminalResizingUntil;
+  terminalResizingUntil = Date.now() + 350;
+  if (terminalResizeIdleTimer) clearTimeout(terminalResizeIdleTimer);
+  terminalResizeIdleTimer = setTimeout(flushPendingTerminalSnap, 380);
+  // 告诉渲染层「正在拖动」：拖动期间它不会发对齐请求（中途改尺寸会打乱系统拖拽跟踪），
+  // 直到鼠标重新回到内容区（说明松手了）才继续。
+  if (first) {
+    const win = getTerminalWindow();
+    if (win && !win.isDestroyed()) win.webContents.send(IPC.TERMINAL_DRAG_ACTIVE);
+  }
+}
+
+/* 渲染层按实测余量请求对齐尺寸（行 / 列都要刚好装下整格）：拖动中先挂起，
+   松手后（或本来就空闲时）立即执行。 */
+function requestTerminalSnap(payload) {
+  const win = getTerminalWindow();
+  if (!win || win.isMaximized() || win.isFullScreen()) return { ok: false };
+  const [currentWidth, currentHeight] = win.getContentSize();
+  const minWidth = Math.round(win.getMinimumSize()[0]) || 0;
+  const minHeight = Math.round(win.getMinimumSize()[1]) || 0;
+  const wantedWidth = Math.round(Number(payload && payload.width)) || currentWidth;
+  const wantedHeight = Math.round(Number(payload && payload.height)) || currentHeight;
+  // 安全上限：正常对齐最多只差一格（≤ 约 20px），偏差过大说明状态不对，宁可不做。
+  const SNAP_LIMIT_PX = 60;
+  const size = {};
+  if (wantedWidth !== currentWidth && wantedWidth >= minWidth && Math.abs(wantedWidth - currentWidth) <= SNAP_LIMIT_PX) {
+    size.width = wantedWidth;
+  }
+  if (wantedHeight !== currentHeight && wantedHeight >= minHeight && Math.abs(wantedHeight - currentHeight) <= SNAP_LIMIT_PX) {
+    size.height = wantedHeight;
+  }
+  if (!Object.keys(size).length) return { ok: false, width: currentWidth, height: currentHeight };
+  if (Date.now() < terminalResizingUntil) {
+    terminalSnapPending = true;
+    return { ok: true, deferred: true, size };
+  }
+  applyTerminalSnap(size);
+  return { ok: true, size };
+}
 
 /* The terminal window size is a user setting (设置 → 终端 → 窗口大小); the value is
    also written back when the window is resized by hand, so the next open matches. */
@@ -440,6 +503,8 @@ function openTerminalWindow() {
   terminalWindow.loadFile(path.join(RENDERER_DIR, 'terminal.html'));
   terminalWindow.on('resize', scheduleTerminalGeometrySave);
   terminalWindow.on('move', scheduleTerminalGeometrySave);
+  // 只用来标记「正在拖动」：不拦截、不改尺寸，松手后再执行挂起的对齐请求
+  terminalWindow.on('will-resize', markTerminalResizing);
   // 实际生效的几何（恢复时可能被夹取过）也记下来，保证记忆与窗口一致。
   scheduleTerminalGeometrySave();
   terminalWindow.once('ready-to-show', () => {
@@ -510,6 +575,7 @@ module.exports = {
   openTerminalWindow,
   getTerminalWindow,
   forgetTerminalGeometry,
+  requestTerminalSnap,
   broadcast,
   setBlurSuppressed,
   applyPin,

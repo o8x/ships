@@ -36,7 +36,7 @@
   const FONT_MIN = 8;
   const FONT_MAX = 24;
 
-  /* xterm 挂在 #term-fit（无内边距）里，留白由外层 #term-host（上 / 左右 6.5px、下 13px）提供：FitAddon 用
+  /* xterm 挂在 #term-fit（无内边距）里，留白由外层 #term-host（上下 5px、左右 0）提供：FitAddon 用
      「父元素的 border box 高度」算行数，父元素带内边距会把可用高度多算一份内边距，
      于是一行被挤出可视区 —— 最后一行只露大半行，页面还会多出几像素可滚动高度
      （滚轮时标题跟着上下动）。父元素无内边距时测量值即真实可用区。 */
@@ -48,6 +48,7 @@
   const lightClose = document.getElementById('light-close');
   const lightMinimize = document.getElementById('light-minimize');
   const lightZoom = document.getElementById('light-zoom');
+  const sizeEl = document.getElementById('term-size');
 
   let term = null;
   let fit = null;
@@ -62,6 +63,10 @@
   let alwaysOnTop = true;
   let shellPath = '';
   let sshPicker = null;
+  let sizeBadgeTimer = null;
+  let lastMetricsKey = '';
+  // 主进程标记「正在拖动窗口」：期间一律不发对齐请求（中途改尺寸会打乱 macOS 拖拽跟踪）
+  let dragSuspected = false;
 
   function themeColors() {
     // macOS-like overlay scrollbar (only a safety net: the scrollbar is hidden below)
@@ -101,7 +106,57 @@
     if (!force && key === lastHostKey) return;
     lastHostKey = key;
     fit.fit();
+    fitColumns();
     syncPtySize();
+    snapExactSize();
+    if (sizeEl && !sizeEl.classList.contains('hidden')) {
+      sizeEl.textContent = `${term.cols}×${term.rows}`;
+    }
+  }
+
+  /* 按实测余量对齐窗口高度：终端网格取整后底部会剩 leftover（0 ~ 行高-1）。
+     拖动过程中不干预（下边框严格跟手），停手 150ms 后由这里把差额补掉，
+     让最后一行紧贴窗口下边缘。余量 < 1px 时不动。 */
+  /* FitAddon 只要 scrollback > 0 就固定预留 14px（给 overview ruler），会把终端挤得比
+     窗口窄、右侧空出一条白边（我们本来就隐藏滚动条）。这里按真实可用宽度自己算列数。 */
+  function fitColumns() {
+    if (!term || !term.cols || !host) return;
+    const screenEl = host.querySelector('.xterm-screen');
+    if (!screenEl) return;
+    const cellWidth = screenEl.getBoundingClientRect().width / term.cols;
+    if (!cellWidth) return;
+    const cols = Math.max(2, Math.floor(host.clientWidth / cellWidth));
+    if (cols !== term.cols) term.resize(cols, term.rows);
+  }
+
+  /* 行 / 列取整后底部与右侧会各剩一条带（0 ~ 单元格尺寸）。拖动时不动作（主进程会挂起），
+     松手后按实测余量把窗口收到刚好装下整格。 */
+  function snapExactSize() {
+    if (!term || !term.rows || !host) return;
+    if (dragSuspected) return; // 拖动中：等松手（鼠标回到内容区）后再对齐
+    const rowsEl = host.querySelector('.xterm-rows');
+    const firstRow = rowsEl && rowsEl.firstElementChild;
+    const cellHeight = firstRow ? firstRow.getBoundingClientRect().height : 0;
+    if (!cellHeight) return;
+    const screenEl = host.querySelector('.xterm-screen');
+    const cellWidth = screenEl && term.cols ? screenEl.getBoundingClientRect().width / term.cols : 0;
+    const payload = {};
+    const leftoverHeight = host.clientHeight - term.rows * cellHeight;
+    if (leftoverHeight > 1) payload.height = Math.round(window.innerHeight - leftoverHeight);
+    const leftoverWidth = cellWidth ? host.clientWidth - term.cols * cellWidth : 0;
+    if (leftoverWidth > 1) payload.width = Math.round(window.innerWidth - leftoverWidth);
+    if (!Object.keys(payload).length) return;
+    const snap = window.ships && window.ships.terminal && window.ships.terminal.snapSize;
+    if (typeof snap === 'function') snap(payload);
+  }
+
+  /* iTerm 式：拖动 / 缩放期间在头栏中间显示「列 × 行」，停手 700ms 后隐藏。 */
+  function showSizeBadge() {
+    if (!sizeEl || !term) return;
+    sizeEl.textContent = `${term.cols}×${term.rows}`;
+    sizeEl.classList.remove('hidden');
+    clearTimeout(sizeBadgeTimer);
+    sizeBadgeTimer = setTimeout(() => sizeEl.classList.add('hidden'), 700);
   }
 
   function applyFontSize(value) {
@@ -253,7 +308,10 @@
       term.loadAddon(fit);
       fitIfNeeded();
     }
-    observer = new ResizeObserver(() => scheduleResize());
+    observer = new ResizeObserver(() => {
+      showSizeBadge();
+      scheduleResize();
+    });
     observer.observe(hostBox || host);
     term.onData((data) => {
       if (sessionId) window.ships.terminal.input(sessionId, data);
@@ -279,6 +337,24 @@
   });
 
   const offZoom = window.ships.terminal.onZoom((direction) => zoomFont(direction));
+  // 拖动结束后主进程请我们重新测量一次（拖动期间不允许改窗口尺寸）→ 重新 fit 并按实测余量对齐
+  const offRecalibrate = window.ships.terminal.onRecalibrate(() => fitIfNeeded(true));
+  const offDragActive =
+    typeof window.ships.terminal.onDragActive === 'function'
+      ? window.ships.terminal.onDragActive(() => {
+          dragSuspected = true;
+        })
+      : null;
+  // 拖动中渲染层收不到鼠标事件；一旦鼠标又出现在内容区，说明已经松手 → 这时再重新 fit + 对齐
+  window.addEventListener(
+    'mousemove',
+    () => {
+      if (!dragSuspected) return;
+      dragSuspected = false;
+      fitIfNeeded(true);
+    },
+    true
+  );
 
   itermBtn.addEventListener('click', () => window.ships.terminal.openIterm());
   lightClose.addEventListener('click', () => window.ships.windowControl('close'));
@@ -303,6 +379,8 @@
 
   window.addEventListener('beforeunload', () => {
     offZoom();
+    if (offRecalibrate) offRecalibrate();
+    if (offDragActive) offDragActive();
     if (sessionId) window.ships.terminal.kill(sessionId);
   });
 

@@ -377,10 +377,28 @@ input[type='color'].swatch::-webkit-color-swatch {
    字号跟着终端字号走（--term-header-font-size 由 scripts/terminal.js 在 applyFontSize 里写入）。
    窗口内容本身没有上留白，所以「头栏高度」就是终端文字上方看到的整条高度。 */
 #term-header {
+  position: relative;
   height: max(var(--term-header-height), calc(var(--term-header-font-size) + 6px));
   gap: 6px;
   /* 左留白交给红绿灯组（12px 左边距 = 第一个红绿灯到窗口左边缘的距离），右侧 12px */
   padding: 0 12px 0 0;
+}
+/* 终端内容：上下各留 10px，左右铺满（xterm 仍挂在里面那层无内边距的 #term-fit 上） */
+#term-host {
+  padding: var(--term-padding-y) 0;
+}
+/* 拖动 / 缩放期间的头栏尺寸提示（居中、不吃鼠标事件，停手后由 JS 隐藏） */
+#term-size {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-size: var(--term-header-font-size);
+  line-height: 1;
+  color: var(--color-fg-muted);
+  white-space: nowrap;
 }
 /* 图标按钮与 SSH 下拉都随头栏字号一起缩放（默认 12px 字号下是 18px 高） */
 #term-actions {
