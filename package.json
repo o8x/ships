@@ -1,6 +1,6 @@
 {
   "name": "ships",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "A macOS menu bar toolbox for developers.",
   "author": "Ships",
   "license": "MIT",
@@ -48,6 +48,7 @@
       "minHeight": 320,
       "alwaysOnTop": true,
       "scrollback": 10000,
+      "hotkey": "CommandOrControl+Shift+Z",
       "fontSize": 12,
       "shell": ""
     },
