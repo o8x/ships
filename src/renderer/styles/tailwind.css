@@ -387,6 +387,21 @@ input[type='color'].swatch::-webkit-color-swatch {
 #term-host {
   padding: var(--term-padding-y) 0;
 }
+/* 当前 SSH 会话标题（居中、不吃鼠标事件；手动 ssh / 头部下拉 / 目录浏览连接时由 JS 更新） */
+#term-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  font-size: var(--term-header-font-size);
+  line-height: 1;
+  color: var(--color-fg-muted);
+}
 /* 拖动 / 缩放期间的头栏尺寸提示（居中、不吃鼠标事件，停手后由 JS 隐藏） */
 #term-size {
   position: absolute;
@@ -415,7 +430,7 @@ input[type='color'].swatch::-webkit-color-swatch {
 #term-actions .select-trigger {
   font-size: var(--term-header-font-size);
   height: max(18px, calc(var(--term-header-font-size) + 6px));
-  width: 180px;
+  width: 130px;
 }
 
 /* 自绘小红绿灯（系统红绿灯已由主进程隐藏，见 window-manager） */
@@ -466,7 +481,7 @@ input[type='color'].swatch::-webkit-color-swatch {
 /* 终端窗口头栏下拉的菜单（菜单挂在 body 上，用 body.term-window 限定范围）：
    条目高度与下拉本体一致（默认 20px），字号跟随头栏字号，宽度与下拉对齐。 */
 body.term-window .select-menu {
-  min-width: 180px;
+  min-width: 130px;
   padding: 3px;
 }
 body.term-window .select-menu .select-option {

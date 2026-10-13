@@ -41,6 +41,8 @@ const api = {
     kill: (id) => ipcRenderer.invoke(IPC.TERMINAL_KILL, { id }),
     destroy: () => ipcRenderer.invoke(IPC.TERMINAL_DESTROY),
     export: (payload) => ipcRenderer.invoke(IPC.TERMINAL_EXPORT, payload),
+    copyText: (text) => ipcRenderer.invoke(IPC.TERMINAL_COPY_TEXT, { text }),
+    pasteText: () => ipcRenderer.invoke(IPC.TERMINAL_PASTE_TEXT),
     openIterm: () => ipcRenderer.invoke(IPC.TERMINAL_OPEN_ITERM),
     setAlwaysOnTop: (value) => ipcRenderer.invoke(IPC.TERMINAL_SET_TOP, { value }),
     snapSize: (payload) => ipcRenderer.invoke(IPC.TERMINAL_SNAP_SIZE, payload),
@@ -49,6 +51,7 @@ const api = {
     onZoom: (cb) => on(IPC.TERMINAL_ZOOM, cb),
     onData: (cb) => on(IPC.TERMINAL_DATA, cb),
     onExit: (cb) => on(IPC.TERMINAL_EXIT, cb),
+    onSession: (cb) => on(IPC.TERMINAL_SESSION, cb),
   },
   ssh: {
     list: () => ipcRenderer.invoke(IPC.SSH_LIST),

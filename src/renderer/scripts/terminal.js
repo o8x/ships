@@ -49,6 +49,7 @@
   const lightMinimize = document.getElementById('light-minimize');
   const lightZoom = document.getElementById('light-zoom');
   const sizeEl = document.getElementById('term-size');
+  const titleEl = document.getElementById('term-title');
 
   let term = null;
   let fit = null;
@@ -67,6 +68,8 @@
   let lastMetricsKey = '';
   // 主进程标记「正在拖动窗口」：期间一律不发对齐请求（中途改尺寸会打乱 macOS 拖拽跟踪）
   let dragSuspected = false;
+  // 当前会话检测到的 SSH 目标（主进程每秒扫一次进程树得出）；空串 = 未连接 SSH
+  let sshTitle = '';
 
   function themeColors() {
     // macOS-like overlay scrollbar (only a safety net: the scrollbar is hidden below)
@@ -87,6 +90,16 @@
 
   function write(text) {
     if (term) term.write(text);
+  }
+
+  /* 头栏居中显示当前 SSH 目标（主进程扫描会话进程树得出，见 terminal-service）；
+     未连接 SSH 时隐藏。尺寸提示（#term-size）出现时临时让位给「列 × 行」。 */
+  function renderTitle() {
+    if (!titleEl) return;
+    titleEl.textContent = sshTitle;
+    titleEl.classList.toggle('hidden', !sshTitle);
+    // 同步到窗口标题（titleBarStyle 隐藏了系统标题，但仍用于 Window 菜单 / Mission Control）
+    document.title = sshTitle || 'Ships Terminal';
   }
 
   /* Only tell the PTY about a real size change: a redundant resize makes the shell
@@ -155,8 +168,12 @@
     if (!sizeEl || !term) return;
     sizeEl.textContent = `${term.cols}×${term.rows}`;
     sizeEl.classList.remove('hidden');
+    if (titleEl) titleEl.style.visibility = 'hidden'; // 居中位置让给「列 × 行」
     clearTimeout(sizeBadgeTimer);
-    sizeBadgeTimer = setTimeout(() => sizeEl.classList.add('hidden'), 700);
+    sizeBadgeTimer = setTimeout(() => {
+      sizeEl.classList.add('hidden');
+      if (titleEl) titleEl.style.visibility = '';
+    }, 700);
   }
 
   function applyFontSize(value) {
@@ -204,6 +221,8 @@
       return;
     }
     sessionId = result.id;
+    sshTitle = '';
+    renderTitle();
     // the PTY was created with the current size: remember it so we do not resize again
     lastCols = term.cols;
     lastRows = term.rows;
@@ -324,9 +343,16 @@
     if (!message || message.id !== sessionId || message.type !== 'data') return;
     write(message.data);
   });
+  const offSession = window.ships.terminal.onSession((message) => {
+    if (!message || message.id !== sessionId) return;
+    sshTitle = message.ssh || '';
+    renderTitle();
+  });
   const offExit = window.ships.terminal.onExit((message) => {
     if (!message || message.id !== sessionId) return;
     sessionId = '';
+    sshTitle = '';
+    renderTitle();
     if (message.type === 'error') {
       // 启动失败：留在窗口里显示原因（否则用户看不到是为什么）。
       write(`\r\n${ANSI.error}${i18n.t('terminalWin.failed', { error: message.message })}${ANSI.reset}\r\n`);
@@ -359,6 +385,31 @@
     true
   );
 
+  /* Windows cmd style quick-edit: a single right-click copies the current selection
+     when there is one (then clears it), otherwise pastes the system clipboard. There is
+     no context menu. xterm keeps its selection on right-click, so this reads it first. */
+  function pasteFromClipboard() {
+    window.ships.terminal.pasteText().then((result) => {
+      if (result && result.ok && result.text && term) {
+        term.paste(result.text);
+        term.focus();
+      }
+    });
+  }
+
+  host.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    if (!term) return;
+    const selection = term.getSelection();
+    if (selection) {
+      window.ships.terminal.copyText(selection).then(() => {
+        if (term) term.clearSelection();
+      });
+    } else {
+      pasteFromClipboard();
+    }
+  });
+
   itermBtn.addEventListener('click', () => window.ships.terminal.openIterm());
   lightClose.addEventListener('click', () => window.ships.windowControl('close'));
   lightMinimize.addEventListener('click', () => window.ships.windowControl('minimize'));
@@ -382,6 +433,7 @@
 
   window.addEventListener('beforeunload', () => {
     offZoom();
+    if (offSession) offSession();
     if (offRecalibrate) offRecalibrate();
     if (offDragActive) offDragActive();
     if (sessionId) window.ships.terminal.kill(sessionId);

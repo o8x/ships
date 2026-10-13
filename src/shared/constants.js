@@ -54,6 +54,9 @@ const IPC = {
   TERMINAL_ZOOM: 'terminal:zoom',
   TERMINAL_DATA: 'terminal:data',
   TERMINAL_EXIT: 'terminal:exit',
+  TERMINAL_SESSION: 'terminal:session',
+  TERMINAL_COPY_TEXT: 'terminal:copy-text',
+  TERMINAL_PASTE_TEXT: 'terminal:paste-text',
 
   SSH_LIST: 'ssh:list',
   SSH_CONNECT: 'ssh:connect',

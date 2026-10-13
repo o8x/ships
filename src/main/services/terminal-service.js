@@ -6,10 +6,12 @@
 // window; every session has an id so several can live at once.
 
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 const os = require('os');
 const path = require('path');
 const sshService = require('./ssh-service');
+const sshConfig = require('./ssh-config-service');
+const processTree = require('../utils/process-tree');
 const logger = require('../utils/logger');
 
 /* Packaged builds keep the app source inside app.asar, which is an archive — a
@@ -24,6 +26,9 @@ const BRIDGE = unpackedPath(path.join(__dirname, '..', 'scripts', 'pty-bridge.py
 const PYTHON_CANDIDATES = ['/usr/bin/python3', '/opt/homebrew/bin/python3', '/usr/local/bin/python3'];
 const DEFAULT_COLS = 80;
 const DEFAULT_ROWS = 24;
+// How often each session's process subtree is scanned for an open `ssh` connection.
+const SESSION_POLL_MS = 1000;
+const PS_MAX_BUFFER = 8 * 1024 * 1024;
 
 /* GUI apps inherit a minimal PATH, so probe the usual absolute locations before
    falling back to `python3` from PATH. */
@@ -42,6 +47,67 @@ function pythonBinary() {
 
 const sessions = new Map();
 let counter = 0;
+let pollTimer = null;
+let pollBusy = false;
+
+/* Turn the ssh destination token into something readable for the window title:
+   resolve a ~/.ssh/config alias to user@hostname, otherwise show the token as typed. */
+function resolveSshLabel(destination) {
+  const token = String(destination || '');
+  if (!token) return '';
+  const at = token.lastIndexOf('@');
+  const typedUser = at >= 0 ? token.slice(0, at) : '';
+  const hostPart = at >= 0 ? token.slice(at + 1) : token;
+  let host = null;
+  try {
+    host = sshConfig.list().find((entry) => entry.alias === hostPart) || null;
+  } catch (err) {
+    host = null;
+  }
+  if (!host) return token;
+  const user = typedUser || host.user || '';
+  return user ? `${user}@${host.hostName}` : host.hostName;
+}
+
+/* Once per second: snapshot the process table and report the ssh target per session.
+   Only emits when the value changes so the renderer is not spammed. */
+function pollSessions() {
+  if (!sessions.size) {
+    stopSessionPoll();
+    return;
+  }
+  if (pollBusy) return;
+  pollBusy = true;
+  execFile('/bin/ps', ['-A', '-o', 'pid=,ppid=,command='], { maxBuffer: PS_MAX_BUFFER }, (err, stdout) => {
+    pollBusy = false;
+    if (err || !stdout) return;
+    const tree = processTree.buildTree(stdout);
+    for (const entry of sessions.values()) {
+      const destination = processTree.sshTargetUnder(tree, entry.pid);
+      const label = resolveSshLabel(destination);
+      if (label === entry.sshLabel) continue;
+      entry.sshLabel = label;
+      try {
+        entry.emit({ id: entry.id, type: 'session', ssh: label || null });
+      } catch (sendErr) {
+        /* window went away: ignore */
+      }
+    }
+  });
+}
+
+function startSessionPoll() {
+  if (pollTimer) return;
+  pollTimer = setInterval(pollSessions, SESSION_POLL_MS);
+  if (pollTimer.unref) pollTimer.unref();
+  pollSessions();
+}
+
+function stopSessionPoll() {
+  if (!pollTimer) return;
+  clearInterval(pollTimer);
+  pollTimer = null;
+}
 
 function loginShell(preferred) {
   const wanted = String(preferred || '').trim();
@@ -113,7 +179,8 @@ function start(payload, emit) {
     send({ type: 'exit', code, signal });
   });
 
-  sessions.set(id, { id, child, emit, cols, rows });
+  sessions.set(id, { id, child, emit, cols, rows, pid: child.pid, sshLabel: '' });
+  startSessionPoll();
   return { ok: true, id, cols, rows, shell };
 }
 

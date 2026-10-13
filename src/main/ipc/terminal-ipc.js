@@ -3,7 +3,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { dialog } = require('electron');
+const { dialog, clipboard } = require('electron');
 const { IPC, DEFAULT_SETTINGS } = require('../../shared/constants');
 const terminal = require('../services/terminal-service');
 const settings = require('../services/settings-service');
@@ -42,10 +42,15 @@ function isOverlaySender(event) {
   return Boolean(win && !win.isDestroyed() && win.webContents.id === event.sender.id);
 }
 
+const EVENT_CHANNELS = {
+  data: IPC.TERMINAL_DATA,
+  session: IPC.TERMINAL_SESSION,
+};
+
 function emitTo(sender) {
   return (message) => {
     if (!sender || sender.isDestroyed()) return;
-    sender.send(message.type === 'data' ? IPC.TERMINAL_DATA : IPC.TERMINAL_EXIT, message);
+    sender.send(EVENT_CHANNELS[message.type] || IPC.TERMINAL_EXIT, message);
   };
 }
 
@@ -130,6 +135,22 @@ function registerTerminalIpc(ipcMain) {
     wm.forgetTerminalGeometry();
     logger.file('[terminal] settings reset to defaults');
     return { ok: true, settings: next };
+  });
+
+  /* Right-click on the terminal (Windows cmd style): copy the current selection when
+     there is one, otherwise paste the system clipboard into the running shell. Both
+     only respond to the terminal window itself. */
+  ipcMain.handle(IPC.TERMINAL_COPY_TEXT, (event, payload) => {
+    if (!isOverlaySender(event)) return { ok: false };
+    const text = String((payload && payload.text) || '');
+    if (!text) return { ok: false };
+    clipboard.writeText(text);
+    return { ok: true };
+  });
+
+  ipcMain.handle(IPC.TERMINAL_PASTE_TEXT, (event) => {
+    if (!isOverlaySender(event)) return { ok: false, text: '' };
+    return { ok: true, text: clipboard.readText() || '' };
   });
 
   /* Export: dump the xterm buffer text into a local file chosen by the user. */
