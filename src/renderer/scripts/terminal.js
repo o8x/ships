@@ -14,8 +14,7 @@
         sshFailed: '连接失败：{error}',
         linesOn: '隐藏行号',
         linesOff: '显示行号',
-        copyAll: '复制全部内容',
-        copiedAll: '已复制终端全部内容到剪贴板',
+        newWindow: '新建窗口',
         failed: '无法启动终端会话：{error}',
         noTerminal: 'xterm 未能加载，无法显示终端',
       },
@@ -26,8 +25,7 @@
         sshFailed: 'Connect failed: {error}',
         linesOn: 'Hide line numbers',
         linesOff: 'Show line numbers',
-        copyAll: 'Copy all',
-        copiedAll: 'Copied the whole terminal buffer to the clipboard',
+        newWindow: 'New window',
         failed: 'Cannot start the terminal session: {error}',
         noTerminal: 'xterm failed to load',
       },
@@ -50,7 +48,7 @@
   const linesBtn = document.getElementById('btn-lines');
   const filesBtn = document.getElementById('btn-files');
   const itermBtn = document.getElementById('btn-iterm');
-  const copyBtn = document.getElementById('btn-copy');
+  const splitBtn = document.getElementById('btn-split');
   const lightClose = document.getElementById('light-close');
   const lightMinimize = document.getElementById('light-minimize');
   const lightZoom = document.getElementById('light-zoom');
@@ -384,26 +382,14 @@
     lastRows = term.rows;
   }
 
-  function bufferText() {
-    if (!term) return '';
-    const buffer = term.buffer.active;
-    const lines = [];
-    for (let i = 0; i < buffer.length; i += 1) {
-      const line = buffer.getLine(i);
-      lines.push(line ? line.translateToString(true) : '');
-    }
-    while (lines.length && !lines[lines.length - 1]) lines.pop();
-    return `${lines.join('\n')}\n`;
-  }
-
   function renderHeader() {
     linesBtn.innerHTML = (showLines ? Icons.eyeOff : Icons.eye)(15);
     linesBtn.style.color = showLines ? 'var(--color-accent)' : '';
     linesBtn.setAttribute('data-tip', i18n.t(showLines ? 'terminalWin.linesOn' : 'terminalWin.linesOff'));
     filesBtn.innerHTML = Icons.folder(15);
     itermBtn.innerHTML = Icons.terminal(15);
-    copyBtn.innerHTML = Icons.copy(15);
-    copyBtn.setAttribute('data-tip', i18n.t('terminalWin.copyAll'));
+    splitBtn.innerHTML = Icons.split(15);
+    splitBtn.setAttribute('data-tip', i18n.t('terminalWin.newWindow'));
     // 自绘小红绿灯的符号（尺寸交给 CSS，见 #term-lights svg）
     lightClose.innerHTML = Icons.trafficClose(6);
     lightMinimize.innerHTML = Icons.trafficMinimize(6);
@@ -609,11 +595,9 @@
       fitIfNeeded(true);
     });
   }
-  if (copyBtn) {
-    copyBtn.addEventListener('click', () => {
-      // 复制全部 buffer 到剪贴板（不弹通知）。
-      window.ships.terminal.copyText(bufferText());
-    });
+  if (splitBtn) {
+    // 新开一扇终端窗口（与主面板底部栏的终端按钮行为一致）。
+    splitBtn.addEventListener('click', () => window.ships.openTerminal());
   }
 
   window.addEventListener('beforeunload', () => {

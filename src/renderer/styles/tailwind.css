@@ -427,16 +427,20 @@ body.show-lines #term-host {
   width: var(--term-header-font-size);
   height: var(--term-header-font-size);
 }
-/* SSH 下拉：按内容自适应宽度，最小 100px、最大 200px（超出用省略号）。 */
+/* SSH 下拉：按内容自适应宽度，最小 100px、最大 200px（超出用省略号）；
+   高度固定 14px，字号固定 11px（含下拉条目）。 */
 #term-actions .select-trigger {
-  font-size: var(--term-header-font-size);
-  height: max(18px, calc(var(--term-header-font-size) + 6px));
+  font-size: 11px;
+  height: 14px;
   width: auto;
   min-width: 100px;
   max-width: 200px;
 }
-/* 下拉框的箭头也跟随头栏字号缩放（否则只有文字变大、箭头不动） */
-#term-actions .select-trigger .select-chevron svg,
+/* 下拉框的箭头与字号一致 */
+#term-actions .select-trigger .select-chevron svg {
+  width: 11px;
+  height: 11px;
+}
 #file-actions .select-trigger .select-chevron svg {
   width: var(--term-header-font-size);
   height: var(--term-header-font-size);
@@ -511,6 +515,15 @@ body.term-window .select-menu .select-option svg {
 /* 条目之间留 2px 间距 */
 body.term-window .select-menu .select-option + .select-option {
   margin-top: 2px;
+}
+/* 终端窗口头栏的 SSH 下拉菜单：条目高度 14px、字号与下拉本体一致（固定 11px）。 */
+body.term-window:not(.file-window) .select-menu .select-option {
+  height: 14px;
+  font-size: 11px;
+}
+body.term-window:not(.file-window) .select-menu .select-option svg {
+  width: 11px;
+  height: 11px;
 }
 
 .xterm .xterm-viewport,
