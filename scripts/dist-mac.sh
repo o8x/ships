@@ -17,6 +17,10 @@ if [ -n "${CSC_LINK:-}${APPLE_ID:-}${CSC_NAME:-}" ]; then
 else
   echo "[sign] no formal signing; ad-hoc signing after pack"
   export CSC_IDENTITY_AUTO_DISCOVERY=false
+  # CI may pass these as empty strings; an empty-but-defined CSC_LINK still makes
+  # electron-builder attempt (and fail) to sign, so clear them entirely.
+  unset CSC_LINK CSC_KEY_PASSWORD CSC_NAME
+  unset APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
 fi
 
 # --publish never: releases are published by CI (softprops/action-gh-release),
