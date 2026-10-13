@@ -7,9 +7,17 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore
+    # Major bumps (e.g. Tailwind v4, Electron majors) usually need manual work;
+    # keep them out of the automatic queue.
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     commit-message:
       prefix: chore
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
