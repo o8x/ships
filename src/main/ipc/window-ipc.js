@@ -9,8 +9,11 @@ const {
   getMainWindow,
   getSettingsWindow,
   getTerminalWindow,
+  isTerminalWindow,
   openTerminalWindow,
   closeTerminalWindow,
+  getFileWindow,
+  openFileWindow,
 } = require('../window-manager');
 
 function registerWindowIpc(ipcMain) {
@@ -21,7 +24,7 @@ function registerWindowIpc(ipcMain) {
     if (!win || win.isDestroyed()) return { ok: false, action };
     if (action === 'close') {
       // 终端窗口：按「关闭按钮行为」隐藏或销毁；其它窗口照旧关闭
-      if (getTerminalWindow() === win) closeTerminalWindow();
+      if (isTerminalWindow(win)) closeTerminalWindow(win);
       else win.close();
       return { ok: true, action };
     }
@@ -45,13 +48,16 @@ function registerWindowIpc(ipcMain) {
   ipcMain.on(IPC.WINDOW_CLOSE_SETTINGS, () => closeSettingsWindow());
 
   ipcMain.handle(IPC.DEVTOOLS_OPEN, (_event, target) => {
-    // target: 'main'（悬浮面板）/ 'settings' / 'terminal'（置顶终端窗口，未打开则先打开）
+    // target: 'main'（悬浮面板）/ 'settings' / 'terminal'（置顶终端窗口）/ 'file'（独立文件窗口）；
+    // 未打开时先打开对应窗口。
     const win =
       target === 'settings'
         ? getSettingsWindow()
         : target === 'terminal'
           ? getTerminalWindow() || openTerminalWindow()
-          : getMainWindow();
+          : target === 'file'
+            ? getFileWindow() || openFileWindow()
+            : getMainWindow();
     if (!win) return { ok: false };
     if (target !== 'settings') win.show();
     win.webContents.openDevTools({ mode: 'detach' });

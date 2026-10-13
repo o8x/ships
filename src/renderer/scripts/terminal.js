@@ -42,6 +42,7 @@
      （滚轮时标题跟着上下动）。父元素无内边距时测量值即真实可用区。 */
   const host = document.getElementById('term-fit');
   const hostBox = document.getElementById('term-host');
+  const filesBtn = document.getElementById('btn-files');
   const topBtn = document.getElementById('btn-top');
   const itermBtn = document.getElementById('btn-iterm');
   const exportBtn = document.getElementById('btn-export');
@@ -49,7 +50,6 @@
   const lightMinimize = document.getElementById('light-minimize');
   const lightZoom = document.getElementById('light-zoom');
   const sizeEl = document.getElementById('term-size');
-  const titleEl = document.getElementById('term-title');
 
   let term = null;
   let fit = null;
@@ -68,8 +68,11 @@
   let lastMetricsKey = '';
   // 主进程标记「正在拖动窗口」：期间一律不发对齐请求（中途改尺寸会打乱 macOS 拖拽跟踪）
   let dragSuspected = false;
-  // 当前会话检测到的 SSH 目标（主进程每秒扫一次进程树得出）；空串 = 未连接 SSH
-  let sshTitle = '';
+  // 当前会话检测到的 SSH 原始目标（主进程每秒扫进程树得出）；空串 = 未连接 SSH。
+  // 只用于启用文件按钮与连接文件面板，不在头栏显示（需求：隐藏头栏 ssh 信息）。
+  let sshTarget = '';
+  // 底部文件面板（SFTP）控制器
+  let filesApi = null;
 
   function themeColors() {
     // macOS-like overlay scrollbar (only a safety net: the scrollbar is hidden below)
@@ -92,14 +95,80 @@
     if (term) term.write(text);
   }
 
-  /* 头栏居中显示当前 SSH 目标（主进程扫描会话进程树得出，见 terminal-service）；
-     未连接 SSH 时隐藏。尺寸提示（#term-size）出现时临时让位给「列 × 行」。 */
-  function renderTitle() {
-    if (!titleEl) return;
-    titleEl.textContent = sshTitle;
-    titleEl.classList.toggle('hidden', !sshTitle);
-    // 同步到窗口标题（titleBarStyle 隐藏了系统标题，但仍用于 Window 菜单 / Mission Control）
-    document.title = sshTitle || 'Ships Terminal';
+  /* 文件夹按钮随文件面板的状态变化：无 ssh 目标时禁用、连接中变暗、展开时高亮。 */
+  function applyFilesState(state) {
+    if (!filesBtn) return;
+    filesBtn.disabled = !state.enabled;
+    filesBtn.style.opacity = state.enabled ? '' : '0.4';
+    filesBtn.style.color = state.open ? 'var(--color-accent)' : '';
+    filesBtn.classList.toggle('loading', Boolean(state.connecting));
+  }
+
+  /* 在终端会话里执行 `cd <path>`（文件面板路径行的「在终端 cd 到此目录」）。 */
+  function shellQuote(value) {
+    const text = String(value || '');
+    if (/^[A-Za-z0-9_@%+=:,./~-]+$/.test(text)) return text;
+    return `'${text.replace(/'/g, `'\\''`)}'`;
+  }
+
+  function cdInTerminal(path) {
+    if (!sessionId || !path) return;
+    window.ships.terminal.input(sessionId, `cd ${shellQuote(path)}\r`);
+    if (term) term.focus();
+  }
+
+  /* 跟踪用户在终端里输入的命令行：提交的命令若是纯 `cd …`，且文件面板已展开，
+     就让它跟随到该目录（路径不存在时静默不变）。 */
+  let typedLine = '';
+  /* 读取 xterm 当前行「光标之前」的文本：既包含 shell 回显 / Tab 补全后的真实命令，
+     又排除光标之后的自动建议（zsh autosuggestion 之类的灰色提示）。 */
+  function currentLineText() {
+    if (!term) return '';
+    const buffer = term.buffer.active;
+    const line = buffer.getLine(buffer.baseY + buffer.cursorY);
+    if (!line) return '';
+    return line.translateToString(false, 0, buffer.cursorX);
+  }
+
+  /* 去掉提示符，取出提示符之后的命令部分（最后一个 # / $ / % / > 之后）。 */
+  function commandFromRendered(rendered) {
+    const text = String(rendered || '');
+    let index = -1;
+    for (const marker of ['# ', '$ ', '% ', '> ']) {
+      const at = text.lastIndexOf(marker);
+      if (at > index) index = at;
+    }
+    return (index >= 0 ? text.slice(index + 2) : text).trim();
+  }
+
+  function submitLine(line) {
+    // 以终端当前行（回显后的真实内容，含 Tab 补全）为准；解析不出再退回键入跟踪。
+    const rendered = commandFromRendered(currentLineText());
+    const candidate = /^\s*cd(?:\s|$)/.test(rendered) ? rendered : line;
+    const match = /^\s*cd(?:\s+(.*))?\s*$/.exec(candidate || '');
+    if (!match || !filesApi) return;
+    filesApi.followCd(match[1] == null ? '' : match[1]);
+  }
+  function trackLine(data) {
+    // 跳过 ANSI 转义序列（箭头 / 括号粘贴 \x1b[200~ 等），否则会污染命令行。
+    for (let i = 0; i < data.length; i += 1) {
+      const ch = data[i];
+      if (ch === '\u001b') {
+        i += 1;
+        while (i < data.length && !/[A-Za-z~]/.test(data[i])) i += 1;
+        continue;
+      }
+      if (ch === '\r' || ch === '\n') {
+        submitLine(typedLine);
+        typedLine = '';
+      } else if (ch === '\u007f' || ch === '\b') {
+        typedLine = typedLine.slice(0, -1);
+      } else if (ch === '\u0003' || ch === '\u0015') {
+        typedLine = '';
+      } else if (ch >= ' ') {
+        typedLine += ch;
+      }
+    }
   }
 
   /* Only tell the PTY about a real size change: a redundant resize makes the shell
@@ -147,6 +216,9 @@
   function snapExactSize() {
     if (!term || !term.rows || !host) return;
     if (dragSuspected) return; // 拖动中：等松手（鼠标回到内容区）后再对齐
+    // 文件面板打开时不做整格对齐：面板高度是窗口的百分比，收窗口会让面板跟着变、
+    // 终端可用高度并非等量减少，会与对齐互相牵动导致窗口持续缩水。
+    if (filesApi && filesApi.isOpen()) return;
     const rowsEl = host.querySelector('.xterm-rows');
     const firstRow = rowsEl && rowsEl.firstElementChild;
     const cellHeight = firstRow ? firstRow.getBoundingClientRect().height : 0;
@@ -168,12 +240,8 @@
     if (!sizeEl || !term) return;
     sizeEl.textContent = `${term.cols}×${term.rows}`;
     sizeEl.classList.remove('hidden');
-    if (titleEl) titleEl.style.visibility = 'hidden'; // 居中位置让给「列 × 行」
     clearTimeout(sizeBadgeTimer);
-    sizeBadgeTimer = setTimeout(() => {
-      sizeEl.classList.add('hidden');
-      if (titleEl) titleEl.style.visibility = '';
-    }, 700);
+    sizeBadgeTimer = setTimeout(() => sizeEl.classList.add('hidden'), 700);
   }
 
   function applyFontSize(value) {
@@ -184,9 +252,11 @@
     syncPtySize();
   }
 
-  /* 头栏（SSH 下拉等）字号跟随终端字号；高度交给 CSS 的 max(32px, 字号 + …) 兜底。 */
+  /* 头栏（SSH 下拉等）字号 = 终端字号 + 1（永远比终端设置大 1px）；
+     文件面板文字字号 = 终端字号。Cmd +/-、设置里的字体大小都会作用到它们。 */
   function applyHeaderFontSize(value) {
-    document.documentElement.style.setProperty('--term-header-font-size', `${value}px`);
+    document.documentElement.style.setProperty('--term-header-font-size', `${value + 1}px`);
+    document.documentElement.style.setProperty('--file-font-size', `${value}px`);
   }
 
   /* 字号来源有两处：设置 → 终端（写回设置，这里跟随）与 Cmd + / Cmd -（临时）。
@@ -221,8 +291,8 @@
       return;
     }
     sessionId = result.id;
-    sshTitle = '';
-    renderTitle();
+    sshTarget = '';
+    if (filesApi) filesApi.setSshTarget('');
     // the PTY was created with the current size: remember it so we do not resize again
     lastCols = term.cols;
     lastRows = term.rows;
@@ -241,6 +311,7 @@
   }
 
   function renderHeader() {
+    filesBtn.innerHTML = Icons.folder(15);
     topBtn.innerHTML = alwaysOnTop ? Icons.pin(15) : Icons.pinOff(15);
     topBtn.style.color = alwaysOnTop ? 'var(--color-accent)' : '';
     itermBtn.innerHTML = Icons.terminal(15);
@@ -333,6 +404,7 @@
     });
     observer.observe(hostBox || host);
     term.onData((data) => {
+      trackLine(data);
       if (sessionId) window.ships.terminal.input(sessionId, data);
       else startSession();
     });
@@ -345,14 +417,14 @@
   });
   const offSession = window.ships.terminal.onSession((message) => {
     if (!message || message.id !== sessionId) return;
-    sshTitle = message.ssh || '';
-    renderTitle();
+    sshTarget = message.target || '';
+    if (filesApi) filesApi.setSshTarget(sshTarget);
   });
   const offExit = window.ships.terminal.onExit((message) => {
     if (!message || message.id !== sessionId) return;
     sessionId = '';
-    sshTitle = '';
-    renderTitle();
+    sshTarget = '';
+    if (filesApi) filesApi.setSshTarget('');
     if (message.type === 'error') {
       // 启动失败：留在窗口里显示原因（否则用户看不到是为什么）。
       write(`\r\n${ANSI.error}${i18n.t('terminalWin.failed', { error: message.message })}${ANSI.reset}\r\n`);
@@ -410,6 +482,20 @@
     }
   });
 
+  /* 文件面板：头部文件夹按钮显隐底部面板；SFTP 连接跟随当前 ssh 目标。 */
+  if (filesBtn) {
+    filesBtn.disabled = true;
+    filesBtn.style.opacity = '0.4';
+    filesBtn.setAttribute('data-tip', i18n.t('terminalFiles.button'));
+    filesBtn.addEventListener('click', () => {
+      if (filesApi) filesApi.toggle();
+    });
+  }
+  filesApi =
+    window.ShipsTerminalFiles && filesBtn
+      ? window.ShipsTerminalFiles.mount({ onStateChange: applyFilesState, onCd: cdInTerminal })
+      : null;
+
   itermBtn.addEventListener('click', () => window.ships.terminal.openIterm());
   lightClose.addEventListener('click', () => window.ships.windowControl('close'));
   lightMinimize.addEventListener('click', () => window.ships.windowControl('minimize'));
@@ -434,6 +520,7 @@
   window.addEventListener('beforeunload', () => {
     offZoom();
     if (offSession) offSession();
+    if (filesApi) filesApi.closeConnection();
     if (offRecalibrate) offRecalibrate();
     if (offDragActive) offDragActive();
     if (sessionId) window.ships.terminal.kill(sessionId);

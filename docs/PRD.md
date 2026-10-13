@@ -87,15 +87,17 @@ Ships/
     │   ├── main.js              # 应用入口：单实例、Dock 隐藏、注册 IPC、创建托盘
     │   ├── tray.js              # 托盘图标与右键菜单
     │   ├── window-manager.js    # 主面板 / 设置窗口 / 置顶终端窗口的创建、定位、几何记忆、显隐、广播
-    │   ├── ipc/                 # IPC 处理器（app / settings / window / ssh / geo / clipboard / hash / net-test / terminal）
+    │   ├── ipc/                 # IPC 处理器（app / settings / window / ssh / geo / clipboard / hash / net-test / terminal / sftp / file-window）
     │   ├── scripts/             # pty-bridge.py（PTY 桥接，交互终端用；打包时经 build.asarUnpack 解包到 app.asar.unpacked）
-    │   ├── services/            # settings / ssh-config / ssh / ssh-browse / iterm / terminal / hotkey / geo / clipboard / hash 服务
-    │   └── utils/               # logger / json-store / paths / ls-listing（远端 `ls -l` 解析）/ utf8（UTF-8 保真解码 + 非法字节转义）/ net-test（网络测试命令与校验）/ window-geometry（终端窗口几何记忆的纯计算）/ process-tree（终端会话进程树里找 ssh 目标）
+    │   ├── services/            # settings / ssh-config / ssh / iterm / terminal / sftp（文件管理 SFTP 会话）/ layout（文件管理布局）/ hotkey / geo / clipboard / hash 服务
+    │   └── utils/               # logger / json-store / paths / utf8（UTF-8 保真解码 + 非法字节转义）/ net-test（网络测试命令与校验）/ window-geometry（终端窗口几何记忆的纯计算）/ process-tree（终端会话进程树里找 ssh 目标）
     ├── preload/                 # main-preload.js / settings-preload.js / icons.js（assets/icons/*.svg）/ flags.js（assets/flags/*.svg）
     └── renderer/
         ├── index.html           # 托盘主面板
         ├── settings.html        # 设置窗口
-        ├── scripts/             # theme / i18n / ui / registry / tool-order / app / settings
+        ├── terminal.html        # 置顶终端窗口（含内嵌文件面板）
+        ├── file-window.html     # 独立文件窗口
+        ├── scripts/             # theme / i18n / ui / registry / tool-order / app / settings / terminal（置顶终端）/ terminal-files（内嵌面板宿主）/ file-manager（文件管理 UI）/ file-window（独立文件窗口）
         │   ├── tools/           # 每个工具一个文件，注册进 ShipsToolRegistry
         │   └── settings/        # 设置分区，注册进 ShipsSettingsRegistry
         └── styles/              # constants.css（设计变量）+ tailwind.css（入口）
@@ -166,15 +168,9 @@ Ships/
 
 ---
 
-### 3.7 SSH 目录浏览（仅主面板）
+### 3.7 远端文件（独立文件窗口）
 
-1. **入口**：主面板「SSH 管理」每行的 `folder` 图标（`ssh:list-dir` 不传 `path`）；设置窗口无此入口。顶栏在「返回主机列表」「上一级」右侧另有 `/root`、`/tmp` 两个**图标按钮**（无文字，悬浮提示「进入 <path>」）：`/root` 用小房子 `home.svg`、`/tmp` 用「带时钟的文件」`temp-file.svg`；列表来自 `src/renderer/scripts/constants.js` 的 `SSH_QUICK_PATHS`（`[{ path, icon }, …]`，按顺序渲染，可增删改），点击直接进入该目录。
-2. **起始目录**：主进程读取 `ssh-browse.json` 中该主机的「上次打开的目录」，列出它的**父目录**（父目录列表中该目录**整行高亮**：强调色淡底 + 淡描边，文件名加粗并带「上次」标签）；无记录时列出 `~`。
-3. **列目录**：复用或新建该主机的 ssh2 连接，执行 `sh -c 'cd <dir> 2>/dev/null || exit 3; pwd -P || exit 4; LC_ALL= LC_TIME=C ls -l --quoting-style=literal 2>/dev/null || LC_ALL= LC_TIME=C ls -l || exit 5'`（外层用 `sh -c` 包一层，远端登录 shell 是 fish / csh 等非 POSIX shell 也不会失败；`--quoting-style=literal` 是 GNU 选项，BSD/macOS 上自动回退普通 `ls -l`，避免文件名被 shell 转义）；`pwd -P` 给出绝对路径，`ls -l` 解析为 `{ name, type: dir|file|link|other, size, target? }`。**排序 = 远端 `ls` 顺序 + 文件夹优先**：先按远端 `ls` 的输出顺序排列，再做一次**稳定分区**（`ls-listing.js` 的 `dirsFirst`）把目录整体提到最前面，组内顺序与 `ls` 完全一致、不按名称重排（日期字段固定为 C 语言以便解析，组内顺序仍由远端 locale 决定——远端 session 无 locale 时即 C 字节序，如 `Makefile` 在 `app` 之前；有 `en_US.UTF-8` 等 locale 时按该 locale 排序，如 `app` 在 `Dockerfile` 之前）；**`.` / `..` 与空白名一律忽略**（不显示、不计数）；**以 `.` 开头的隐藏项不列出**（`ls -l` 不含 `-A`）；单个目录最多 2000 条（按 `ls` 顺序截断），超出置 `truncated` 并提示「目录过大，仅显示部分内容」。**输出按 UTF-8 保真解码**（`src/main/utils/utf8.js` 的 `decodeUtf8WithEscapes`）：合法 UTF-8 原样保留，无法解码的字节、C0/C1 控制字符与 DEL 显示为 `\xNN`（换行 / 制表符保留，它们是输出的结构），因此坏字节呈现为 `oU\xd9\xfa\x7f` 而不再是 `�`；代价是这类名字无法原样回传（SSH 命令通道是字符串），进入这种目录会失败并以红闪提示。
-4. **导航**：双击目录行 / **单击目录前的三角** / 点 `/root`、`/tmp` 快捷按钮 / 在路径栏回车 → 进入该目录并列下一级（`remember: true`，把该目录记为该主机的「上次打开的目录」）；顶栏「上一级」按父目录上跳（**不修改记录**）；「返回主机列表」回到主机列表；已处于 `/` 时「上一级」禁用。**路径栏可编辑**：输入后回车进入 —— 绝对路径 / `~` 原样提交，其它按「相对当前目录」解析（当前 `/tmp` 时输入 `www` → `/tmp/www`）；成功时输入框规范化为服务端返回的绝对路径，失败（目录不存在 / 无权限 / 连不上）**不进入**：**不显示任何文案、不改变布局**，保留原列表与已输入内容，只让路径框按 `ships-blink-error` **红闪 3 次**（0.24s × 3；边框 + 底色变红后自动恢复，动画结束即移除 `.blink-error`）；只有**首次加载就没有任何目录可显示**时，才在提示行显示 `无法打开目录：… · <输入的路径>`；`Esc` 或失焦恢复当前目录。
-5. **打开终端并进入该目录**：**目录**条目悬浮时右侧出现 `terminal` 图标 → `ssh:open-dir` → 记录该目录，并执行 `ssh [-p 端口] [-i 私钥] [-J 跳板机] -t [user@]host 'cd <dir>; exec ${SHELL:-/bin/sh} -l'`（**选项 → 目标主机 → 远端命令**的顺序；登录 shell 直接落在该目录，等价于连上后手打 `cd <dir>`；`cd` 失败也仍会进入登录 shell）。命令由 `ssh-service.buildOpenAtCommand()` 拼装，**执行位置与 §3.4 的 SSH 连接同一个开关**：`settings.sshBuiltinTerminal` 为真（默认）时注入**置顶终端窗口**（窗口未打开则先打开），关掉才开 iTerm 新窗口。条目**单击无任何效果**；**文件没有任何操作**（不出现悬浮图标、双击也不响应），只显示名称与体积。条目图标按类型取：目录 `folder.svg`；文件按 `src/renderer/scripts/constants.js` 的 `FILE_TYPE_ICONS`（扩展名）/ `FILE_NAME_ICONS`（无扩展名的文件名，如 Makefile）映射到 code / braces / terminal / doc / image / play / archive，未命中用 `file.svg`。
-6. **连接复用**：每台主机缓存一条 ssh2 连接（`keepaliveInterval = 15000ms`），空闲 **2 分钟**关闭；命令超时 20s，执行失败时丢弃连接并用新连接**重试一次**；应用退出（`before-quit`）时全部关闭。
-7. **失败提示**：连接失败 / 无权限 / 目录不存在等在主面板内红字提示（`无法打开目录：…`），并写入 `ships.log`。
+主面板不再内嵌目录浏览：**SSH 管理**每行的 `folder` 图标改为**打开独立文件窗口**（§3.9-11）并自动连接该主机（`file-window:open`，`target` = 主机别名）。原来的主面板目录浏览（`ssh:list-dir` / `ssh:open-dir` / `ssh-browse-service` / `ls-listing` / `ssh-browse.json`）已整体移除。远端目录 / 文件的浏览、下载、上传统一由**文件管理**（§3.9-10 内嵌面板、§3.9-11 独立窗口）经 SFTP 提供。
 
 ---
 
@@ -196,10 +192,10 @@ Ships/
 
 ### 3.9 置顶终端窗口（Steam 式悬浮）
 
-1. **入口**：主面板底部栏最左侧的**终端图标**（`terminal`，始终打开 / 聚焦）、**全局快捷键**（§3.9-8，已展示且在前台时按 = **隐藏**，再按 = 重新显示，会话不丢）、或由 **SSH 连接**（§3.4）自动拉起。
+1. **入口与多窗口（Steam 式独立）**：主面板底部栏的**终端图标**（`terminal`）**每次点击都新开一扇独立的终端窗口**，落在**当前桌面 / 鼠标所在屏幕**（`terminal:open` → `openTerminalWindow()`；几何沿用 `terminal-window.json` 记忆）。**窗口一旦打开就永远留在那个桌面**——不同桌面可以同时存在多扇终端，且**绝不**把别的桌面上已打开的窗口拉过来（已移除原来的「先 true 再 false」跨桌面拉取）。**全局快捷键**（§3.9-8）在当前终端前台时按 = **隐藏**，否则新开一扇。**SSH 连接**（§3.4）注入命令到**当前聚焦的终端**；没有聚焦的终端时新开一扇。多扇终端窗口各自持有独立的会话、文件面板与 SFTP 连接（按 webContents 归属）。
 2. **窗口**：默认 **1024 × 768**（`ships.terminalWindow.width/height`，**可在 设置 → 终端 → 窗口大小 调整**，见 §5.1；`terminalWindowWidth` / `terminalWindowHeight`），可缩放、最小 `ships.terminalWindow.minWidth × minHeight` = 480×320；改设置立即 `setSize`，手动拖动窗口（非最大化 / 全屏）防抖 400ms 写回设置。`titleBarStyle: hiddenInset`，但**系统红绿灯由主进程 `setWindowButtonVisibility(false)` 隐藏**，头栏左侧改为**自绘小红绿灯**；终端内容**四边不留边距**（`--term-padding-y: 0`，终端铺满整个窗口 —— `vim` 之类的全屏程序四周不会出现白边）；窗口可自由拉伸，**拖动过程中不干预**（下边框严格跟手、绝不中途改尺寸），松手后按实测余量把窗口对齐到整格（见下条）。
-   - **头栏（`#term-header`，默认 22px）**：左侧自绘小红绿灯（9px 圆点 ×3，**左边距 12px** = 第一个圆点到窗口左边缘的距离；悬浮符号 `×` / `−` / `⤢`，颜色取 `--traffic-*`；悬浮任意一个时三个都显示符号，窗口失焦时整体变灰并隐藏符号 —— 与系统观感一致），点击分别调 `window:control` 的 `close` / `minimize` / `zoom`（只作用于发起窗口）；**不显示固定窗口标题**，仅在检测到 SSH 连接时于**中间居中显示当前 SSH 目标**（`#term-title`，见下条），右侧图标区（**SSH 主机下拉** + **置顶开关** `pin` / `pin-off`、**在 iTerm 中打开并关闭此窗口**、**导出终端文本**，距右边缘 12px）。头部不挂 `data-tip` 悬浮提示，为拖拽区（红绿灯与图标区为 `no-drag`）。
-   - **头栏尺寸随终端字号缩放**：字号取 CSS 变量 `--term-header-font-size`（`styles/constants.css` 定义、`terminal.js` 的 `applyFontSize()` 在改设置 / `Cmd +`/`Cmd -`/`Cmd 0` 缩放时写入）；头栏高 `max(22px, 字号 + 6px)`、图标按钮 `字号 + 6px`（符号 `字号`）、SSH 下拉宽 **130px** / 字号 `字号` / 高 `max(18px, 字号 + 6px)` 且在头栏内**上下居中**。默认 12px → 头栏 22px、按钮 18px、下拉 130×18px；24px → 30px / 30px / 130×30px。下拉菜单（挂在 `body` 上）同宽 130px、**条目高度与下拉本体一致**且**条目之间留 2px**，字号同样跟随。
+   - **头栏（`#term-header`，默认 22px）**：左侧自绘小红绿灯（**尺寸随头栏字号缩放**：`--traffic-size = 字号 × 0.75`、`--traffic-glyph-size = 字号 × 0.5`，12px 字号 = 9px 圆点 / 6px 符号；**左右 padding 均为 10px**：左边距 10px = 第一个圆点到窗口左边缘的距离、右侧图标区距右边缘 10px；悬浮符号 `×` / `−` / `⤢`，颜色取 `--traffic-*`；悬浮任意一个时三个都显示符号，窗口失焦时整体变灰并隐藏符号 —— 与系统观感一致），点击分别调 `window:control` 的 `close` / `minimize` / `zoom`（只作用于发起窗口）；**不显示任何标题文字**（当前 SSH 信息仅用于内部逻辑，不在头栏显示，见下条），右侧图标区（**SSH 主机下拉** + **文件** `folder`、**置顶开关** `pin` / `pin-off`、**在 iTerm 中打开并关闭此窗口**、**导出终端文本**）。头部不挂 `data-tip` 悬浮提示，为拖拽区（红绿灯与图标区为 `no-drag`）。
+   - **头栏尺寸随终端字号缩放（永远 = 终端字号 + 1px）**：字号取 CSS 变量 `--term-header-font-size`（`styles/constants.css` 定义、`terminal.js` 的 `applyFontSize()` 在改设置 / `Cmd +`/`Cmd -`/`Cmd 0` 缩放时写入为 `终端字号 + 1`）；头栏高 `max(22px, 字号 + 6px)`、图标按钮 `字号 + 6px`（符号 `字号`）、SSH 下拉宽 **130px** / 字号 `字号` / 高 `max(18px, 字号 + 6px)` 且在头栏内**上下居中**，下拉箭头也随字号缩放。默认终端 12px → 头栏字号 13px、高 22px、按钮 18px、下拉 130×18px；终端 24px → 25px / 30px / 30px / 130×30px。下拉菜单（挂在 `body` 上）同宽 130px、**条目高度与下拉本体一致**且**条目之间留 2px**，字号同样跟随。
    - **头部 SSH 下拉**（图标区最左）：列出 `~/.ssh/config` 里的主机，条目文本为 `用户名@主机地址`（无 `User` 时只显示主机地址），首项为占位「SSH」；选中任意主机 → `ssh:connect`（带 `inTerminal: true`）→ 由主进程用 `ssh-service.buildCommand()` 拼 `ssh [-p 端口] [-i 私钥] [-J 跳板机] [user@]host` 并**注入当前终端会话**（等价于在这个终端里手敲 `ssh …`，不新建会话、不重建窗口、不弹 iTerm —— 因此也不受「SSH 使用内置终端连接」开关影响）；**同一台主机可以重复选**（每次选择都重新执行，便于断开后重连）。下拉**禁用**并降低不透明度当 `~/.ssh/config` 里没有主机；主机列表在窗口启动与 `settings:changed` 广播时重新读取。控件用 `select-compact`，默认 **130 × 18px**，与头部 18×18 图标按钮同一观感。
    - **屏幕 / 位置 / 尺寸记忆**（`terminal-window.json`，单槽）：打开、移动、缩放、关闭时把「所在屏幕 + 位置 + 尺寸」写入 `terminal-window.json`（关闭前同步落盘，拖动后立刻关窗也不会丢；写盘读窗口**此刻**的真实几何，程序化改尺寸不会被旧快照覆盖）。下次打开时：**该屏幕还在**（`id` + `scaleFactor` + `bounds` 全一致）→ 应用记忆的位置与尺寸（越界部分夹回该屏幕工作区，整窗可见）；**换屏 / 拔掉外接屏 / 分辨率或排列变了 / 无记录** → 用设置里的默认尺寸在当前屏幕（鼠标所在屏幕）工作区内居中。屏幕签名一致才复用，是因为分辨率 / 排列变化后记忆里的绝对坐标不再是同一块屏幕上的同一位置。
 3. **置顶与全屏**：默认置顶（`ships.terminalWindow.alwaysOnTop` / `settings.terminalAlwaysOnTop`，缺省为开；`alwaysOnTop` 且 `setAlwaysOnTop(true, 'screen-saver')`）。头部图钉按钮可**取消置顶**：写回 `terminalAlwaysOnTop=false`，只降窗口层级，全屏辅助与「不跟随桌面切换」的行为不变，再点一下恢复（`terminal:set-top`，见 §5.2）。**该开关只作用于终端窗口，不影响主面板**（面板恒定置顶，见 §8.1）。空格行为是 `setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true })` = `NSWindowCollectionBehaviorDefault | FullScreenAuxiliary` —— **带全屏辅助、但不加入所有桌面**：可以浮在（当前桌面里的）全屏应用之上，同时**不会跟随桌面切换**，始终留在打开它的那个桌面；再次从托盘打开时用「先 true 再 false」把窗口拉到当前桌面。三处调用都带 `skipTransformProcessType: true`（应用已是 `LSUIElement` 菜单栏 Agent，无需进程类型转换，转换会短暂隐藏窗口 / Dock 并改变激活行为）。iTerm 会强制切桌面，所以 SSH 连接改走这里。
@@ -210,7 +206,7 @@ Ships/
    - **尺寸测量**：xterm 挂在**无内边距**的 `#term-fit`（`h-full w-full`）里，留白由外层 `#term-host`（四边 0）提供 —— `FitAddon` 按「父元素的 border box 高度」算行数，若父元素自带内边距会把可用高度多算一份内边距（默认窗口下多算 19.5px ≈ 1 行），于是最后一行被裁掉大半行、页面还多出几像素可滚动高度（滚轮时标题跟着上下动）；父元素无内边距时测量值即真实可用区。`#term-host` 与页面根容器另加 `overflow: hidden` 兜底：即使残留绝对定位元素（如 xterm 的 `xterm-helper-textarea`）越界，也不会让页面可滚动。
     - **字号缩放**：按 `Cmd + =` / `Cmd + -` 只改终端字号（8–24px，初始值取设置里的字体大小），标题栏与图标不缩放（实现见 §5.3）；`Cmd + 0` 复位到设置值。**在 设置 → 终端 改字体大小会即时生效**：终端窗口也在 `settings:changed` 广播名单里（`window-manager.broadcast`），只有设置值本身变化时才覆盖当前字号，临时缩放不会被别的设置变更顶掉。
     - **右键快速编辑（Windows cmd 风格）**：终端内容区**单击右键**即完成复制 / 粘贴，**不弹右键菜单**。有选区时右键 = **复制选区到系统剪贴板并清除选区**（`terminal:copy-text`）；无选区时右键 = **把系统剪贴板文本粘贴进当前 shell**（`terminal:paste-text`，经 `term.paste()` 注入，遵循 bracketed paste 与 `\n → \r` 转换）并让终端重新获得焦点；无会话时粘贴忽略。仅在终端内容区（`#term-fit`）生效，头栏不受影响，且请求只接受来自终端窗口本身。
-    - **当前 SSH 会话标题**：头栏**居中显示当前连接到的 SSH 目标**（`#term-title`，等宽小字、`pointer-events: none`、超长省略，位置与「列 × 行」提示重合），未连接时隐藏。检测方式与来源无关：`terminal-service` 每秒用 `/bin/ps -A -o pid=,ppid=,command=` 取一次进程表，在**该会话进程树**（会话根 = `pty-bridge.py`，其子进程 = 登录 shell）里广度优先找**最近的 `ssh` 进程**，取命令里第一个非选项参数作为目标（`ssh -p 22 user@host` → `user@host`；`sshpass`/`autossh` 也会落到其 `ssh` 子进程）。目标命中 `~/.ssh/config` 的别名时解析成 `user@hostname`（`user` 取命令行里的、缺省时取配置里的），否则原样显示命令行里的目标。因此**手动敲 `ssh …`、头部 SSH 下拉、目录浏览连接**三种方式都能被识别；值变化时经 `terminal:session` 事件推给渲染层（仅变化时推送），会话结束 / `exit` 后清空；同一值也写入 `document.title`（`Ships Terminal` / 目标名 —— 系统标题栏已隐藏，但 Window 菜单与 Mission Control 会用到）。**拖动 / 缩放期间**「列 × 行」尺寸提示出现时标题临时让位、停手后恢复。
+    - **当前 SSH 目标检测（不在头栏显示）**：`terminal-service` 每秒用 `/bin/ps -A -o pid=,ppid=,command=` 取一次进程表，在**该会话进程树**（会话根 = `pty-bridge.py`，其子进程 = 登录 shell）里广度优先找**最近的 `ssh` 进程**，取命令里第一个非选项参数作为目标（`ssh -p 22 user@host` → `user@host`；`sshpass`/`autossh` 也会落到其 `ssh` 子进程）。目标同时给出显示标签（命中 `~/.ssh/config` 别名时解析成 `user@hostname`）与**原始目标 token**；值变化时经 `terminal:session` 事件推给渲染层（仅变化时推送），会话结束 / `exit` 后清空。该目标**不显示在头栏**，仅用于：启用/禁用头部**文件按钮**、驱动内嵌文件面板与独立文件窗口的 SFTP 连接。手动敲 `ssh …`、头部 SSH 下拉两种方式都能被识别。
    - **无留白与整格对齐**：终端主体 `#term-host` `padding: var(--term-padding-y) 0` = **0**（四边都不留白；`#term-fit` 仍是无内边距的那层，保证 `FitAddon` 量到真实可用区）。窗口尺寸保持在「行高 / 列宽的整数倍 + chrome」：
      - **列数自己算**：`FitAddon` 只要 `scrollback > 0` 就固定预留 14px（给 overview ruler），会让终端比窗口窄、右侧空出一条白边（我们本来就隐藏滚动条）。`fitIfNeeded()` 里 `fit.fit()` 之后按实测单元格宽度重新 `term.resize(cols, rows)`，列数铺满可用宽度。
      - **拖动期间一律不改窗口尺寸**：不用 `will-resize` 拦截、也不 `setBounds`（中途改帧会打乱 macOS 的增量拖拽跟踪 → 越拖越小 / 反复跳变）。`will-resize` 只用来标记「正在拖动」并广播 `terminal:drag-active`；渲染层收到后**不再发对齐请求**（请求即使到了主进程也只会被挂起），下边框严格跟手。
@@ -220,12 +216,22 @@ Ships/
 
 5. **导出**：头部导出图标把 xterm 缓冲区文本（含回滚）写入本地文件 —— 系统保存对话框，默认文件名 `ships-terminal-<时间戳>.txt`，成功后在终端里回显路径。
 6. **iTerm 交接**：头部终端图标调用 `iterm-service.openCommand()` 在 iTerm 中重放**最后一次由外部注入的命令**（例如 SSH 连接 / 网络测试命令；没有则开一个登录 shell），成功后关闭当前终端窗口。
-7. **SSH 连接与目录浏览都改走这里**：`ssh:connect`（§3.4）与 `ssh:open-dir`（§3.7）默认都不打开 iTerm，而是打开/聚焦该终端窗口并把 `ssh …` 命令注入其中，失败时才提示错误；两者都受 设置 → 终端 →「SSH 使用内置终端连接」（`settings.sshBuiltinTerminal`）控制，关掉后各自退回 iTerm（头部 SSH 下拉传 `inTerminal: true`，明确要求在**当前终端**执行，不受该开关影响，见第 2 条）。
-8. **全局快捷键**：设置 → 终端 →「打开终端的全局快捷键」（`settings.terminalHotkey`，默认 `CommandOrControl+Shift+Z`，来自 `ships.terminalWindow.hotkey`）用 `globalShortcut` 注册：任意界面按下即打开 / 聚焦本窗口；**窗口已展示且在前台时按下 = 隐藏**（不销毁、会话与 shell 都留着），再按一次重新显示 —— 即「快速终端」开关（`window-manager.toggleTerminalWindow()`）。改绑 / 重置 / 取消时先注销旧值再注册新值；**注册失败（被其它 App 占用、格式非法）不写入设置**，设置界面红字提示并把原值留在设置里；空字符串 = 不注册（界面显示「未设置」）。应用退出（`before-quit`）时 `unregisterAll()`。
+7. **SSH 连接改走这里**：`ssh:connect`（§3.4）默认不打开 iTerm，而是把 `ssh …` 命令注入**当前聚焦的终端窗口**（没有聚焦的终端就新开一扇；窗口不跨桌面移动），失败时才提示错误；受 设置 → 终端 →「SSH 使用内置终端连接」（`settings.sshBuiltinTerminal`）控制，关掉后退回 iTerm（头部 SSH 下拉传 `inTerminal: true`，明确要求在**当前终端**执行，不受该开关影响，见第 2 条）。
+8. **全局快捷键**（`window-manager.toggleTerminalWindow()`）：设置 → 终端 →「打开终端的全局快捷键」（`settings.terminalHotkey`，默认 `CommandOrControl+Shift+Z`）。规则：**同时存在多扇终端窗口时快捷键失效（不响应）**；只有一扇时，若它在**前台**则按「关闭按钮行为」**隐藏或销毁**（多次按同样遵循该设置），否则把它拉回前台；一扇都没有则**新开一扇**（窗口不跨桌面移动）。改绑 / 重置 / 取消时先注销旧值再注册新值；**注册失败（被其它 App 占用、格式非法）不写入设置**，设置界面红字提示并把原值留在设置里；空字符串 = 不注册（界面显示「未设置」）。应用退出（`before-quit`）时 `unregisterAll()`。
 9. **关闭按钮行为**（设置 → 终端 →「关闭按钮行为」，`settings.terminalCloseAction`，默认 `destroy`，来自 `ships.terminalWindow.closeAction`）：
-   - `destroy`：点自绘红绿灯的关闭按钮 / `Cmd-W` 直接**销毁窗口**（结束会话），与旧行为一致。
-   - `hide`：同样操作**只隐藏窗口**（会话与 shell 保留，快捷键或终端图标再打开即回来），窗口 `close` 事件被 `preventDefault()` 拦下。
-   - **例外**：在终端里 `exit`（会话结束）与「iTerm 交接」走 `terminal:destroy` → **始终销毁窗口**，不受 `hide` 影响 —— 否则会留下一个已结束的会话挂在后台。
+   - **同时只存在一扇终端窗口时**：`destroy` → 关闭按钮 / `Cmd-W` **直接销毁**（结束会话）；`hide` → **只隐藏窗口**（会话与 shell 保留；再按全局快捷键回到该窗口）。窗口 `close` 事件在 `hide` 下被 `preventDefault()` 拦下。
+   - **同时存在多扇终端窗口时**：关闭按钮 / `Cmd-W` **一律销毁**（不再遵循 `hide`），且**全局快捷键失效**（见 §3.9-8）。
+    - **例外**：在终端里 `exit`（会话结束）与「iTerm 交接」走 `terminal:destroy` → **始终销毁窗口**，不受上述规则影响 —— 否则会留下一个已结束的会话挂在后台。
+10. **内嵌文件面板（SFTP）**：头部 **文件按钮**（`folder`，仅当检测到当前 ssh 目标时可用，否则禁用；连接中图标旋转、展开时强调色）显隐**窗口底部的内嵌文件面板**（终端区域随之收窄并自动重新 fit）。面板与终端之间有一条**可拖动分隔线**（向上拖 = 终端变小、面板变高），高度持久化到 `file-layout.json`（见 §5.1）。文件管理 UI（左目录树、右文件列表、状态栏、可拖动分栏）由 **`scripts/file-manager.js`** 提供，终端窗口（`terminal-files.js`）与独立文件窗口（`file-window.js`）共用同一套（见 §3.9-11）。
+    - **布局**：左列**目录树**占初始 **300px**（可在分隔线上拖动改变宽度；顶部路径行 = **刷新 / 家目录 / 路径输入框 / 在终端 cd 到此目录**，顺序固定，高度与右列表头一致）；右列**文件列表**表头与行均为网格（图标 / 文件名 / 体积 / **权限** / 时间；**文件名 / 体积 / 权限 / 时间四列列宽可拖动改变**，默认 **160 / 60 / 90 / 130px**）；**上传 `arrow-up` + 内嵌面板的分离 `external` 两个按钮就放在「时间」列的列表头里**（同一列内：左「时间」标签、右两个按钮，**不单独开列**，只有表头有按钮）。文件行不再有行内下载按钮，改为**右键菜单「下载」**。最底**状态栏**（左=当前绝对路径，右=状态信息，中间=**进度条**）。树宽与列宽一并持久化到 `file-layout.json`。字体与样式**跟随终端字号**（`--file-font-size`，`Cmd +/-`、`Cmd 0`、设置里的字体大小都同步作用到文件管理部分）。**面板默认隐藏**（ID 规则用 `:not(.hidden)` 保证不被 `.hidden` 覆盖），仅在点击头部文件按钮时展开。**终端与面板之间只有一条分隔线**（面板自身不再画上边框；分隔线就是那条可拖动的线）。
+    - **首次打开自动放大**：若 `file-layout.json` **没有**本地调整记录，打开面板时按最小布局套用并把终端窗口**只放大不缩小**到够用 —— 终端 ≥ **300**、文件管理 ≥ **200**（目录树 **220**、文件列表 ≥ **400**），即内容区约 **626 × 550**（`terminal:ensure-size`，受屏幕工作区限制，不写回几何记忆）；有本地记录则完全按记录（含面板高度 / 树宽 / 列宽）来。
+    - **交互**：树节点单击进入 / 展开（`caret-right` 展开时旋转 90°），目录树以 `/` 为根按需展开；路径输入回车进入（支持绝对路径 / `~` / 相对当前目录）；**点文件行**时左侧目录树滚动定位并高亮该文件所在目录节点；**文件行右键 → 下载**；上传有两种方式：**拖拽本地文件到右列**，或点列表头最右的**上传按钮**（打开系统文件选择窗口多选后上传到当前目录，逐个显示进度）；**点「刷新」清掉状态栏的「已上传 / 已下载」等提示**。
+    - **权限列**：由 SFTP `attrs.mode`（st_mode）格式化为 `drwxr-xr-x` 风格（类型字符 + rwx ×3）。
+    - **PWD 跟随（cd 命令）**：终端里提交**纯 `cd …` 命令**时识别并导航。检测方式：按回车瞬间读取 xterm **当前行「光标之前」的文本**（`translateToString(false, 0, cursorX)`）再剥掉提示符（最后一个 `# `/`$ `/`% `/`> ` 之后）—— **这样能拿到 shell 回显后的真实命令、包含 Tab 补全结果，同时排除 zsh autosuggestion 之类的灰色建议**；读不到才退回键入跟踪（并跳过 ANSI / 括号粘贴序列）。解析：**相对路径按「终端 shell 的当前目录」`shellCwd` 解析**（初始 = 家目录、每次 cd 成功后同步；不按文件面板手动浏览到的目录，避免两者分叉），绝对路径 / `~` 直接解析；`shellCwd` 为估计值。文件面板若已连接就导航；**并展开该路径的所有上级目录、把目录树滚动定位到目标节点**（`expandTo` + `scrollTreeToSelected`），目标不存在则静默保持当前目录；手动导航 / 其它命令不触发跟随。**连接就绪前收到的 cd 会排队**，连上后跟随。
+    - **连接凭据**：以当前 ssh 目标（§3.9-4 的进程树检测结果，如 `user@host` / 别名）为键 → 命中 `~/.ssh/config`（SSH 管理）记录时按记录的 `HostName`/`Port`/`User`/`IdentityFile` 连接（命令行给了同名用户时优先用命令行用户）；无记录时用命令里的用户名（缺省用本机用户名）+ 默认私钥 `~/.ssh/id_ed25519`。命中记录带 **ProxyJump 时 ssh2 不支持、连接失败并在状态栏提示**。SSH 私钥优先，其次 ssh-agent。
+    - **状态机**：**检测到 ssh 目标即自动建立 SFTP 连接**（面板仍保持隐藏，状态栏显示「正在连接」）—— 这样终端里的 **cd 跟随在面板未展开时也生效**；点文件按钮展开面板（已连接则直接显示）；**再次点按钮只隐藏面板、保留连接**；手动切换 / 断开 ssh（目标变化）→ **销毁该 SFTP 连接**（面板随之收起）；连接失败（认证 / 超时 / ProxyJump / 无法启动子系统）只在状态栏提示。窗口销毁时该窗口的连接一并关闭。
+    - **下载 / 上传进度**：下载与上传（含拖拽多文件逐个）都在状态栏用**进度条**显示百分比（主进程经 `sftp:progress` 事件回传 `transferred/total`）。下载保存到设置的下载目录（默认 `~/Downloads`，重名自动加 ` (n)`，见 §5.1），成功后状态栏显示本地路径。
+11. **独立文件窗口**（`file-window.html`，见 §8.6）：文件管理可**分离为单独窗口**——内嵌面板**列表头最右操作区**的「分离为独立窗口」按钮（在上传按钮右边）或 **SSH 管理的 `folder` 图标**（自动连接该主机）打开；点分离按钮时会**关闭并销毁当前内嵌容器**（连同其 SFTP 连接）再开独立窗口。窗口与终端同为**悬浮 panel**：`alwaysOnTop`（默认开，头栏图钉可关）、可浮在全屏之上但不跟随桌面切换、`titleBarStyle: hiddenInset` + 自绘小红绿灯。头栏含一个 **SSH 下拉**切换连接（列出 `~/.ssh/config`，选中即重连），**无终端**；字体 / 样式 / `Cmd +/-` 缩放与终端配置一致（用 `--file-font-size`，`file-window:zoom`），但**字号最小 13px**——终端字体小于 13px 时不再跟随；头栏与红绿灯同样随字号缩放。**连接与内嵌面板彼此独立**（各自一个 SFTP 会话，可各连不同 ssh），并**不随终端里的 ssh 关闭而关闭**。几何（屏幕 / 位置 / 尺寸）记入 `file-window.json`（单槽，同终端窗口的记忆方式）。
 
 ---
 
@@ -238,16 +244,16 @@ Ships/
 | IP / 网段与掩码 | 输入 `IP`、`IP/前缀`、`IP 掩码`、纯数字或 `0x` 十六进制；自上而下显示：**归属地** → **IP 进制（十进制 / 十六进制 / 二进制）** → 网段结果（网络地址、广播地址、可用范围、主机数、掩码、反掩码、前缀、掩码二进制、地址类型）；IPv6 仅显示 IP 进制 | 未给掩码时按 `/24` 计算并提示；IPv6 不查归属地；归属地卡片固定高度，无运营商显示 `-`；归属地右侧两个图标按钮用浏览器打开 `https://ipgeolocation.io/what-is-my-ip/<ip>` 与 `https://iplocation.io/ip/<ip>`（IP 自动替换；无有效 IPv4 时禁用） |
 | 进制转换 | 2/8/10/16 进制四行双向实时同步；另有 2–36 自定义进制（自绘下拉）；“位宽/字节”统计 | 任一行输入即联动其余 |
 | JSON 格式化 | 粘贴/失焦后**原地格式化**（固定 4 空格缩进）并语法高亮；工具栏单行：文本/结构切换、键排序、复制、压缩、清空；错误定位（行列）；**结构查看**（可折叠树） | 超过 1MB 仅格式化不高亮；输入改变仅重高亮；编辑器高度 180px |
-| SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示系统图标、`user@host(:port)`（22 不显示端口）、别名与**连接按钮**；**双击条目（按钮除外）等同于连接**（连接在置顶终端窗口里执行，见 §3.9，不会切换桌面）；列表在打开面板时自动刷新（无手动刷新按钮）；系统图标来自缓存的探测结果（品牌彩色图标，探测在「设置 · SSH 管理」进行）；行内 `folder` 图标进入**目录浏览**（见 §3.7）：列出该主机目录、双击目录进入下一级、悬浮目录条目在终端里打开并 `cd`（与连接同一个开关：默认置顶终端窗口，可退回 iTerm；文件仅显示体积、无操作）、顶栏可返回上一级 / 返回主机列表 | 忽略通配符主机（如 `Host *`）；未探测显示通用主机图标 |
+| SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示系统图标、`user@host(:port)`（22 不显示端口）、别名与**连接按钮**；**双击条目（按钮除外）等同于连接**（连接在置顶终端窗口里执行，见 §3.9，不会切换桌面）；列表在打开面板时自动刷新（无手动刷新按钮）；系统图标来自缓存的探测结果（品牌彩色图标，探测在「设置 · SSH 管理」进行）；行内 `folder` 图标**打开独立文件窗口并自动连接该主机**（`file-window:open`，见 §3.9-11） | 忽略通配符主机（如 `Host *`）；未探测显示通用主机图标 |
 | 剪贴板 | 主进程按设置周期轮询系统剪贴板，展示最近 N 条记录（默认 **3**，可在设置调整）；文本固定 2 行截断预览，图片渲染为小缩略图，**SVG 代码也渲染为小图（固定 64×64 框内等比缩放）**；每条可复制，支持一键清空历史 | 历史仅存内存、退出即清空；文本超 10 万字截断；图片按「大小+哈希」去重；SVG 超 20 万字符按文本处理 |
 | 编码转换 | 字符串 / Base64 / 十六进制 / URL 编码 / ASCII 十进制 五个字段双向实时同步（UTF-8） | 输入非法时标红不联动 |
 | 哈希计算 | 计算 **MD5 / SHA1 / SHA256**；支持输入字符串或**选择本地文件**（流式计算，适合大文件）；切换类型时清空结果 | 字符串输入防抖 200ms；文件经系统对话框选择 |
 | 营养成分 | 输入商品名与每 100g 的能量(kJ)/蛋白质/脂肪/碳水/钠及商品总重，实时换算：盐、千卡、千焦（含每日推荐 2250kcal / 9410kJ 对比与超出量）、慢跑与步行消耗（公里 / 分钟 / 步数）；底部提供**清空（图标）**与**一个复制按钮（复制输入与结果）** | 输入不做历史记录、不落盘，每次打开为默认值；不做历史列表与商品保存 |
 | 设置 · Ships | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、固定悬浮（置顶常驻、失焦不隐藏）、**Liquid Glass**（主界面启用系统玻璃背景：macOS 26+ 用原生 Liquid Glass，旧系统回退 hud 毛玻璃，见 §8.1）、剪贴板条数、剪贴板轮询间隔、打开数据文件夹、关于、开发者（打开悬浮界面 / 设置界面 / **终端界面** DevTools，`devtools:open` 的 `main` / `settings` / `terminal`） | 见 §5.1 |
 | 设置 · SSH 管理 | `~/.ssh/config` 主机的增删改（别名/HostName/User/Port/IdentityFile/ProxyJump）；列表左侧显示系统图标；新增时自动预填 **用户 root / 端口 22 / 私钥 `~/.ssh/id_ed25519`**，**私钥支持手动选择文件**（对话框默认 `~/.ssh`，选后转为 `~` 路径），保存时别名默认取主机地址；表单内含「探测系统」，**探测成功后才允许保存**，探测失败**保留表单内容**；支持**导出 config** | 别名与主机地址至少填一项；删除二次确认 |
-| 设置 · 终端 | 配置置顶终端窗口：**默认 shell**（留空 = 系统默认 `$SHELL`，可手填或用「选择文件」挑，写入前校验文件存在）、**字体大小**（8–24px，默认 12）、**窗口大小**（宽 × 高，最小 480 × 320，默认 1024 × 768；改完立即作用到已打开的终端窗口，手动拖动窗口也会写回；这是「换屏 / 无记忆」时的默认尺寸，同屏则优先沿用终端窗口自己的位置与尺寸）、**缓冲区大小**（默认 10000 行）、**打开终端的全局快捷键**（默认 `⌘⇧Z`；点按钮后按新组合键改绑，`Backspace` 清除、`Esc` 取消，至少含 Command / Control / Alt 之一，被占用 / 非法时红字提示且不落盘）、**SSH 使用内置终端连接**（开关：开 = 点连接、以及目录浏览里「打开」都在置顶终端执行 `ssh`，关 = 两者都改用 iTerm）、**关闭按钮行为**（分段控件：隐藏窗口 / 销毁窗口，默认销毁）、**重置**（二次确认后把以上终端设置恢复默认值，并清掉 `terminal-window.json` 里记住的屏幕 / 位置 / 大小） | 对应 `settings.json` 的 `terminalShell`/`terminalFontSize`/`terminalWindowWidth`/`terminalWindowHeight`/`terminalScrollback`/`terminalHotkey`/`terminalCloseAction`/`sshBuiltinTerminal`；默认值来自 `package.json` 的 `ships.terminalWindow`/`ships.sshBuiltinTerminal`；窗口位置 / 屏幕在 `terminal-window.json`（见 §5.1、§3.9） |
+| 设置 · 终端 | 配置置顶终端窗口：**默认 shell**（留空 = 系统默认 `$SHELL`，可手填或用「选择文件」挑，写入前校验文件存在）、**字体大小**（8–24px，默认 12）、**窗口大小**（宽 × 高，最小 480 × 320，默认 1024 × 768；改完立即作用到已打开的终端窗口，手动拖动窗口也会写回；这是「换屏 / 无记忆」时的默认尺寸，同屏则优先沿用终端窗口自己的位置与尺寸）、**缓冲区大小**（默认 10000 行）、**打开终端的全局快捷键**（默认 `⌘⇧Z`；点按钮后按新组合键改绑，`Backspace` 清除、`Esc` 取消，至少含 Command / Control / Alt 之一，被占用 / 非法时红字提示且不落盘）、**SSH 使用内置终端连接**（开关：开 = 点「连接」在置顶终端执行 `ssh`，关 = 改用 iTerm）、**关闭按钮行为**（分段控件：隐藏窗口 / 销毁窗口，默认销毁）、**SFTP 下载目录**（文本 + 「选择目录」，默认 `~/Downloads`，见 §3.9-10）、**重置**（二次确认后把以上终端设置恢复默认值，并清掉 `terminal-window.json` 里记住的屏幕 / 位置 / 大小） | 对应 `settings.json` 的 `terminalShell`/`terminalFontSize`/`terminalWindowWidth`/`terminalWindowHeight`/`terminalScrollback`/`terminalHotkey`/`terminalCloseAction`/`sshBuiltinTerminal`/`sftpDownloadDir`；默认值来自 `package.json` 的 `ships.terminalWindow`/`ships.sshBuiltinTerminal`/`ships.sftpDownloadDir`；窗口位置 / 屏幕在 `terminal-window.json`（见 §5.1、§3.9） |
 | 设置 · 网络测试 | 在本地或通过 `~/.ssh/config` 里的主机执行测试命令（TCP / UDP / HTTP(S) / ICMP / ARP / 扫描应用 / 扫描主机）；下方是**可直接输入命令的交互终端**（真实 PTY + 默认登录 shell + xterm.js），「测试」把校验过的命令送进终端执行（选主机时包一层 `ssh`）、「停止」发送 Ctrl-C；详见 §3.8 | 端口默认 80；扫描主机需网段（前缀 16–30）；扫描应用端口可留空；输入不落盘 |
-| 底部栏 | 左显示版本号；右侧依次为**终端图标**（打开置顶终端窗口，见 §3.9）、**网络测试图标**（打开设置 → 网络测试分区）、**图钉（固定悬浮）**与设置入口 | 图钉状态取 `settings.pinWindow`；版本取 `package.json` |
+| 底部栏 | 左显示版本号；右侧依次为**终端图标**（`terminal`，每次**新开**一扇置顶终端窗口，见 §3.9）、**文件管理图标**（`folder`，打开独立文件窗口且**不选中任何连接**，`file-window:open` 传空 `target`）、**网络测试图标**（打开设置 → 网络测试分区）、**外观图标**（`monitor`/`sun`/`moon`，点击在**跟随系统 → 浅色 → 深色 → 跟随系统**间循环，写 `settings.theme`；非 system 时图标用强调色）、**图钉（固定悬浮）**与设置入口 | 图钉状态取 `settings.pinWindow`；外观取 `settings.theme`；版本取 `package.json` |
 | 通用交互 | 顶部栏左侧为 App 彩色图标 + 名称、右侧 TAB 右对齐；所有下拉框为 Tailwind 自绘（非系统 `<select>`）；TAB 与图标按钮悬浮显示提示；切换类组件均带过渡 / 入场动画；各工具输入不做历史记录、不落盘，面板切换 / 重启后不保留 | 见 §11 |
 
 ---
@@ -258,11 +264,13 @@ Ships/
 
 | 文件 | 位置 | 结构 | 生命周期 |
 | --- | --- | --- | --- |
-| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/ships/settings.json`） | `{ locale, theme, accent, launchAtLogin, pinWindow, vibrancy, clipboardLimit, clipboardPollMs, terminalShell, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, terminalHotkey, terminalCloseAction, sshBuiltinTerminal }` | 持久；重启保留 |
+| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/ships/settings.json`） | `{ locale, theme, accent, launchAtLogin, pinWindow, vibrancy, clipboardLimit, clipboardPollMs, terminalShell, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, terminalHotkey, terminalCloseAction, sshBuiltinTerminal, sftpDownloadDir, fileWindowAlwaysOnTop }` | 持久；重启保留 |
 | `ships.log` | 同上目录 | 追加写入的文本日志（启动信息、SSH 探测过程 / 命令 / 输出 / 报错等） | 持久；用于排查本地网络与权限问题 |
 | `ssh-detected.json` | 同上目录 | `{ [alias]: { os, family, label, at } }` | 持久；缓存探测结果 |
-| `ssh-browse.json` | 同上目录 | `{ [alias]: "/abs/dir" }`（每台主机最近打开的目录） | 持久；由目录浏览写入，下次进入时列出其父目录 |
 | `terminal-window.json` | 同上目录 | `{ display: { id, scaleFactor, bounds: { x, y, width, height } }, bounds: { x, y, width, height } }`（置顶终端窗口最近一次的所在屏幕 + 位置 + 尺寸） | 持久；打开 / 拖动 / 缩放 / 关闭时写入（含「实际生效」的几何，恢复时被夹取过也记夹取后的值）；同一块屏幕再次打开即沿用，换屏 / 拔屏 / 无记录则改用默认尺寸居中 |
+| `file-window.json` | 同上目录 | 同 `terminal-window.json` 的结构（独立文件窗口的屏幕 + 位置 + 尺寸） | 持久；记忆方式与终端窗口一致 |
+| `file-layout.json` | 同上目录 | `{ treeWidth, name, size, perm, time, panelHeight }`（**内嵌面板**的目录树宽、文件名 / 体积 / 权限 / 时间列宽、面板高度，单位 px；默认 `300 / 160 / 60 / 90 / 130 / 260`；`time` 默认 130 是**默认值**，最小可拖到 60） | 持久；拖动分隔线 / 列宽时写入；**有记录时不再套用首次的最小布局**（§3.9-10） |
+| `file-window-layout.json` | 同上目录 | 同 `file-layout.json` 结构（**独立文件窗口**自己的布局记录，与内嵌面板**分开保存**） | 持久；独立窗口拖动分隔线 / 列宽时写入 |
 | 剪贴板历史 | 内存（不落盘） | 最近 5 条 `{ id, type, text?, thumb?, width?, height?, truncated?, at }` | 随进程退出丢失 |
 | `~/.ssh/config` | 用户主目录 | 标准 OpenSSH 配置 | 由设置内 SSH 管理读写；未加密（非机密） |
 
@@ -287,7 +295,7 @@ Ships/
 | `ssh:detect` | `{ alias }` | `{ queued }` | 异步，结果经 `ssh:detected` 回传（兼容保留） |
 | `ssh:detect-host` | `{ alias?, hostName, user?, port?, identityFile?, proxyJump? }` | `{ ok, alias, info }` | 对任意主机（可尚未保存）同步探测，结果写入缓存并广播 |
 | `ssh:get-detected` | — | `{ [alias]: { os, family, label, at } }` | 读取探测缓存 |
-| `terminal:open` | — | `{ ok }` | 打开 / 聚焦置顶终端窗口（§3.9） |
+| `terminal:open` | — | `{ ok }` | **新开**一扇置顶终端窗口（落在当前桌面；不复用 / 不拉取别的桌面的窗口，§3.9） |
 | `terminal:start` | `{ cols, rows }` | `{ ok, id, cols, rows, shell }` | 新建交互终端会话（真实 PTY + 默认登录 shell） |
 | `terminal:input` | `{ id, data }` | `{ ok }` | 把 xterm 的键盘输入写进 PTY |
 | `terminal:resize` | `{ id, cols, rows }` | `{ ok }` | 同步 PTY 尺寸（`TIOCSWINSZ`） |
@@ -295,6 +303,18 @@ Ships/
 | `terminal:kill` | `{ id }` | `{ ok }` | 结束会话 |
 | `terminal:copy-text` | `{ text }` | `{ ok }` | 右键快速编辑「复制」：把文本写入系统剪贴板（`clipboard.writeText`）；空文本返回 `{ ok: false }`；只接受来自终端窗口本身的请求 |
 | `terminal:paste-text` | — | `{ ok, text }` | 右键快速编辑「粘贴」：读取系统剪贴板文本返回给渲染层，由 `term.paste()` 注入 shell；只接受来自终端窗口本身的请求 |
+| `sftp:connect` | `{ target }` | `{ ok, id?, home?, target?, error?, code? }` | 新建一条 SFTP 会话（`target` = ssh 目标 token；命中 `~/.ssh/config` 用记录，否则命令行用户 + `~/.ssh/id_ed25519`）；返回会话 `id`（内嵌面板与独立窗口各持一个）；`code` ∈ `proxyjump`/`auth`/`timeout`/`sftp`/`connect`/`no-target`；只接受来自终端窗口或独立文件窗口的请求 |
+| `sftp:list` | `{ id, path? }` | `{ ok, path, parent, home, entries?, code?, error? }` | 列远端目录（`entries[]` = `{ name, type: dir\|file\|link, size, mtime, mode }`，目录在前；`mode` 为 st_mode，用于渲染权限列）；`path` 省略 / `~` 取家目录；会话不存在返回 `code: 'not-connected'` |
+| `sftp:download` | `{ id, path }` | `{ ok, path?, name?, error? }` | 下载远端文件到设置的下载目录（重名自动加 ` (n)`），返回本地绝对路径；过程中经 `sftp:progress` 回传进度 |
+| `sftp:upload` | `{ id, localPath, remoteDir }` | `{ ok, name?, path?, error? }` | 把本地文件上传到远端目录（`remoteDir` 省略 / `~` 取家目录），同名覆盖；过程中经 `sftp:progress` 回传进度 |
+| `sftp:close` | `{ id }` | `{ ok }` | 关闭指定 SFTP 会话（切换 ssh / 窗口销毁时调用） |
+| `sftp:transfer-command` | `{ id, path, recursive? }` | `{ ok, command?, error? }` | 生成把远端文件 / 目录传回本地下载目录的 `scp` 命令（目录加 `-r`，端口 22 / 默认私钥省略，远端路径加引号），**并写入系统剪贴板**；只接受终端窗口 / 独立文件窗口的请求 |
+| `file-window:open` | `{ target? }` | `{ ok }` | 打开 / 聚焦独立文件窗口；`target` 省略沿用上次目标，传**空串** = **不选中任何连接**（主面板「文件管理」按钮用），传别名 = 自动连接该主机（SSH 管理 `folder` 图标用）。已存在时把 `target` 经 `file-window:target` 发过去 |
+| `file-window:info` | — | `{ ok, target, settings }` | 独立文件窗口启动时读取初始目标与当前设置；只接受来自该窗口的请求 |
+| `file-window:close` | — | `{ ok }` | 销毁独立文件窗口（自绘红绿灯关闭按钮）；只接受来自该窗口的请求 |
+| `file-window:set-top` | `{ value: boolean }` | `{ ok, alwaysOnTop }` | 独立文件窗口的置顶开关：写 `settings.fileWindowAlwaysOnTop`；持久 |
+| `files-layout:get` | — | `{ treeWidth, name, size, time, panelHeight }` | 读取文件管理布局（`file-layout.json`） |
+| `files-layout:set` | `{ ...patch }` | 合并后的布局 | 合并写入文件管理布局（拖动分隔线 / 列宽时调用） |
 | `terminal:export` | `{ text, name? }` | `{ ok, path?, canceled?, error? }` | 保存对话框 + 把终端文本写入本地文件 |
 | `terminal:open-iterm` | — | `{ ok, command?, error? }` | 在 iTerm 中重放最后注入的命令并关闭终端窗口 |
 | `terminal:set-top` | `{ value: boolean }` | `{ ok, alwaysOnTop }` | 终端窗口头部图钉：写 `settings.terminalAlwaysOnTop`，由 `window-manager` 的 settings 监听调 `setAlwaysOnTop(true, 'screen-saver')` / `setAlwaysOnTop(false)`；持久，下次打开沿用 |
@@ -302,22 +322,23 @@ Ships/
 | `terminal:reset` | — | `{ ok, settings }` | 设置 → 终端 →「重置」：把终端相关设置（`terminalShell`/`terminalFontSize`/`terminalScrollback`/`terminalWindowWidth`/`terminalWindowHeight`/`terminalAlwaysOnTop`/`terminalHotkey`/`sshBuiltinTerminal`）恢复为 `package.json` 里的默认值，并删除 `terminal-window.json`（记住的屏幕 / 位置 / 大小）；返回重置后的完整设置 |
 | `terminal:destroy` | — | `{ ok }` | 会话结束后销毁终端窗口（渲染层在 shell `exit` 时调用）：**始终销毁，不受「关闭按钮行为=隐藏」影响**；只接受来自终端窗口本身的请求 |
 | `terminal:snap-size` | `{ width?, height? }` | `{ ok, size?, deferred? }` | 渲染层按**实测余量**请求把窗口收到「整行 / 整列」：**拖动期间只挂起**（`deferred: true`），松手后由渲染层重新测量再对齐；偏差 > 60px 视为状态异常、不做。只接受来自终端窗口本身的请求 |
+| `terminal:ensure-size` | `{ width, height }` | `{ ok, width?, height? }` | 打开内嵌文件面板时把本窗口**只放大不缩小**到至少给定内容尺寸（首次无布局记录时用，见 §3.9-10）；受屏幕工作区限制，不写回几何记忆；只接受来自终端窗口本身的请求 |
 | `window:control` | `{ action: 'close' \| 'minimize' \| 'zoom' }` | `{ ok, action }` | 终端窗口自绘小红绿灯的窗口控制：只作用于**发起请求的那个窗口**（`BrowserWindow.fromWebContents(event.sender)`），未知 action 返回 `{ ok: false }`；`close` 在终端窗口上按「关闭按钮行为」隐藏或销毁（见 §3.9-9） |
 | `net-test:command` | `{ id, protocol, target, port, host? }` | `{ ok, command?, error? }` | 校验后把测试命令注入指定终端会话；`host` 为 SSH 别名时整条命令包一层 `ssh` |
-| `ssh:list-dir` | `{ alias, path?, remember? }` | `{ ok, path?, parent?, entries?, truncated?, lastDir?, code?, error? }` | 列出远端目录：`path` 省略时取「上次目录的父目录」或 `~`；`remember: true` 时**仅在列出成功后**把实际路径记入 `ssh-browse.json`（输错路径不会被记住）；`code` ∈ `noDir`/`noPath`/`listFailed`/`timeout`/`connect` |
-| `ssh:open-dir` | `{ alias, path }` | `{ ok, command?, error? }` | 打开终端并 `cd` 进该目录（副作用：记录该目录为「上次打开的目录」）；默认注入置顶终端窗口，`settings.sshBuiltinTerminal` 为 `false` 时改用 iTerm |
 | `ssh-config:read` | — | `hosts` | |
 | `ssh-config:upsert` | `host` | 更新后的 `hosts` | 保留未管理指令与注释 |
 | `ssh-config:remove` | `alias` | 更新后的 `hosts` | |
 | `ssh-config:export` | — | `{ ok, path?, canceled?, error? }` | 经保存对话框导出 `~/.ssh/config` 副本 |
 | `geo:lookup` | `ip`（IPv4 字符串） | `{ iso_3166, country, province, city, isp }` 或 `null` | 本地 `assets/geoip.json` 查询；内网返回 `{ isp: '保留地址' }`；**逐级回退**（省 / 市只有中国、台湾有数据，缺失不影响国家级结果；只有 ISP 命中时仅返回 `isp`；都不命中返回 `null`） |
-| `devtools:open` | `'main' \| 'settings' \| 'terminal'` | `{ ok }` | 打开对应窗口的开发者工具（detach 模式；主面板会先显示，`'terminal'` 未打开时先打开置顶终端窗口） |
+| `devtools:open` | `'main' \| 'settings' \| 'terminal' \| 'file'` | `{ ok }` | 打开对应窗口的开发者工具（detach 模式；主面板会先显示，`'terminal'` / `'file'` 未打开时先打开对应窗口） |
 | `clipboard:list` | — | `item[]`（最多 5 条） | 内存历史，含文本 / 图片缩略图 |
 | `clipboard:copy` | `id` | `{ ok, error? }` | 文本用 `writeText`，图片用 `ClipboardItem` 写回 |
 | `clipboard:clear` | — | `{ ok }` | 清空历史（不清空系统剪贴板） |
 | `hash:text` | `text` | `{ md5, sha1, sha256 }` | 计算文本哈希 |
 | `hash:file` | `file`（绝对路径） | `{ ok, hashes?, info?, error? }` | 流式计算文件哈希 |
 | `dialog:open-file` | — | `{ path, name, size }` 或 `null` | 打开系统文件选择对话框 |
+| `dialog:open-dir` | `{ defaultPath? }` | `{ path }` 或 `null` | 打开系统目录选择对话框（设置 → 终端 → SFTP 下载目录） |
+| `dialog:open-files` | — | `{ paths: string[] }` | 多选文件对话框（文件管理「上传」按钮），返回本地绝对路径列表 |
 
 **send（渲染 → 主，单向）**
 
@@ -337,15 +358,18 @@ Ships/
 | `clipboard:changed` | `item[]` | 剪贴板历史变化（主进程每约 1.2s 轮询系统剪贴板） |
 | `terminal:data` | `{ id, type: 'data', data }` | PTY 输出（原样文本，含 ANSI），只发给拥有该会话的窗口 |
 | `terminal:exit` | `{ id, type: 'exit', code, signal }` 或 `{ id, type: 'error', message }` | 会话结束 / 启动失败 |
-| `terminal:session` | `{ id, type: 'session', ssh }` | 会话进程树里检测到的当前 SSH 目标（`ssh` 为 `user@hostname` / `user@host`，未连接时为 `null`）；仅在值变化时推送（主进程每秒扫描一次进程树，见 §3.9-4） |
+| `terminal:session` | `{ id, type: 'session', ssh, target }` | 会话进程树里检测到的当前 SSH 目标：`ssh` 为显示用标签（命中配置别名时解析成 `user@hostname`）、`target` 为命令行里的原始目标 token（供文件面板连接用），未连接时均为 `null`；仅在值变化时推送（主进程每秒扫描一次进程树，见 §3.9-4、§3.9-10；**不在头栏显示**） |
 | `terminal:recalibrate` | — | 拖动结束后请终端窗口重新测量并按整行对齐高度（拖动期间主进程不改窗口尺寸，见 §3.9-4） |
 | `terminal:drag-active` | — | 主进程检测到终端窗口开始被拖动（`will-resize`）：渲染层据此在拖动期间不发对齐请求 |
+| `terminal:zoom` / `file-window:zoom` | `'in' \| 'out' \| 'reset'` | 焦点在终端窗口 / 独立文件窗口时 `Cmd +/-/0` 的字号缩放（见 §5.3） |
+| `sftp:progress` | `{ id, direction: 'upload' \| 'download', name, transferred, total }` | SFTP 上传 / 下载进度，只发给发起该操作、拥有该会话的窗口（渲染层在状态栏显示进度条） |
+| `file-window:target` | `target` | 独立文件窗口已打开时，`file-window:open` 带目标再次调用 → 请它切换连接 |
 | `settings:open-section` | `sectionId` | 请求设置窗口切换到指定分区（由 `window:open-settings` 的 `section` 触发） |
 
 ### 5.3 菜单与权限映射
 
 - 托盘左键：切换主面板；托盘右键菜单：`打开设置`、`退出 Ships`。
-- **应用菜单**（`src/main/menu.js`）：自定义模板 = 应用菜单 / 编辑（撤销、剪切、拷贝、粘贴、全选；终端窗口另有**右键快速编辑**直接复制选区 / 粘贴剪贴板，见 §3.9-4，因此编辑菜单只是快捷键层面的补充）/ 视图（放大、缩小、实际大小、全屏、开发者工具）/ 窗口菜单。视图里的三个缩放项 **只显示快捷键、不向系统注册**（`registerAccelerator: false`），改由主进程 `before-input-event` 统一处理：`Cmd + = / +` / `Cmd + -` / `Cmd + 0` —— **焦点在置顶终端窗口时只改 xterm 字号**（`terminal:zoom` → 8–24px，默认 12px，改完重新 fit 并同步 PTY），其它窗口保持原来的整页缩放。终端窗口另外用 `setVisualZoomLevelLimits(1, 1)` 关掉 pinch 缩放、`zoom-changed` 把 `Cmd+滚轮` 也接到字号缩放上，保证标题栏与图标永远不跟着放大缩小。
+- **应用菜单**（`src/main/menu.js`）：自定义模板 = 应用菜单 / 编辑（撤销、剪切、拷贝、粘贴、全选；终端窗口另有**右键快速编辑**直接复制选区 / 粘贴剪贴板，见 §3.9-4，因此编辑菜单只是快捷键层面的补充）/ 视图（放大、缩小、实际大小、全屏、开发者工具）/ 窗口菜单。视图里的三个缩放项 **只显示快捷键、不向系统注册**（`registerAccelerator: false`），改由主进程 `before-input-event` 统一处理：`Cmd + = / +` / `Cmd + -` / `Cmd + 0` —— **焦点在置顶终端窗口时只改 xterm 字号**（`terminal:zoom` → 8–24px，默认 12px，改完重新 fit 并同步 PTY；同时改写 `--file-font-size`，文件管理部分一并缩放）；**焦点在独立文件窗口时改其文件管理字号**（`file-window:zoom`）；其它窗口保持原来的整页缩放。两个悬浮窗口另外用 `setVisualZoomLevelLimits(1, 1)` 关掉 pinch 缩放、`zoom-changed` 把 `Cmd+滚轮` 也接到字号缩放上，保证头栏与图标永远不跟着放大缩小。
 - 不涉及系统权限申请（无摄像头/麦克风等）；SSH 连接依赖用户本机 iTerm 与 `~/.ssh/config`。
 
 ### 5.4 本地 HTTP API
@@ -421,20 +445,22 @@ stateDiagram-v2
 
 ---
 
-### 6.5 SSH 目录浏览
+### 6.5 文件管理（SFTP）
 
 ```mermaid
 flowchart TD
-  A[主列表点击 folder 图标] --> B["ssh:list-dir（不传 path）"]
-  B --> C{ssh-browse.json 有该主机记录?}
-  C -- 有 --> D[列出记录目录的父目录<br/>该目录以强调色 + 上次标记高亮]
-  C -- 无 --> E[列出 ~]
-  D --> F[双击目录行]
-  E --> F
-  F --> G["ssh:list-dir remember=true<br/>记录该目录并列出下一级"]
-  H[悬浮条目 → terminal 图标] --> I["ssh:open-dir<br/>记录该目录 + 打开终端并 cd 进入<br/>（默认置顶终端，可退回 iTerm）"]
-  J[点击 上一级] --> K["ssh:list-dir 父目录（不修改记录）"]
-  L[点击 返回主机列表] --> M[回到主机列表]
+  A[点文件夹按钮 / 分离按钮 / SSH 管理 folder 图标] --> B{打开哪个?}
+  B -- 内嵌面板（终端窗口） --> C[以当前 ssh 目标连接 sftp:connect]
+  B -- 独立文件窗口 --> D[file-window:open<br/>下拉选主机 / 自动连接]
+  C --> E[列家目录 sftp:list]
+  D --> E
+  E --> F[目录树 / 文件列表 / 状态栏]
+  F --> G[点文件行 → 树滚动定位到其目录]
+  F --> H[拖拽 / 上传按钮 → sftp:upload（状态栏进度）]
+  F --> I[右键文件行 → 下载 sftp:download（状态栏进度）]
+  F --> J[路径行「在终端 cd 到此目录」→ 写 cd 到 PTY]
+  F --> K[拖动分隔线 / 列宽 → files-layout:set]
+  L[终端里切换 / 断开 ssh] --> M[销毁内嵌面板的 sftp:close]
 ```
 
 ---
@@ -482,7 +508,7 @@ flowchart TD
 - 结构：顶部栏（高 46px）：**左侧**为 App 彩色图标 + 名称（固定不压缩），**右侧**为 TAB 图标区（右对齐、超出可横向滚动；图标 22×22px、按钮 36×36px、间距 6px）→ 内容区（可滚动）→ 底部栏（高 34px）。
 - TAB 工具顺序由单一文件 `src/renderer/scripts/tool-order.js` 的 `window.ShipsToolOrder` 数组决定（改数组即改顺序；未列出的工具按注册顺序追加到末尾）。
 - 圆角：外层面板 `--radius-window`（10px），透明窗口使圆角外露；**主窗口无描边边框**（仅卡片/输入框有边框）。
-- 底部栏：左侧版本号（`vX.Y.Z`），右侧依次为**终端**（`terminal`，打开置顶终端窗口，§3.9）、**网络测试**（`wifi`，打开设置 → 网络测试分区）、图钉（固定悬浮）与设置按钮（齿轮），四个图标按钮均为 24×24px、**间距 12px**（比顶部 TAB 小，间距放大后图标之间的留白与顶部观感一致）。
+- 底部栏：左侧版本号（`vX.Y.Z`），右侧依次为**终端**（`terminal`，每次新开一扇置顶终端窗口，§3.9）、**文件管理**（`folder`，打开独立文件窗口且不选中任何连接，§3.9-11）、**网络测试**（`wifi`，打开设置 → 网络测试分区）、**外观**（`monitor`/`sun`/`moon`，循环切换跟随系统 / 浅色 / 深色）、图钉（固定悬浮）与设置按钮（齿轮），六个图标按钮均为 24×24px、**间距 12px**（比顶部 TAB 小，间距放大后图标之间的留白与顶部观感一致）。
 - `Escape` 隐藏面板；默认失焦自动隐藏；固定悬浮时保持显示并可通过顶部「应用图标 + 名称」区域拖动。
 - **Liquid Glass（设置项 `Liquid Glass`，键 `settings.vibrancy`，仅 macOS）**：粒度分三档，由 `window-manager.js` 的 `glassMode()` 判定：
   - **`liquid`（macOS 26+，优先）**：用 `electron-liquid-glass` 在窗口内容后插入原生 `NSGlassEffectView`（Liquid Glass）。窗口 `transparent: true`、**不设 `vibrancy`**、`roundedCorners: false`，内容加载后 `liquidGlass.addView(win.getNativeWindowHandle(), { cornerRadius: WINDOW.cornerRadius })`（默认 10px）由玻璃自带圆角；**不叠加 tint，保持高透**（背景的 blur 与折射直接透出）。
@@ -499,7 +525,7 @@ flowchart TD
 ### 8.3 图标与资源
 
 - **SVG 图标**：所有界面图标以独立 `.svg` 文件存放于 `assets/icons/`（kebab-case 命名，如 `clock.svg`、`arrow-left.svg`、`arrow-up.svg`、`file.svg`、`doc.svg`、`image.svg`、`archive.svg`、`caret-right.svg`、`home.svg`、`temp-file.svg`、`traffic-close.svg` / `traffic-minimize.svg` / `traffic-zoom.svg`（终端窗口自绘小红绿灯的悬浮符号）），**代码中不硬编码** SVG 标记；由 `src/preload/icons.js` 在启动时读取目录、转成 camelCase 键名并经 `contextBridge` 暴露为 `window.shipsIcons`，渲染层 `ShipsUI.Icons[name](size)` 注入尺寸后使用（会先移除图标根标签上已有的 `width` / `height` 再注入，兼容自带尺寸的品牌图标）。新增 / 修改图标只需增删 / 编辑文件；系统品牌图标（`ubuntu.svg` / `fedora.svg` / `arch.svg` / `centos.svg` / `debian.svg` / `linux.svg` / `mint.svg` / `opensuse.svg` / `RHEL.svg` / `rocky.svg` / `windows.svg` 等）同样放在此处，用于 SSH 探测结果展示。
-- **文件类型图标（目录浏览）**：按 `src/renderer/scripts/constants.js` 的 `FILE_TYPE_ICONS`（扩展名 → 图标名，92 项）与 `FILE_NAME_ICONS`（无扩展名的文件名，如 `Makefile` / `Dockerfile` / `LICENSE` / `README`）映射到 `code` / `braces` / `terminal` / `doc` / `image` / `play` / `archive`，未命中用 `DEFAULT_FILE_ICON = file`；目录固定 `folder`。未引入第三方图标库：远端文件只有文件名，没有类型探测，系统图标类库（读取本地文件图标）在此用不上。
+- **文件类型图标（文件管理）**：按 `src/renderer/scripts/constants.js` 的 `FILE_TYPE_ICONS`（扩展名 → 图标名，92 项）与 `FILE_NAME_ICONS`（无扩展名的文件名，如 `Makefile` / `Dockerfile` / `LICENSE` / `README`）映射到 `code` / `braces` / `terminal` / `doc` / `image` / `play` / `archive`，未命中用 `DEFAULT_FILE_ICON = file`；目录固定 `folder`（目录只出现在左侧目录树）。未引入第三方图标库：远端文件只有文件名，没有类型探测，系统图标类库（读取本地文件图标）在此用不上。
 - 位图资源（应用图标 / 托盘 / 打包）统一放在 `assets/imgs/`；`assets/icons/` 只保留 SVG 图标。
 - **国旗图标**：`assets/flags/<CC>.svg`（长方形）与 `assets/flags/<CC>_1x1.svg`（方形）；由 `src/preload/flags.js` 按需读取并缓存，暴露为 `window.shipsFlags.get(code, shape)`（code 为两位国家码，shape 为 `rect`/`1x1`）。
 - **归属地数据库**：`assets/geoip.json`（单行大文件），由主进程 `geo-service` 直接 `require`，不逐行读取；渲染层通过 `geo:lookup` 使用。
@@ -512,14 +538,7 @@ flowchart TD
 - 结构：`[系统图标] [user@host(:port)]` + 别名小字 → 右侧 `[目录] [连接]`（探测已移至设置）。
 - 未探测时显示通用主机图标；探测完成后直接替换为对应系统品牌图标（如 `ubuntu.svg`、`windows.svg`）。
 - 端口为 22 时省略；通配符主机不展示。
-- **交互**：点击右侧「连接」按钮，或**双击条目**（按钮区域除外）均执行连接（默认在置顶终端窗口里 `ssh`，见 §3.4；可设为 iTerm）；点击「目录」按钮进入目录浏览视图；打开面板时自动刷新列表。
-- **目录浏览视图**（独占内容区，替换主机列表，见 §3.7）：
-  - 顶栏：`←` 返回主机列表、`↑` 上一级、`/root`（`home.svg`）与 `/tmp`（`temp-file.svg`）两个图标快捷按钮、**可编辑路径框**（等宽字体，回车进入、Esc / 失焦恢复）。目录打开失败时**不显示文案、不产生重排**，路径框红闪 3 次后恢复。
-  - 条目：目录名前有**向右三角按钮**（`caret-right.svg`，图标 12px、按钮 13×20px 且内容靠左对齐；**单击即进入该目录**，悬浮提示「进入该目录」），文件不显示三角但保留同宽占位（13px），因此文件名称整体缩进（目录名与文件名左边界一致，实测距行左边缘 54px）；类型图标：目录 `folder.svg`，文件按扩展名映射到 code / braces / terminal / doc / image / play / archive（未命中 `file.svg`，见 §3.7）；符号链接按文件显示并附 `→ 目标`；文件名中的非法字节 / 控制字符以 `\xNN` 显示；文件显示人类可读体积（B / KB / MB / GB），目录不显示体积；顺序为**文件夹优先 + 组内沿用远端 `ls` 顺序**（见 §3.7）；**文件夹行底色比文件行略深**（`--color-row-dir-bg` = `color-mix(in srgb, var(--color-fg) 4%, var(--color-surface))`，浅色下约 `#f6f6f6` vs 文件行 `#ffffff`）。
-  - 行高：条目比主机行紧凑（`.row-card.row-compact` → `gap-2 / px-2.5 / py-1`，类型图标框 `h-6 w-6`、悬浮操作按钮 `h-6 w-6`，三角占位 `w-3.5`），列表行距 `gap-2`；因 `html` 字号为 13px（`1rem = 13px`），实测条目行高约 28px、主机行约 38px。
-  - 交互：目录**双击**进入下一级；条目**单击无效果**；**目录**悬浮时右侧出现 `terminal` 图标，点击后打开终端并 `cd` 进入该目录（默认置顶终端窗口，`settings.sshBuiltinTerminal=false` 时用 iTerm，见 §3.7）；**文件无任何操作**（无悬浮图标、双击不响应）。
-  - 高亮：「上次打开的目录」**整行换底色**（`.row-card.row-last` → `--color-last-bg` / `--color-last-border`），文件名加粗并带 `chip`「上次」标记。
-  - 滚动：工具标题与顶栏（返回 / 上一级 / 路径）**固定不动**，只有条目列表在剩余高度内滚动；浏览时在 `#content` 上加 `.tool-fixed`，返回主机列表即移除（普通页面滚动恢复）。
+- **交互**：点击右侧「连接」按钮，或**双击条目**（按钮区域除外）均执行连接（默认在置顶终端窗口里 `ssh`，见 §3.4；可设为 iTerm）；点击 `folder` 图标**打开独立文件窗口并自动连接该主机**（`file-window:open`，见 §3.9-11）；打开面板时自动刷新列表。
 
 ---
 
@@ -527,9 +546,20 @@ flowchart TD
 
 - 尺寸与位置：默认 **1024 × 768**（`ships.terminalWindow.width/height`，可在 **设置 → 终端 → 窗口大小** 调整，存 `settings.json` 的 `terminalWindowWidth` / `terminalWindowHeight`），可缩放、最小 `minWidth × minHeight` = 480×320，`titleBarStyle: hiddenInset`；改设置立即生效，手动拖动窗口写回设置。**屏幕 / 位置 / 尺寸会自动记忆**（`terminal-window.json`）：同屏重开沿用记忆（越界夹回工作区），换屏 / 拔屏 / 无记录则用默认尺寸在当前屏幕居中，详见 §3.9。
 - 层级：`alwaysOnTop` + `setAlwaysOnTop(true, 'screen-saver')`（由终端窗口自己的图钉开关控制，与主面板无关）；`setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true })` —— 带全屏辅助（可浮在全屏应用之上）但**不加入所有桌面**（切换桌面时窗口留在原桌面，详见 §3.9）。
-- 头部：**22px** 自绘头栏 `#term-header`（左侧**自绘小红绿灯** 9px×3、左边距 12px —— 系统红绿灯已隐藏，点击 = `window:control` 关闭 / 最小化 / 缩放；**中间居中仅在检测到 SSH 连接时显示当前目标**（`#term-title`，与「列 × 行」同一居中位、拖动时让位，见 §3.9-4）；右侧图标区：**SSH 主机下拉**（默认 130×18px，条目 `用户名@主机地址`，选中即在当前终端执行 `ssh …`，见 §3.9-2）+ 三枚 18×18px 图标按钮（符号 12px）：**置顶开关**（置顶时 `pin` 图标 + 强调色，取消后 `pin-off`）、iTerm 交接、导出文本）；**头栏尺寸随终端字号缩放**（`--term-header-font-size`，默认 12px：高 `max(22px, 字号+6px)`，24px 字号 → 30px），头部为拖拽区、红绿灯与图标区为 `no-drag`，头栏不挂 `data-tip`。
+- 头部：**22px** 自绘头栏 `#term-header`（左侧**自绘小红绿灯** ×3、**左右 padding 各 10px** —— **红绿灯尺寸随头栏字号缩放**（字号×0.75 圆点 / ×0.5 符号，12px→9px/6px），系统红绿灯已隐藏，点击 = `window:control` 关闭 / 最小化 / 缩放；**不显示任何标题文字**；右侧图标区：**SSH 主机下拉**（默认 130×18px，条目 `用户名@主机地址`，选中即在当前终端执行 `ssh …`，见 §3.9-2）+ 四枚 18×18px 图标按钮（符号 12px）：**文件**（`folder`，无 ssh 目标时禁用、连接中图标旋转、面板展开时强调色，见 §3.9-10）、**置顶开关**（置顶时 `pin` 图标 + 强调色，取消后 `pin-off`）、iTerm 交接、导出文本）；**头栏字号 = 终端字号 + 1**（`--term-header-font-size`，默认终端 12px → 头栏 13px：高 `max(22px, 字号+6px)`，终端 24px → 头栏 25px / 高 30px），头部为拖拽区、红绿灯与图标区为 `no-drag`，头栏不挂 `data-tip`。
 - 主体：xterm.js 终端铺满剩余区域（外层 `#term-host` 负责 6.5 / 13px 留白，xterm 挂在无内边距的 `#term-fit` 上，保证 `FitAddon` 按真实可用区算行数 —— 最后一行完整可见、页面不可滚动，见 §3.9），滚动缓冲 **10000 行**、**不显示滚动条**（滚轮 / 触控板滚动缓冲区，防跳变见 §3.9）。
+- 内嵌文件面板（`#file-panel` + `#term-divider`，见 §3.9-10、§8.6）：默认隐藏，由头部文件夹按钮显隐；面板与终端间是 **6px 可拖动分隔线**（中间一条 1px 线，`:hover` 变强调色加粗；**面板自身不画上边框，所以只有这一条线**），面板高度 = `file-layout.json` 的 `panelHeight`（默认 260px、最小 120px，向上拖 = 终端变小），**字体跟随终端字号**（`--file-font-size`）。面板内容由 `scripts/file-manager.js` 构建（见 §8.6），左目录树初始宽 300px、列宽与面板高度均可拖动并持久化。
 - 入口：主面板底部栏「终端」图标；SSH 连接（§3.4）也会拉起本窗口。
+
+### 8.6 文件管理（内嵌面板 / 独立文件窗口）
+
+- 复用组件：`scripts/file-manager.js` 的 `ShipsFileManager.create()` 同时服务终端窗口的内嵌面板与独立文件窗口，结构为 `.fm-wrap` = `.fm-main`（左 `.fm-tree-pane` 目录树 + `.fm-divider-v` 4px 分隔线 + 右 `.fm-list-pane` 文件列表）+ `.fm-status` 状态栏。
+- 路径行（`.fm-path-row`，顺序固定，**高度与文件列表表头一致 1.9em，两条下边框对齐**）：**刷新** / **家目录** / 路径输入框 /（内嵌面板才有）**在终端 cd 到此目录**。点「刷新」同时清掉状态栏的完成提示。**上传 / 分离为独立窗口** 两个按钮放在**列表头最右的操作区**（上传在左、分离在其右；分离只有内嵌面板才有）。
+- 目录树：行高 `1.85em`、缩进 14px/级，`caret-right` 展开时旋转 90°、`folder` 图标，选中目录行强调色 15% 底；点文件列表某行时树滚动定位到该文件所在目录节点。
+- 文件列表：表头与行共用网格 `1.9em | var(--fm-name) | var(--fm-size) | var(--fm-perm) | var(--fm-time)`（图标 / 文件名 / 体积 / **权限（在时间左边）** / 时间；列宽默认 **160 / 60 / 90 / 130px**）；**文件名 / 体积 / 权限 / 时间四列右缘有拖动把手**改变列宽；**权限列**由 `attrs.mode` 格式化为 `drwxr-xr-x`。行内**无下载按钮**，**右键**行弹出 `.fm-menu` 菜单：**下载**、**复制传输命令**（菜单字号 / 条目高度 / 内边距与头部 SSH 下拉一致，随 `--term-header-font-size` 缩放）；**目录树节点也支持右键**「复制传输命令」。复制传输命令由 `sftp:transfer-command` 生成 `scp [-P 端口] [-i 私钥] [-r] 用户@主机:'远端路径' 下载目录`（目录加 `-r`，端口 22 / 默认私钥省略）并写入系统剪贴板，状态栏回显「已复制：<命令>」。上传支持**拖拽**（`.drag-over` 虚线强调色描边）与**「时间」列表头里的上传按钮**（多选文件）；**上传 / 分离两个按钮都在「时间」列的列表头内**（左「时间」标签、右两个按钮），分离按钮仅内嵌面板显示。列宽与树宽写入 `file-layout.json`（内嵌）/ `file-window-layout.json`（独立窗口）。
+- 状态栏：左=当前绝对路径；中=**进度条** `.fm-progress`（上传 / 下载时显示，`sftp:progress` 回填百分比）；右=状态信息（连接 / 上传 / 下载 / 错误）。
+- 字体：`.fm-root { font-size: var(--file-font-size) }`；终端窗口由 `terminal.js` 跟随终端字号，独立窗口由 `file-window.js` 跟随设置与 `Cmd +/-`。
+- 独立文件窗口 `file-window.html`：头栏 `#file-header`（自绘小红绿灯 + SSH 下拉 `select-compact` + 图钉），主体 `#file-root` 即 `.fm-root`；`alwaysOnTop` 默认开、`titleBarStyle: hiddenInset`、`setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true })`；屏幕 / 位置 / 尺寸记入 `file-window.json`。
 
 ---
 
@@ -542,11 +572,11 @@ flowchart TD
 ## 10. 连接测试
 
 - **设置 · 网络测试**（§3.8）：在本地或通过 SSH 主机执行 `nc` / `curl` / `ping` / `arp` / `nmap` 一次性命令，输出显示在设置页内嵌的 xterm 终端；校验与命令映射见 §3.8。
-- **SSH 的可用性**通过 **SSH 管理 → 探测操作系统** 隐式验证（同时也是目录浏览所用连接）：
+- **SSH 的可用性**通过 **SSH 管理 → 探测操作系统** 隐式验证：
   - 步骤：点击探测 → 后台 `ssh2` 连接 → 读取 `uname -s` 与 `/etc/os-release`，识别到具体发行版。
   - 成功判定：连接建立且命令返回可识别系统。
   - 超时：`readyTimeout = 8000ms`；失败归类为 `unknown`。
-- **目录浏览的可用性**：`ssh:list-dir` 的远端退出码映射为 `noDir`（3，目录不存在 / 无权限）、`noPath`（4，无法解析绝对路径）、`listFailed`（5，列目录失败），另有 `timeout`（20s 无响应）与 `connect`（连接 / 认证失败）；失败时主面板红字提示并写入 `ships.log`。
+- **文件管理（SFTP）的可用性**：`sftp:connect` 以 ssh2 建立连接，`code` ∈ `proxyjump`（配置带 -J，ssh2 不支持）、`auth`（认证失败）、`timeout`（`readyTimeout = 12000ms`）、`sftp`（子系统启动失败）、`connect`（其它连接错误）、`no-target`（未检测到 ssh 目标）；`sftp:list` 的失败映射 `noDir`（目录不存在 / 无权限）/ `listFailed`；失败在文件面板状态栏红字提示并写入 `ships.log`。
 
 ---
 
@@ -573,8 +603,7 @@ flowchart TD
 | `--color-success` | `#2f9e44` | `#4ade80` |
 
 - JSON 语法色：`--color-json-key/str/num/bool/null`（深浅各一套）。
-- **强调色使用范围**：`--color-accent` 仅用于高亮与控件（TAB 选中、分段控件、开关、焦点环、强调按钮、色板等），**不**用于卡片 / 输入框的边框与背景（这些保持中性色）；**唯一例外**是 SSH 目录浏览中「上次打开的目录」整行高亮（`.row-card.row-last`）。
-- **目录浏览行底色 / 高亮色**：`constants.css` 的 `--color-row-dir-bg` = `color-mix(in srgb, var(--color-fg) 4%, var(--color-surface))`（文件夹行 `.row-card.row-dir`，浅色下约 `#f6f6f6`）；`--color-last-bg` = `color-mix(in srgb, var(--color-accent) 16%, var(--color-surface))`、`--color-last-border` = 35% 强调色 + `--color-border`（「上次打开的目录」整行高亮，浅色下 `#dee7ff`、深色下 `#2b344d`）；`.row-card.row-last` 在 `.row-card.row-dir` 之后声明，故高亮优先于文件夹底色 —— 改这几处即全局生效。
+- **强调色使用范围**：`--color-accent` 仅用于高亮与控件（TAB 选中、分段控件、开关、焦点环、强调按钮、色板、文件管理的选中行 / 分隔线悬浮等），**不**用于卡片 / 输入框的边框与背景（这些保持中性色）。
 - **清晰度**：`theme.js` 按 `window.devicePixelRatio` 在 `<html>` 上设置 `data-dpr`（≥2 为 `2`，否则 `1`，并在 `resize` / 分辨率变化时更新）。仅当 `data-dpr="2"` 时，卡片 / 输入框 / 分段 / 下拉等使用 **0.5px 发丝线**、浅色卡片带轻微投影；非 HiDPI 下**不使用**这些效果。
 - 强调色由设置写入 `:root` 的 `--color-accent`；TAB 选中、开关、按钮等统一引用。
 - **Liquid Glass / 毛玻璃配色**：`[data-vibrancy='on']`（浅色）与 `[data-vibrancy='on'][data-theme='dark']`（深色）在 `constants.css` 中把 `--color-bg` 覆盖为 `transparent`，并把 `--color-surface/-2/-3` 调成**极淡的半透明白**（`0.08 / 0.12 / 0.22`）：卡片 / 输入框几乎不填色、仅留描边与极淡一层，让原生玻璃的 blur 与折射直接透出（贴近系统 Liquid Glass 应用）；同时**加深文字**（浅色 `--color-fg` 纯黑、`--color-fg-muted` 黑 55%；深色反之）保证可读性。弹层 `select-menu` 额外用 `--color-surface-3` 提高辨识度。属性由主面板 `app.js` 设置，设置窗口不设置（保持不透明）。材质明暗由主进程 `nativeTheme.themeSource`（取 `settings.theme`）控制。
@@ -588,8 +617,9 @@ flowchart TD
 | `--tabbar-height` | 46px |
 | `--footer-height` | 34px |
 | `--term-header-height` | 22px（终端窗口头栏最小高度，刚好放下自绘小红绿灯；实际为 `max(22px, --term-header-font-size + 6px)`） |
-| `--term-header-font-size` | 12px（终端窗口头栏字号，`terminal.js` 的 `applyFontSize()` 跟随终端字号改写） |
+| `--term-header-font-size` | 13px（终端窗口头栏字号 = **终端字号 + 1**，`terminal.js` 的 `applyFontSize()` 改写；独立文件窗口为 **文件字号 + 1**） |
 | `--term-padding-y` | 0px（终端内容与窗口四边的留白；0 = 终端铺满整个窗口） |
+| `--file-font-size` | 12px（文件管理基础字号；终端窗口里由 `terminal.js` 跟随终端字号改写，独立窗口由 `file-window.js` 跟随设置与 `Cmd +/-`，见 §8.6） |
 | `--traffic-size` / `--traffic-glyph-size` | 9px / 6px（头栏自绘小红绿灯的圆点直径与悬浮符号尺寸） |
 | `--traffic-close` / `--traffic-minimize` / `--traffic-zoom` / `--traffic-inactive` | `#ff5f57` / `#febc2e` / `#28c840` / 失焦灰（浅色 `rgba(0,0,0,.18)`、深色 `rgba(255,255,255,.28)`） |
 | `--radius-window` | 12px |
@@ -601,17 +631,16 @@ flowchart TD
 
 **组件**
 
-- 输入 `field`、按钮 `btn` / `btn-accent`、图标按钮 `icon-btn`、结果行 `row-card`（目录浏览条目用 `row-card row-compact`，更紧凑）、TAB `tab` / `tab-active`、开关 `switch`、分段控件 `segment`、色块 `swatch`。
+- 输入 `field`、按钮 `btn` / `btn-accent`、图标按钮 `icon-btn`、结果行 `row-card`、TAB `tab` / `tab-active`、开关 `switch`、分段控件 `segment`、色块 `swatch`。
 - **纵向间距统一 10px**：工具/设置分区用 `.section`（`gap: 10px`、`margin-bottom: 10px`）；结果行、输入、区块之间的间距均为 10px（不再混用 8/12/16px）。
 - **统一标题**：每个工具内容区顶部由 `app.js` 渲染统一头部 `.tool-head`（标题取 `tools.<id>`、说明取 `toolDesc.<id>`）；切换 TAB 时内容区自动滚动回顶部。
 - 自绘控件：下拉框 `select-trigger` / `select-menu` / `select-option`（`ShipsUI.createSelect`，替代系统 `<select>`；`.select-trigger.select-compact` 是头栏尺寸变体 —— 内边距 6px / 圆角取更紧凑的 `--radius-control-sm`（4px，比常规控件的 8px 小），字号与高度由 `#term-actions` 规则按头栏字号推导；终端窗口的下拉菜单由 `body.term-window .select-menu` 限定为 130px 宽、条目高度与下拉本体一致，用于终端窗口头栏里的 SSH 主机下拉）；**终端窗口自绘小红绿灯** `.traffic-light`（`.traffic-close` / `.traffic-minimize` / `.traffic-zoom`，9px 圆点 + 悬浮符号，见 §3.9-2）；悬浮提示 `ships-tip`（`ShipsUI.initTooltips`，元素加 `data-tip`，时间戳工具的偏移输入框用 `data-tip` 说明表达式语法）；JSON 覆盖式高亮编辑器 `json-editor` 与结构树 `json-tree`。
 - 输入校验态：普通输入框加 `.invalid` 时描红（`border-color: var(--color-danger)`），时间戳工具的两个偏移输入框即用它表示偏移表达式非法；`.field:disabled` 半透明 + `not-allowed` 光标（IP 工具网络测试在 ICMP / ARP / 扫描主机下禁用端口输入）。
 - 分段控件：`ShipsUI.segmented(options, value, onSelect, { className })` 支持选项 `disabled`（置灰不可点选，`.segment button:disabled` 透明 0.4）、`tip`（悬浮提示，配合 `data-tip`）与 `setOptions()`（原地重建，用于跟随状态变化）；`.segment-compact` 为单行多段变体（内边距 4px / 6px），设置 → 网络测试的类型切换即用它。
-- 悬浮操作图标：目录浏览中**只有目录条目**用 `group` + `invisible group-hover:visible`（未悬浮时不可见，且不产生布局跳动；文件条目不加该图标）；「上次」标记用 `.chip`。
+- 悬浮操作图标：文件列表每行的**下载按钮**用 `visibility:hidden` → 行 `:hover` 显示（不产生布局跳动）。
 - 内嵌终端：设置 → 网络测试使用 **xterm.js**（`@xterm/xterm` + `@xterm/addon-fit`，从 `node_modules` 直接以 `<script>` / `<link>` 加载，配合 `FitAddon` + `ResizeObserver` 自适应），高度随面板伸缩（最小 200px），配色读取 `constants.css` 的 CSS 变量（`--color-bg` / `--color-fg` / `--color-accent`）；后端是 `src/main/scripts/pty-bridge.py` 创建的真实 PTY（Python 标准库，无 node-pty 原生依赖），因此终端可交互（键盘输入直通 PTY，支持 `clear` / Ctrl-C / sudo 提示）。
-- 固定头部布局：`.tool-fixed`（由工具加在 `#content` 上）把内容区改为列方向 flex + `overflow: hidden`，`.tool-head` 不收缩、其后工具容器 `flex: 1 1 auto; min-height: 0`，工具自身再让列表 `flex: 1 1 0%; min-height: 0; overflow-y: auto` —— 顶部标题与工具顶栏固定，只有列表滚动。目前仅 SSH 目录浏览使用。
 - 视觉点缀：不使用 emoji；SSH 探测结果直接使用 `assets/icons` 中的品牌彩色图标（Ubuntu/Fedora/Arch/CentOS/… 及 Windows），macOS 用灰色 command 图标；IP 归属地展示彩色国旗。
-- **动效**：TAB 选中、分段控件、下拉菜单、开关、JSON 视图切换均有过渡 / 入场动画；工具与设置分区内容进入时带 `ships-fade-up`，下拉菜单与 TAB 选中带 `ships-pop`（详见 `styles/tailwind.css` 的 Motion 段）；SSH 目录浏览的失败反馈用 `ships-blink-error`（`.blink-error`，边框 + 底色红闪 3 次后自动移除，无文案、无重排）。
+- **动效**：TAB 选中、分段控件、下拉菜单、开关、JSON 视图切换均有过渡 / 入场动画；工具与设置分区内容进入时带 `ships-fade-up`，下拉菜单与 TAB 选中带 `ships-pop`（详见 `styles/tailwind.css` 的 Motion 段）；文件管理的上传 / 下载进度用 `.fm-progress-fill` 宽度过渡。
 - 图标按钮与 TAB 一律通过 `data-tip` 提供悬浮说明。
 
 **平台差异**

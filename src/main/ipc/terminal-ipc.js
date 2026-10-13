@@ -23,6 +23,7 @@ const TERMINAL_SETTING_KEYS = [
   'terminalHotkey',
   'terminalCloseAction',
   'sshBuiltinTerminal',
+  'sftpDownloadDir',
 ];
 
 function terminalDefaults() {
@@ -31,15 +32,16 @@ function terminalDefaults() {
   return patch;
 }
 
-// The always-on-top terminal window owns one session; other features (SSH connect,
-// network tests) can inject a command into it while it is open.
-let overlaySessionId = '';
+// Each terminal window owns its own session; other features (SSH connect, network
+// tests) inject a command into the most recently focused terminal window.
 let overlayLastCommand = '';
-let pendingInject = '';
+// webContents.id -> session id（该终端窗口当前的 PTY 会话）
+const sessionByOwner = new Map();
+// webContents.id -> 待注入命令（窗口刚打开、会话还没就绪时先记下）
+const pendingByOwner = new Map();
 
 function isOverlaySender(event) {
-  const win = wm.getTerminalWindow();
-  return Boolean(win && !win.isDestroyed() && win.webContents.id === event.sender.id);
+  return wm.isTerminalWebContents(event.sender.id);
 }
 
 const EVENT_CHANNELS = {
@@ -54,15 +56,19 @@ function emitTo(sender) {
   };
 }
 
-/* Runs `command` in the terminal window, opening it first when needed. */
+/* Runs `command` in a terminal window: the focused one if any, otherwise a new one
+   (windows never move across desktops — we never pull an existing one over). */
 function runInTerminal(command) {
   if (!command) return false;
-  wm.openTerminalWindow();
+  const win = wm.getFocusedTerminalWindow() || wm.openTerminalWindow();
   overlayLastCommand = command;
-  if (overlaySessionId && terminal.get(overlaySessionId)) {
-    terminal.inject(overlaySessionId, command);
+  if (!win || win.isDestroyed()) return false;
+  const ownerId = win.webContents.id;
+  const sessionId = sessionByOwner.get(ownerId);
+  if (sessionId && terminal.get(sessionId)) {
+    terminal.inject(sessionId, command);
   } else {
-    pendingInject = command; // flushed once the window's session reports in
+    pendingByOwner.set(ownerId, command); // flushed once the window's session reports in
   }
   return true;
 }
@@ -72,13 +78,20 @@ function registerTerminalIpc(ipcMain) {
   ipcMain.handle(IPC.TERMINAL_OPEN, () => ({ ok: Boolean(wm.openTerminalWindow()) }));
 
   ipcMain.handle(IPC.TERMINAL_START, (event, payload) => {
-    const started = terminal.start(payload, emitTo(event.sender));
+    const ownerId = event.sender.id;
+    const baseEmit = emitTo(event.sender);
+    const started = terminal.start(payload, (message) => {
+      if ((message.type === 'exit' || message.type === 'error') && sessionByOwner.get(ownerId) === message.id) {
+        sessionByOwner.delete(ownerId);
+      }
+      baseEmit(message);
+    });
     if (isOverlaySender(event)) {
-      overlaySessionId = started.id;
-      if (pendingInject) {
-        const command = pendingInject;
-        pendingInject = '';
-        terminal.inject(started.id, command);
+      sessionByOwner.set(ownerId, started.id);
+      const pending = pendingByOwner.get(ownerId);
+      if (pending) {
+        pendingByOwner.delete(ownerId);
+        terminal.inject(started.id, pending);
       }
     }
     return started;
@@ -97,8 +110,9 @@ function registerTerminalIpc(ipcMain) {
      「关闭按钮行为=隐藏」影响（隐藏会让一个已结束的会话挂在后台）。 */
   ipcMain.handle(IPC.TERMINAL_DESTROY, (event) => {
     if (!isOverlaySender(event)) return { ok: false };
+    const win = wm.getTerminalWindowForWebContents(event.sender.id);
     // 先回包再销毁：销毁窗口会让渲染层收不到 IPC 回复
-    setImmediate(() => wm.destroyTerminalWindow());
+    setImmediate(() => wm.destroyTerminalWindow(win));
     return { ok: true };
   });
 
@@ -115,7 +129,13 @@ function registerTerminalIpc(ipcMain) {
      只接受来自终端窗口本身的请求；低于最小高度 / 无变化时不动。 */
   ipcMain.handle(IPC.TERMINAL_SNAP_SIZE, (event, payload) => {
     if (!isOverlaySender(event)) return { ok: false };
-    return wm.requestTerminalSnap(payload || {});
+    return wm.requestTerminalSnap(wm.getTerminalWindowForWebContents(event.sender.id), payload || {});
+  });
+
+  /* 打开内嵌文件面板时把本窗口「只放大不缩小」到至少给定内容尺寸（保证文件管理空间）。 */
+  ipcMain.handle(IPC.TERMINAL_ENSURE_SIZE, (event, payload) => {
+    if (!isOverlaySender(event)) return { ok: false };
+    return wm.ensureTerminalContentSize(wm.getTerminalWindowForWebContents(event.sender.id), payload || {});
   });
 
   /* 全局快捷键：先试注册，成功了才写设置 —— 否则会存下一个按不出来（被占用 / 非法）的组合键。
@@ -140,21 +160,28 @@ function registerTerminalIpc(ipcMain) {
   /* Right-click on the terminal (Windows cmd style): copy the current selection when
      there is one, otherwise paste the system clipboard into the running shell. Both
      only respond to the terminal window itself. */
-  ipcMain.handle(IPC.TERMINAL_COPY_TEXT, (event, payload) => {
+  ipcMain.handle(IPC.TERMINAL_COPY_TEXT, async (event, payload) => {
     if (!isOverlaySender(event)) return { ok: false };
     const text = String((payload && payload.text) || '');
     if (!text) return { ok: false };
-    clipboard.writeText(text);
+    // Electron 的 clipboard 读写在新版是异步的：必须 await，否则返回的 Promise 无法被 IPC 序列化。
+    await clipboard.writeText(text);
     return { ok: true };
   });
 
-  ipcMain.handle(IPC.TERMINAL_PASTE_TEXT, (event) => {
+  ipcMain.handle(IPC.TERMINAL_PASTE_TEXT, async (event) => {
     if (!isOverlaySender(event)) return { ok: false, text: '' };
-    return { ok: true, text: clipboard.readText() || '' };
+    let text = '';
+    try {
+      text = String((await clipboard.readText()) || '');
+    } catch (err) {
+      text = '';
+    }
+    return { ok: true, text };
   });
 
   /* Export: dump the xterm buffer text into a local file chosen by the user. */
-  ipcMain.handle(IPC.TERMINAL_EXPORT, async (_event, payload) => {
+  ipcMain.handle(IPC.TERMINAL_EXPORT, async (event, payload) => {
     const text = String((payload && payload.text) || '');
     const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
     const options = {
@@ -162,7 +189,7 @@ function registerTerminalIpc(ipcMain) {
       defaultPath: (payload && payload.name) || path.join(os.homedir(), `ships-terminal-${stamp}.txt`),
       filters: [{ name: 'Text', extensions: ['txt', 'log'] }],
     };
-    const win = wm.getTerminalWindow();
+    const win = wm.getTerminalWindowForWebContents(event.sender.id);
     const result = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options);
     if (result.canceled || !result.filePath) return { ok: false, canceled: true };
     try {
@@ -175,12 +202,12 @@ function registerTerminalIpc(ipcMain) {
   });
 
   /* Hand the session over to iTerm (same command when known) and close the window. */
-  ipcMain.handle(IPC.TERMINAL_OPEN_ITERM, async () => {
+  ipcMain.handle(IPC.TERMINAL_OPEN_ITERM, async (event) => {
     const command = overlayLastCommand || `${terminal.loginShell()} -l`;
     const result = await iterm.openCommand(command, 'terminal:handoff');
     if (result && result.ok) {
       // 交接成功 = 会话交给 iTerm：这里必须销毁（而不是按关闭行为隐藏）
-      wm.destroyTerminalWindow();
+      wm.destroyTerminalWindow(wm.getTerminalWindowForWebContents(event.sender.id));
     }
     return result && result.ok
       ? { ok: true, command }

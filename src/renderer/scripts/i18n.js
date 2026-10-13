@@ -7,6 +7,10 @@ window.ShipsI18n = (function createI18n() {
       settings: '设置',
       networkTest: '网络测试',
       terminal: '终端（置顶）',
+      fileManager: '文件管理',
+      themeSystem: '外观：跟随系统',
+      themeLight: '外观：浅色',
+      themeDark: '外观：深色',
       emptyTools: '暂无可用工具',
       common: {
         copy: '复制',
@@ -54,6 +58,10 @@ window.ShipsI18n = (function createI18n() {
       settings: 'Settings',
       networkTest: 'Network test',
       terminal: 'Terminal (on top)',
+      fileManager: 'Files',
+      themeSystem: 'Appearance: system',
+      themeLight: 'Appearance: light',
+      themeDark: 'Appearance: dark',
       emptyTools: 'No tools available',
       common: {
         copy: 'Copy',

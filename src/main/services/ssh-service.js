@@ -183,21 +183,6 @@ class SshService extends EventEmitter {
     return iterm.openCommand(command, `ssh connect(alias=${host.alias})`);
   }
 
-  /* Command that opens an interactive login shell on the host already inside dir,
-     i.e. the same state as typing `ssh <host>` and then `cd <dir>` by hand.
-     `;` (not `&&`) keeps the shell alive even if the directory disappeared.
-     The caller decides where to run it (built-in terminal window or iTerm). */
-  buildOpenAtCommand(host, dir) {
-    const remote = 'cd ' + shellQuote(dir || '~') + '; exec ${SHELL:-/bin/sh} -l';
-    const command = this.buildCommand(host, { forceTty: true, command: shellQuote(remote) });
-    logger.file(`[ssh] open-at(alias=${host.alias}) dir=${dir || '~'} command: ${command}`);
-    return command;
-  }
-
-  openAt(host, dir) {
-    return iterm.openCommand(this.buildOpenAtCommand(host, dir), `ssh open-at(alias=${host.alias})`);
-  }
-
   detect(host) {
     if (!host || !host.alias || this.pending.has(host.alias)) return;
     logger.file(`[ssh] detect start alias=${host.alias} host=${host.hostName} port=${host.port} user=${host.user || '-'} identity=${host.identityFile || '-'}`);

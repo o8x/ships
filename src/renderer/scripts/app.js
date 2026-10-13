@@ -12,7 +12,9 @@
     content: document.getElementById('content'),
     version: document.getElementById('footer-version'),
     terminal: document.getElementById('btn-terminal'),
+    files: document.getElementById('btn-files'),
     networkTest: document.getElementById('btn-network-test'),
+    theme: document.getElementById('btn-theme'),
     pin: document.getElementById('btn-pin'),
     settings: document.getElementById('btn-settings'),
   };
@@ -113,6 +115,22 @@
     dom.brand.classList.toggle('brand-drag', pinned);
   }
 
+  /* 底部「外观」按钮：跟随系统 / 浅色 / 深色 循环切换，图标与提示随当前值变化。 */
+  function renderThemeButton() {
+    if (!dom.theme) return;
+    const theme = state.settings.theme || 'system';
+    const icon = theme === 'light' ? Icons.sun : theme === 'dark' ? Icons.moon : Icons.monitor;
+    dom.theme.innerHTML = (icon || Icons.monitor)(15);
+    dom.theme.setAttribute('data-tip', i18n.t(`theme${theme.charAt(0).toUpperCase()}${theme.slice(1)}`));
+    dom.theme.style.color = theme === 'system' ? '' : 'var(--color-accent)';
+  }
+
+  function cycleTheme() {
+    const theme = state.settings.theme || 'system';
+    const next = theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system';
+    window.ships.setSettings({ theme: next });
+  }
+
   function renderFooter() {
     dom.version.textContent = `v${state.version}`;
     dom.settings.innerHTML = Icons.gear(18);
@@ -121,6 +139,9 @@
     dom.networkTest.setAttribute('data-tip', i18n.t('networkTest'));
     dom.terminal.innerHTML = Icons.terminal(15);
     dom.terminal.setAttribute('data-tip', i18n.t('terminal'));
+    dom.files.innerHTML = Icons.folder(15);
+    dom.files.setAttribute('data-tip', i18n.t('fileManager'));
+    renderThemeButton();
   }
 
   function applySettings(settings) {
@@ -155,14 +176,18 @@
     dom.settings.addEventListener('click', () => window.ships.openSettings());
     dom.networkTest.addEventListener('click', () => window.ships.openSettings('network'));
     dom.terminal.addEventListener('click', () => window.ships.openTerminal());
+    // 打开独立文件管理窗口，不选中任何连接（target 传空串）。
+    dom.files.addEventListener('click', () => window.ships.fileWindow.open(''));
     dom.pin.addEventListener('click', () => {
       window.ships.setSettings({ pinWindow: !state.settings.pinWindow });
     });
+    dom.theme.addEventListener('click', cycleTheme);
 
     window.ships.onSettingsChanged((next) => {
       const localeChanged = next.locale !== state.settings.locale;
       applySettings(next);
       updatePin();
+      renderThemeButton();
       if (localeChanged) {
         renderTabs();
         renderFooter();

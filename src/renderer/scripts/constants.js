@@ -47,12 +47,6 @@ window.ShipsConstants = {
     readme: 'doc',
   },
   DEFAULT_FILE_ICON: 'file',
-  // SSH 目录浏览顶栏的快捷入口（按顺序显示为图标按钮，点击直接进入）；
-  // icon 为 assets/icons 下的文件名（camelCase）。
-  SSH_QUICK_PATHS: [
-    { path: '/root', icon: 'home' },
-    { path: '/tmp', icon: 'tempFile' },
-  ],
   // IP 工具：端口测试可选协议（needsPort=false 时禁用端口输入）。
   // 需与 src/main/utils/net-test.js 的 PROTOCOLS 保持一致。
   NET_TEST_PROTOCOLS: [

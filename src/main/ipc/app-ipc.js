@@ -1,6 +1,7 @@
 'use strict';
 
-const { app, shell } = require('electron');
+const { app, shell, BrowserWindow, dialog } = require('electron');
+const os = require('os');
 const { IPC, VERSION, TERMINAL_WINDOW } = require('../../shared/constants');
 const { DATA_DIR, LOG_FILE, describeDataFiles } = require('../utils/paths');
 
@@ -33,6 +34,28 @@ function registerAppIpc(ipcMain) {
     }
     await shell.openExternal(url);
     return { ok: true };
+  });
+
+  // Directory picker (settings → terminal → SFTP download directory).
+  ipcMain.handle(IPC.DIALOG_OPEN_DIR, async (event, options) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const dialogOptions = { properties: ['openDirectory', 'createDirectory', 'showHiddenFiles'] };
+    if (options && options.defaultPath) {
+      const dir = String(options.defaultPath);
+      dialogOptions.defaultPath = dir.startsWith('~') ? dir.replace(/^~/, os.homedir()) : dir;
+    }
+    const result = win ? await dialog.showOpenDialog(win, dialogOptions) : await dialog.showOpenDialog(dialogOptions);
+    if (result.canceled || !result.filePaths.length) return null;
+    return { path: result.filePaths[0] };
+  });
+
+  // Multi-file picker for SFTP upload (file manager's upload button).
+  ipcMain.handle(IPC.DIALOG_OPEN_FILES, async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const dialogOptions = { properties: ['openFile', 'multiSelections', 'showHiddenFiles'] };
+    const result = win ? await dialog.showOpenDialog(win, dialogOptions) : await dialog.showOpenDialog(dialogOptions);
+    if (result.canceled || !result.filePaths.length) return { paths: [] };
+    return { paths: result.filePaths };
   });
 }
 

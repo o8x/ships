@@ -54,6 +54,14 @@
       "shell": ""
     },
     "sshBuiltinTerminal": true,
+    "sftpDownloadDir": "~/Downloads",
+    "fileWindow": {
+      "width": 900,
+      "height": 600,
+      "minWidth": 480,
+      "minHeight": 320,
+      "alwaysOnTop": true
+    },
     "defaultLocale": "zh",
     "defaultTheme": "system",
     "defaultAccent": "#2e6bfc"

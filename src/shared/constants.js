@@ -49,6 +49,7 @@ const IPC = {
   TERMINAL_DESTROY: 'terminal:destroy',
   TERMINAL_RESET: 'terminal:reset',
   TERMINAL_SNAP_SIZE: 'terminal:snap-size',
+  TERMINAL_ENSURE_SIZE: 'terminal:ensure-size',
   TERMINAL_RECALIBRATE: 'terminal:recalibrate',
   TERMINAL_DRAG_ACTIVE: 'terminal:drag-active',
   TERMINAL_ZOOM: 'terminal:zoom',
@@ -58,14 +59,33 @@ const IPC = {
   TERMINAL_COPY_TEXT: 'terminal:copy-text',
   TERMINAL_PASTE_TEXT: 'terminal:paste-text',
 
+  SFTP_CONNECT: 'sftp:connect',
+  SFTP_LIST: 'sftp:list',
+  SFTP_DOWNLOAD: 'sftp:download',
+  SFTP_UPLOAD: 'sftp:upload',
+  SFTP_CLOSE: 'sftp:close',
+  SFTP_TRANSFER_COMMAND: 'sftp:transfer-command',
+  SFTP_PROGRESS: 'sftp:progress',
+
+  FILES_LAYOUT_GET: 'files-layout:get',
+  FILES_LAYOUT_SET: 'files-layout:set',
+
+  FILE_WINDOW_OPEN: 'file-window:open',
+  FILE_WINDOW_INFO: 'file-window:info',
+  FILE_WINDOW_CLOSE: 'file-window:close',
+  FILE_WINDOW_SET_TOP: 'file-window:set-top',
+  FILE_WINDOW_ZOOM: 'file-window:zoom',
+  FILE_WINDOW_TARGET: 'file-window:target',
+
+  DIALOG_OPEN_DIR: 'dialog:open-dir',
+  DIALOG_OPEN_FILES: 'dialog:open-files',
+
   SSH_LIST: 'ssh:list',
   SSH_CONNECT: 'ssh:connect',
   SSH_DETECT: 'ssh:detect',
   SSH_DETECT_HOST: 'ssh:detect-host',
   SSH_GET_DETECTED: 'ssh:get-detected',
   SSH_DETECTED: 'ssh:detected',
-  SSH_LIST_DIR: 'ssh:list-dir',
-  SSH_OPEN_DIR: 'ssh:open-dir',
   SSH_CONFIG_READ: 'ssh-config:read',
   SSH_CONFIG_UPSERT: 'ssh-config:upsert',
   SSH_CONFIG_REMOVE: 'ssh-config:remove',
@@ -103,6 +123,18 @@ const TERMINAL_WINDOW = Object.assign(
   ships.terminalWindow || {}
 );
 
+// Detached file-manager window (floats like the terminal window).
+const FILE_WINDOW = Object.assign(
+  {
+    width: 900,
+    height: 600,
+    minWidth: 480,
+    minHeight: 320,
+    alwaysOnTop: true,
+  },
+  ships.fileWindow || {}
+);
+
 // macOS only: NSVisualEffectMaterial used when the native frosted glass is on.
 // 'hud' gives the strongly see-through, low-opacity look of the system HUD
 // (Control Center style); 'content'/'under-window' are effectively opaque/gray.
@@ -132,6 +164,10 @@ const DEFAULT_SETTINGS = {
   // 打开置顶终端窗口的全局快捷键（Electron accelerator，空字符串 = 不注册）
   terminalHotkey: TERMINAL_WINDOW.hotkey || 'CommandOrControl+Shift+Z',
   sshBuiltinTerminal: ships.sshBuiltinTerminal !== false,
+  // 内置终端文件面板：下载保存目录（默认 ~/Downloads）
+  sftpDownloadDir: ships.sftpDownloadDir || '~/Downloads',
+  // 独立文件窗口置顶
+  fileWindowAlwaysOnTop: FILE_WINDOW.alwaysOnTop !== false,
 };
 
 module.exports = {
@@ -142,6 +178,7 @@ module.exports = {
   WINDOW,
   SETTINGS_WINDOW,
   TERMINAL_WINDOW,
+  FILE_WINDOW,
   VIBRANCY,
   DEFAULT_SETTINGS,
 };

@@ -22,9 +22,14 @@ function applyZoom(direction, contents) {
   const target = contents || focusedContents();
   if (!target || target.isDestroyed()) return;
 
-  const terminalWin = wm.getTerminalWindow();
-  if (terminalWin && terminalWin.webContents === target) {
+  if (wm.isTerminalWebContents(target.id)) {
     target.send(IPC.TERMINAL_ZOOM, direction);
+    return;
+  }
+
+  const fileWin = wm.getFileWindow();
+  if (fileWin && fileWin.webContents === target) {
+    target.send(IPC.FILE_WINDOW_ZOOM, direction);
     return;
   }
 

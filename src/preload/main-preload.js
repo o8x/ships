@@ -1,6 +1,6 @@
 'use strict';
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 const { IPC } = require('../shared/constants');
 const { loadIcons } = require('./icons');
 const { get: getFlag } = require('./flags');
@@ -32,6 +32,16 @@ const api = {
   hashText: (text) => ipcRenderer.invoke(IPC.HASH_TEXT, text),
   hashFile: (file) => ipcRenderer.invoke(IPC.HASH_FILE, file),
   openFile: () => ipcRenderer.invoke(IPC.DIALOG_OPEN_FILE),
+  openDirectory: (options) => ipcRenderer.invoke(IPC.DIALOG_OPEN_DIR, options),
+  openFiles: () => ipcRenderer.invoke(IPC.DIALOG_OPEN_FILES),
+  // 拖拽上传用：取 File 对象的本地绝对路径（Electron 44 已移除 File.path）。
+  getPathForFile: (file) => {
+    try {
+      return webUtils.getPathForFile(file) || '';
+    } catch (err) {
+      return '';
+    }
+  },
   openTerminal: () => ipcRenderer.invoke(IPC.TERMINAL_OPEN),
   terminal: {
     start: (cols, rows, shell) => ipcRenderer.invoke(IPC.TERMINAL_START, { cols, rows, shell }),
@@ -46,6 +56,7 @@ const api = {
     openIterm: () => ipcRenderer.invoke(IPC.TERMINAL_OPEN_ITERM),
     setAlwaysOnTop: (value) => ipcRenderer.invoke(IPC.TERMINAL_SET_TOP, { value }),
     snapSize: (payload) => ipcRenderer.invoke(IPC.TERMINAL_SNAP_SIZE, payload),
+    ensureSize: (payload) => ipcRenderer.invoke(IPC.TERMINAL_ENSURE_SIZE, payload),
     onRecalibrate: (cb) => on(IPC.TERMINAL_RECALIBRATE, cb),
     onDragActive: (cb) => on(IPC.TERMINAL_DRAG_ACTIVE, cb),
     onZoom: (cb) => on(IPC.TERMINAL_ZOOM, cb),
@@ -53,13 +64,32 @@ const api = {
     onExit: (cb) => on(IPC.TERMINAL_EXIT, cb),
     onSession: (cb) => on(IPC.TERMINAL_SESSION, cb),
   },
+  sftp: {
+    connect: (target) => ipcRenderer.invoke(IPC.SFTP_CONNECT, { target }),
+    list: (id, path) => ipcRenderer.invoke(IPC.SFTP_LIST, { id, path }),
+    download: (id, path) => ipcRenderer.invoke(IPC.SFTP_DOWNLOAD, { id, path }),
+    upload: (id, localPath, remoteDir) => ipcRenderer.invoke(IPC.SFTP_UPLOAD, { id, localPath, remoteDir }),
+    close: (id) => ipcRenderer.invoke(IPC.SFTP_CLOSE, { id }),
+    transferCommand: (id, path, recursive) => ipcRenderer.invoke(IPC.SFTP_TRANSFER_COMMAND, { id, path, recursive }),
+    onProgress: (cb) => on(IPC.SFTP_PROGRESS, cb),
+  },
+  filesLayout: {
+    get: (scope) => ipcRenderer.invoke(IPC.FILES_LAYOUT_GET, { scope }),
+    set: (scope, patch) => ipcRenderer.invoke(IPC.FILES_LAYOUT_SET, { scope, patch }),
+  },
+  fileWindow: {
+    open: (target) => ipcRenderer.invoke(IPC.FILE_WINDOW_OPEN, { target }),
+    info: () => ipcRenderer.invoke(IPC.FILE_WINDOW_INFO),
+    close: () => ipcRenderer.invoke(IPC.FILE_WINDOW_CLOSE),
+    setAlwaysOnTop: (value) => ipcRenderer.invoke(IPC.FILE_WINDOW_SET_TOP, { value }),
+    onTarget: (cb) => on(IPC.FILE_WINDOW_TARGET, cb),
+    onZoom: (cb) => on(IPC.FILE_WINDOW_ZOOM, cb),
+  },
   ssh: {
     list: () => ipcRenderer.invoke(IPC.SSH_LIST),
     connect: (payload) => ipcRenderer.invoke(IPC.SSH_CONNECT, payload),
     detect: (payload) => ipcRenderer.invoke(IPC.SSH_DETECT, payload),
     onDetected: (cb) => on(IPC.SSH_DETECTED, cb),
-    listDir: (payload) => ipcRenderer.invoke(IPC.SSH_LIST_DIR, payload),
-    openDir: (payload) => ipcRenderer.invoke(IPC.SSH_OPEN_DIR, payload),
   },
 };
 

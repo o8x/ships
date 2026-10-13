@@ -26,12 +26,11 @@
           <button id="light-zoom" class="traffic-light traffic-zoom" type="button"></button>
         </div>
         <div id="term-actions" class="flex shrink-0 items-center" style="-webkit-app-region: no-drag">
+          <button id="btn-files" class="icon-btn" type="button"></button>
           <button id="btn-top" class="icon-btn" type="button"></button>
           <button id="btn-iterm" class="icon-btn" type="button"></button>
           <button id="btn-export" class="icon-btn" type="button"></button>
         </div>
-        <!-- 当前 SSH 会话标题（居中；手动输入 ssh / 头部下拉 / 目录浏览连接时自动更新） -->
-        <span id="term-title" class="hidden"></span>
         <!-- 拖动 / 缩放期间在中间显示「列 × 行」（iTerm 式），停手后隐藏 -->
         <span id="term-size" class="hidden"></span>
       </header>
@@ -39,6 +38,12 @@
       <main id="term-host" class="min-h-0 flex-1 overflow-hidden">
         <div id="term-fit" class="h-full w-full"></div>
       </main>
+      <!-- 终端 / 文件面板之间的可拖动分隔线（向上拖 = 终端变小），见 scripts/terminal-files.js -->
+      <div id="term-divider" class="hidden"></div>
+      <!-- 文件面板：点头部文件夹按钮显隐（不销毁连接），内容由 scripts/file-manager.js 构建 -->
+      <section id="file-panel" class="hidden">
+        <div id="file-panel-root" class="fm-root"></div>
+      </section>
     </div>
 
     <script src="./scripts/theme.js"></script>
@@ -47,6 +52,8 @@
     <script src="./scripts/ui.js"></script>
     <script src="../../node_modules/@xterm/xterm/lib/xterm.js"></script>
     <script src="../../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+    <script src="./scripts/file-manager.js"></script>
+    <script src="./scripts/terminal-files.js"></script>
     <script src="./scripts/terminal.js"></script>
   </body>
 </html>

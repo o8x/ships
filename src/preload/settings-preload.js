@@ -25,6 +25,7 @@ const api = {
   sshDetectHost: (host) => ipcRenderer.invoke(IPC.SSH_DETECT_HOST, host),
   sshGetDetected: () => ipcRenderer.invoke(IPC.SSH_GET_DETECTED),
   openFile: (options) => ipcRenderer.invoke(IPC.DIALOG_OPEN_FILE, options),
+  openDirectory: (options) => ipcRenderer.invoke(IPC.DIALOG_OPEN_DIR, options),
   terminal: {
     start: (cols, rows, shell) => ipcRenderer.invoke(IPC.TERMINAL_START, { cols, rows, shell }),
     input: (id, data) => ipcRenderer.invoke(IPC.TERMINAL_INPUT, { id, data }),

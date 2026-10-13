@@ -5,7 +5,6 @@ const { IPC } = require('../../shared/constants');
 const { Notification, dialog, BrowserWindow } = require('electron');
 const configService = require('../services/ssh-config-service');
 const sshService = require('../services/ssh-service');
-const browseService = require('../services/ssh-browse-service');
 const { broadcast, getMainWindow } = require('../window-manager');
 const { runInTerminal } = require('./terminal-ipc');
 const logger = require('../utils/logger');
@@ -65,37 +64,6 @@ function registerSshIpc(ipcMain) {
   });
 
   ipcMain.handle(IPC.SSH_GET_DETECTED, () => sshService.getDetected());
-
-  // Directory browser. `path` omitted → start at the parent of the remembered
-  // directory (or the home directory). `remember: true` records the path — but only
-  // after it actually listed, so a typo in the path bar is never remembered.
-  ipcMain.handle(IPC.SSH_LIST_DIR, async (_event, payload) => {
-    const host = findHost(payload && payload.alias);
-    if (!host) return { ok: false, code: 'host', error: 'host not found' };
-    const dir = (payload && payload.path) || '';
-    const result = await browseService.listDir(host, dir);
-    if (result && result.ok && result.path && payload && payload.remember) {
-      browseService.rememberDir(host.alias, result.path);
-    }
-    return result;
-  });
-
-  /* 目录浏览里的「打开」与 SSH_CONNECT 同一套开关：内置终端开着就在置顶终端窗口
-     里执行同一条命令，关掉才退回 iTerm（否则这里会无视设置总是弹出 iTerm）。 */
-  ipcMain.handle(IPC.SSH_OPEN_DIR, async (_event, payload) => {
-    const host = findHost(payload && payload.alias);
-    if (!host) return { ok: false, code: 'host', error: 'host not found' };
-    const dir = (payload && payload.path) || '';
-    const settingsService = require('../services/settings-service');
-    if (settingsService.get('sshBuiltinTerminal') === false) {
-      return browseService.openAt(host, dir);
-    }
-    const command = sshService.buildOpenAtCommand(host, dir);
-    if (dir) browseService.rememberDir(host.alias, dir);
-    logger.file(`[ssh] open-at(alias=${host.alias}) -> terminal`);
-    if (!runInTerminal(command)) return { ok: false, error: 'terminal unavailable', command };
-    return { ok: true, command };
-  });
 
   ipcMain.handle(IPC.SSH_CONFIG_READ, () => configService.list());
   ipcMain.handle(IPC.SSH_CONFIG_UPSERT, (_event, host) => configService.upsert(host));

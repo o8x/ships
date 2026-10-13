@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    />
+    <title>Ships Files</title>
+    <link rel="stylesheet" href="./styles/constants.css" />
+    <link rel="stylesheet" href="./styles/tailwind.build.css" />
+  </head>
+  <body class="term-window file-window bg-transparent">
+    <div class="flex h-full w-full flex-col overflow-hidden" style="background: var(--color-bg)">
+      <header
+        id="file-header"
+        class="flex shrink-0 items-center justify-between gap-2 px-3"
+        style="border-bottom: 1px solid var(--color-border); -webkit-app-region: drag"
+      >
+        <div id="file-lights" class="flex shrink-0 items-center" style="-webkit-app-region: no-drag">
+          <button id="light-close" class="traffic-light traffic-close" type="button"></button>
+          <button id="light-minimize" class="traffic-light traffic-minimize" type="button"></button>
+          <button id="light-zoom" class="traffic-light traffic-zoom" type="button"></button>
+        </div>
+        <div id="file-actions" class="flex shrink-0 items-center" style="-webkit-app-region: no-drag">
+          <button id="btn-top" class="icon-btn" type="button"></button>
+        </div>
+      </header>
+      <main id="file-root" class="fm-root min-h-0 flex-1"></main>
+    </div>
+
+    <script src="./scripts/theme.js"></script>
+    <script src="./scripts/constants.js"></script>
+    <script src="./scripts/i18n.js"></script>
+    <script src="./scripts/ui.js"></script>
+    <script src="./scripts/file-manager.js"></script>
+    <script src="./scripts/file-window.js"></script>
+  </body>
+</html>

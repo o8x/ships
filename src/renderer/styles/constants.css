@@ -30,12 +30,14 @@
   --footer-height: 34px;
   --tabbar-height: 46px;
 
-  /* 终端窗口头栏：高 22px（刚好放下自绘的小红绿灯），字号跟随终端字号
-     —— terminal.js 的 applyFontSize() 会改写 --term-header-font-size。 */
+  /* 终端窗口头栏：高 22px（刚好放下自绘的小红绿灯），字号 = 终端字号 + 1
+     —— terminal.js 的 applyFontSize() 会改写 --term-header-font-size（默认终端 12 → 13）。 */
   --term-header-height: 22px;
-  --term-header-font-size: 12px;
+  --term-header-font-size: 13px;
   /* 终端内容与窗口四边的留白：0 = 终端铺满窗口（vim 等全屏程序四周不留白） */
   --term-padding-y: 0px;
+  /* 文件管理（内嵌面板 / 独立窗口）基础字号；终端窗口里由 terminal.js 跟随终端字号改写 */
+  --file-font-size: 12px;
   /* 头栏里自绘小红绿灯（macOS 观感，比系统标准尺寸小） */
   --traffic-size: 9px;
   --traffic-glyph-size: 6px;
@@ -46,13 +48,6 @@
   /* 强调色（可被设置覆盖，脚本会写到 documentElement.style） */
   --color-accent: #2e6bfc;
   --color-accent-fg: #ffffff;
-
-  /* 目录浏览：上次打开的目录高亮（强调色淡底 + 淡描边） */
-  --color-last-bg: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface));
-  --color-last-border: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
-
-  /* 目录浏览：文件夹行底色（比文件行略深/略亮一点点） */
-  --color-row-dir-bg: color-mix(in srgb, var(--color-fg) 4%, var(--color-surface));
 }
 
 /* 白天模式 */

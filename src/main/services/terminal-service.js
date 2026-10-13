@@ -85,10 +85,11 @@ function pollSessions() {
     for (const entry of sessions.values()) {
       const destination = processTree.sshTargetUnder(tree, entry.pid);
       const label = resolveSshLabel(destination);
-      if (label === entry.sshLabel) continue;
+      if (label === entry.sshLabel && destination === entry.sshTarget) continue;
       entry.sshLabel = label;
+      entry.sshTarget = destination;
       try {
-        entry.emit({ id: entry.id, type: 'session', ssh: label || null });
+        entry.emit({ id: entry.id, type: 'session', ssh: label || null, target: destination || null });
       } catch (sendErr) {
         /* window went away: ignore */
       }
@@ -179,7 +180,7 @@ function start(payload, emit) {
     send({ type: 'exit', code, signal });
   });
 
-  sessions.set(id, { id, child, emit, cols, rows, pid: child.pid, sshLabel: '' });
+  sessions.set(id, { id, child, emit, cols, rows, pid: child.pid, sshLabel: '', sshTarget: '' });
   startSessionPoll();
   return { ok: true, id, cols, rows, shell };
 }

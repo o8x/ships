@@ -12,6 +12,8 @@ const { registerClipboardIpc } = require('./ipc/clipboard-ipc');
 const { registerHashIpc } = require('./ipc/hash-ipc');
 const { registerNetTestIpc } = require('./ipc/net-test-ipc');
 const { registerTerminalIpc } = require('./ipc/terminal-ipc');
+const { registerSftpIpc } = require('./ipc/sftp-ipc');
+const { registerFileWindowIpc } = require('./ipc/file-window-ipc');
 const { installApplicationMenu } = require('./menu');
 const logger = require('./utils/logger');
 const { DATA_FILES } = require('./utils/paths');
@@ -39,6 +41,8 @@ function onReady() {
   registerHashIpc(ipcMain);
   registerNetTestIpc(ipcMain);
   registerTerminalIpc(ipcMain);
+  registerSftpIpc(ipcMain);
+  registerFileWindowIpc(ipcMain);
 
   installApplicationMenu();
   wm.createMainWindow();
@@ -64,7 +68,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   require('./services/clipboard-service').stop();
-  require('./services/ssh-browse-service').closeAll();
+  require('./services/sftp-service').closeAll();
   require('./services/terminal-service').killAll();
   require('./services/hotkey-service').unregisterAll();
 });

@@ -19,6 +19,9 @@
         windowSizeHint: '宽 × 高，最小 480 × 320，默认 1024 × 768；拖动窗口也会写回这里。终端会记住所在屏幕与位置：同一块屏幕沿用记忆，换屏或没有记录时按这里居中显示',
         scrollback: '缓冲区大小',
         scrollbackHint: '保留的历史行数，默认 10000',
+        downloadDir: 'SFTP 下载目录',
+        downloadDirHint: '终端窗口文件面板下载文件的保存位置，默认 ~/Downloads（重名自动加序号）',
+        chooseDir: '选择目录',
         hotkey: '打开终端的全局快捷键',
         hotkeyHint: '在任意界面按下即可拉起置顶终端窗口；点一下右侧按钮再按新的组合键即可改绑（Backspace 清除、Esc 取消，至少含 Command / Control / Alt 之一）',
         hotkeyEmpty: '未设置（点击后按组合键）',
@@ -55,6 +58,9 @@
         windowSizeHint: 'width × height, min 480 × 320, default 1024 × 768; resizing the window writes back here. The terminal remembers its screen and position: the same screen restores it, otherwise this size is used, centered',
         scrollback: 'Scrollback',
         scrollbackHint: 'History lines to keep, default 10000',
+        downloadDir: 'SFTP download folder',
+        downloadDirHint: 'Where the terminal file panel saves downloads, default ~/Downloads (duplicates get a number)',
+        chooseDir: 'Choose folder',
         hotkey: 'Global shortcut to open the terminal',
         hotkeyHint: 'Works from any app; click the button and press a new combo to rebind (Backspace clears, Esc cancels, needs Command / Control / Alt)',
         hotkeyEmpty: 'Not set (click, then press a combo)',
@@ -251,6 +257,30 @@
       scrollField.input.value = String(next.terminalScrollback || 10000);
     });
     wrap.appendChild(row(i18n.t('terminalSettings.scrollback'), i18n.t('terminalSettings.scrollbackHint'), scrollField.input));
+
+    /* SFTP 下载目录（终端窗口文件面板） */
+    const downloadField = field(null, {
+      class: 'field w-[210px] shrink-0 font-mono text-[12px]',
+      placeholder: '~/Downloads',
+      spellcheck: 'false',
+    });
+    downloadField.input.value = ctx.settings.sftpDownloadDir || '~/Downloads';
+    downloadField.input.addEventListener('change', () => {
+      ctx.patch({ sftpDownloadDir: downloadField.input.value.trim() || '~/Downloads' });
+    });
+    syncers.push((next) => {
+      downloadField.input.value = next.sftpDownloadDir || '~/Downloads';
+    });
+    const chooseDirBtn = el('button', { class: 'btn shrink-0 px-2 py-1.5 text-[12px]', type: 'button' }, i18n.t('terminalSettings.chooseDir'));
+    chooseDirBtn.addEventListener('click', async () => {
+      const info = await window.ships.openDirectory({ defaultPath: downloadField.input.value || '~/Downloads' });
+      if (!info) return;
+      downloadField.input.value = info.path;
+      ctx.patch({ sftpDownloadDir: info.path });
+    });
+    const downloadControls = el('div', { class: 'flex shrink-0 items-center gap-2' });
+    downloadControls.append(downloadField.input, chooseDirBtn);
+    wrap.appendChild(row(i18n.t('terminalSettings.downloadDir'), i18n.t('terminalSettings.downloadDirHint'), downloadControls));
 
     /* SSH in the built-in terminal */
     const sshSwitch = switchControl(ctx.settings.sshBuiltinTerminal !== false, (value) => ctx.patch({ sshBuiltinTerminal: value }));

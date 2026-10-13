@@ -90,20 +90,6 @@
   .row-card {
     @apply flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-2;
   }
-  /* Directory browser entries are denser than the host rows. */
-  .row-card.row-compact {
-    @apply gap-2 px-2.5 py-1;
-  }
-  /* Folders sit on a slightly different row background than files. */
-  .row-card.row-dir {
-    background: var(--color-row-dir-bg);
-  }
-  /* Directory browser: the directory opened in the previous session stands out
-     by a tinted background/border (accent is intentionally used here). */
-  .row-card.row-last {
-    background: var(--color-last-bg);
-    border-color: var(--color-last-border);
-  }
   .tab {
     @apply icon-btn h-9 w-9;
   }
@@ -381,27 +367,12 @@ input[type='color'].swatch::-webkit-color-swatch {
   position: relative;
   height: max(var(--term-header-height), calc(var(--term-header-font-size) + 6px));
   gap: 6px;
-  /* 左留白交给红绿灯组（12px 左边距 = 第一个红绿灯到窗口左边缘的距离），右侧 12px */
-  padding: 0 12px 0 0;
+  /* 左留白交给红绿灯组（10px 左边距 = 第一个红绿灯到窗口左边缘的距离），右侧 10px */
+  padding: 0 10px 0 0;
 }
 /* 终端内容：上下各留 10px，左右铺满（xterm 仍挂在里面那层无内边距的 #term-fit 上） */
 #term-host {
   padding: var(--term-padding-y) 0;
-}
-/* 当前 SSH 会话标题（居中、不吃鼠标事件；手动 ssh / 头部下拉 / 目录浏览连接时由 JS 更新） */
-#term-title {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  max-width: 60%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  pointer-events: none;
-  font-size: var(--term-header-font-size);
-  line-height: 1;
-  color: var(--color-fg-muted);
 }
 /* 拖动 / 缩放期间的头栏尺寸提示（居中、不吃鼠标事件，停手后由 JS 隐藏） */
 #term-size {
@@ -433,11 +404,21 @@ input[type='color'].swatch::-webkit-color-swatch {
   height: max(18px, calc(var(--term-header-font-size) + 6px));
   width: 130px;
 }
+/* 下拉框的箭头也跟随头栏字号缩放（否则只有文字变大、箭头不动） */
+#term-actions .select-trigger .select-chevron svg,
+#file-actions .select-trigger .select-chevron svg {
+  width: var(--term-header-font-size);
+  height: var(--term-header-font-size);
+}
 
-/* 自绘小红绿灯（系统红绿灯已由主进程隐藏，见 window-manager） */
-#term-lights {
+/* 自绘小红绿灯（系统红绿灯已由主进程隐藏，见 window-manager）。
+   尺寸跟随头栏字号（--term-header-font-size）一起缩放：12px 字号 = 9px 圆点 / 6px 符号。 */
+#term-lights,
+#file-lights {
   gap: 5px;
-  padding-left: 12px;
+  padding-left: 10px;
+  --traffic-size: calc(var(--term-header-font-size) * 0.75);
+  --traffic-glyph-size: calc(var(--term-header-font-size) * 0.5);
 }
 .traffic-light {
   display: inline-flex;
@@ -467,7 +448,8 @@ input[type='color'].swatch::-webkit-color-swatch {
   transition: opacity 0.1s ease;
 }
 /* 悬浮任意一个时三个都显示符号（macOS 行为） */
-#term-lights:hover .traffic-light svg {
+#term-lights:hover .traffic-light svg,
+#file-lights:hover .traffic-light svg {
   opacity: 1;
 }
 /* 窗口失焦时整体变灰（与系统一致） */
@@ -489,6 +471,10 @@ body.term-window .select-menu .select-option {
   height: max(18px, calc(var(--term-header-font-size) + 6px));
   padding: 0 6px;
   font-size: var(--term-header-font-size);
+}
+body.term-window .select-menu .select-option svg {
+  width: var(--term-header-font-size);
+  height: var(--term-header-font-size);
 }
 /* 条目之间留 2px 间距 */
 body.term-window .select-menu .select-option + .select-option {
@@ -514,6 +500,394 @@ body.term-window .select-menu .select-option + .select-option {
    trackpad still scroll the buffer, there is simply nothing drawn). */
 .xterm .xterm-scrollable-element > .scrollbar {
   display: none !important;
+}
+
+/* ---------------------- 文件管理（内嵌面板 / 独立文件窗口） ----------------
+   见 scripts/file-manager.js：左目录树、右文件列表、最底状态栏（含进度条）。
+   面板高度由 scripts/terminal-files.js 的行内 height 控制；字体跟随 --file-font-size。 */
+/* `:not(.hidden)` 很关键：ID 选择器的 display 会盖过 Tailwind `.hidden { display:none }`，
+   不加这一层判定面板会在「默认隐藏」时仍然显示。 */
+#file-panel:not(.hidden) {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+#term-divider:not(.hidden) {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  height: 6px;
+  cursor: row-resize;
+  background: transparent;
+  -webkit-app-region: no-drag;
+}
+#term-divider::after {
+  content: '';
+  width: 100%;
+  height: 1px;
+  background: var(--color-border);
+}
+#term-divider:hover::after {
+  height: 2px;
+  background: var(--color-accent);
+}
+
+.fm-root {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  font-size: var(--file-font-size, 12px);
+  color: var(--color-fg);
+}
+.fm-wrap {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+}
+.fm-main {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+.fm-tree-pane {
+  display: flex;
+  flex: 0 0 auto;
+  width: 300px;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+.fm-divider-v {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+}
+.fm-divider-v::after {
+  content: '';
+  width: 1px;
+  height: 100%;
+  background: var(--color-border);
+}
+.fm-divider-v:hover::after {
+  width: 2px;
+  background: var(--color-accent);
+}
+.fm-list-pane {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+/* 路径行与文件列表表头同高（1.9em），两条下边框对齐 —— 「标题栏」观感一致 */
+.fm-path-row {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  height: 1.9em;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+.fm-path-btn {
+  width: 1.6em;
+  height: 1.6em;
+  flex: 0 0 auto;
+}
+.fm-path-btn svg {
+  width: 1em;
+  height: 1em;
+}
+.fm-path-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 1.7em;
+  padding: 0 6px;
+  border-radius: var(--radius-control-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-fg);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+.fm-path-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+.fm-tree {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 3px 0;
+}
+.fm-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 1.85em;
+  padding-right: 8px;
+  white-space: nowrap;
+  cursor: default;
+}
+.fm-tree-row:hover {
+  background: var(--color-surface-2);
+}
+.fm-tree-row.selected {
+  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  color: var(--color-accent);
+}
+.fm-tree-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2em;
+  height: 1.2em;
+  flex: 0 0 auto;
+  color: var(--color-fg-muted);
+  transition: transform 0.12s ease;
+}
+.fm-tree-caret.open {
+  transform: rotate(90deg);
+}
+.fm-tree-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-fg-muted);
+  flex: 0 0 auto;
+}
+.fm-tree-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fm-tree-hint,
+.fm-list-hint {
+  padding: 8px 10px;
+  color: var(--color-fg-muted);
+  font-size: 0.92em;
+}
+
+.fm-list-head,
+.fm-row {
+  display: grid;
+  /* 顺序：图标 / 文件名 / 体积 / 权限 / 时间（上传 / 分离按钮就放在时间列表头里，不单独开列） */
+  grid-template-columns: 1.9em var(--fm-name, 160px) var(--fm-size, 60px) var(--fm-perm, 90px) var(--fm-time, 130px);
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+}
+.fm-list-head {
+  position: relative;
+  flex: 0 0 auto;
+  height: 1.9em;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-fg-muted);
+}
+.fm-head-cell {
+  position: relative;
+  white-space: nowrap;
+}
+.fm-col-resize {
+  position: absolute;
+  top: 0;
+  right: -5px;
+  width: 10px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+}
+.fm-col-resize:hover {
+  background: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+.fm-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 2px 0;
+}
+.fm-row {
+  height: 1.95em;
+  cursor: default;
+}
+.fm-row:hover {
+  background: var(--color-surface-2);
+}
+.fm-row.selected {
+  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+}
+.fm-cell-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-fg-muted);
+}
+.fm-cell-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fm-cell-size,
+.fm-cell-time,
+.fm-cell-perm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  color: var(--color-fg-muted);
+}
+/* 时间列表头：左边「时间」标签，右边放上传 / 分离按钮（同一列内，不单独开列） */
+.fm-head-time {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.fm-head-time-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fm-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+.fm-action-btn {
+  width: 1.7em;
+  height: 1.7em;
+  flex: 0 0 auto;
+}
+.fm-action-btn svg {
+  width: 1em;
+  height: 1em;
+}
+/* 文件 / 目录右键菜单：字号 / 高度 / 内边距与头部 SSH 下拉（select-menu / select-option）一致 */
+.fm-menu {
+  position: fixed;
+  z-index: 300;
+  min-width: 130px;
+  padding: 3px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+  animation: ships-pop 0.12s ease both;
+}
+.fm-menu-item {
+  display: block;
+  width: 100%;
+  height: max(18px, calc(var(--term-header-font-size) + 6px));
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-control-sm);
+  background: transparent;
+  color: var(--color-fg);
+  font-size: var(--term-header-font-size);
+  text-align: left;
+  cursor: default;
+}
+.fm-menu-item + .fm-menu-item {
+  margin-top: 2px;
+}
+.fm-menu-item:hover {
+  background: var(--color-surface-2);
+}
+.fm-list.drag-over {
+  outline: 2px dashed var(--color-accent);
+  outline-offset: -4px;
+}
+
+.fm-status {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  height: 1.9em;
+  padding: 0 10px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-fg-muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+.fm-status-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fm-status-msg {
+  flex: 0 0 auto;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fm-progress {
+  flex: 1 1 auto;
+  min-width: 40px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-surface-3);
+  overflow: hidden;
+}
+.fm-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--color-accent);
+  transition: width 0.12s linear;
+}
+.fm-progress.hidden {
+  display: none;
+}
+
+/* 独立文件窗口：头栏与终端一致的小红绿灯 / 拖拽区，字号跟随 --file-font-size */
+body.file-window {
+  /* 独立窗口：头栏字号 = 文件字号 + 1（与终端窗口一致，「标题栏永远比终端设置 +1」） */
+  --term-header-font-size: calc(var(--file-font-size, 13px) + 1px);
+}
+#file-header {
+  position: relative;
+  height: max(var(--term-header-height), calc(var(--term-header-font-size) + 6px));
+  padding: 0 10px 0 0;
+}
+#file-actions {
+  gap: calc(var(--term-header-font-size) * 0.6);
+}
+#file-actions .icon-btn {
+  width: calc(var(--term-header-font-size) + 6px);
+  height: calc(var(--term-header-font-size) + 6px);
+}
+#file-actions .icon-btn svg {
+  width: var(--term-header-font-size);
+  height: var(--term-header-font-size);
+}
+#file-actions .select-trigger {
+  font-size: var(--term-header-font-size);
+  height: max(18px, calc(var(--term-header-font-size) + 6px));
+  width: 130px;
+}
+
+/* 连接中：文件夹按钮图标旋转 */
+@keyframes ships-term-files-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+#term-actions .icon-btn.loading svg {
+  animation: ships-term-files-spin 0.9s linear infinite;
 }
 
 /* Tooltip */

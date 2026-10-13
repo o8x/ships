@@ -3,9 +3,9 @@
 const fs = require('fs');
 const path = require('path');
 const { BrowserWindow, screen } = require('electron');
-const { WINDOW, SETTINGS_WINDOW, TERMINAL_WINDOW, VIBRANCY, IPC } = require('../shared/constants');
+const { WINDOW, SETTINGS_WINDOW, TERMINAL_WINDOW, FILE_WINDOW, VIBRANCY, IPC } = require('../shared/constants');
 const settings = require('./services/settings-service');
-const { TERMINAL_WINDOW_FILE } = require('./utils/paths');
+const { TERMINAL_WINDOW_FILE, FILE_WINDOW_FILE } = require('./utils/paths');
 const { readJson, writeJson } = require('./utils/json-store');
 const { clampNumber, displaySignature, displayBySignature, clampBounds } = require('./utils/window-geometry');
 const logger = require('./utils/logger');
@@ -15,53 +15,81 @@ const PRELOAD_DIR = path.join(__dirname, '..', 'preload');
 
 let mainWindow = null;
 let settingsWindow = null;
-let terminalWindow = null;
+// 置顶终端窗口可以有多个（每次点主面板终端按钮都新开一个，落在当前桌面）。
+const terminalWindows = new Set();
+let lastTerminalWindow = null;
+let fileWindow = null;
+let fileWindowTarget = '';
+let fileWindowOwnerId = null;
 let trayRef = null;
 let blurSuppressed = false;
 let pinnedPositioned = false;
 let terminalGeometryTimer = null;
 let suppressTerminalSizeSave = false;
-/* 终端窗口是否正在被拖动缩放：will-resize 在拖拽的每一帧都会触发，用它当「拖动中」信号，
-   连续 350ms 没再收到就认为松手。**拖动期间一律不改窗口尺寸** —— 中途 setBounds 会打乱
-   macOS 的拖拽跟踪（表现为越拖越小 / 反复跳变），所以把对齐请求先记下来、松手后再执行。 */
-let terminalResizingUntil = 0;
-let terminalResizeIdleTimer = null;
-let terminalSnapPending = false;
+let fileWindowGeometryTimer = null;
 
-function applyTerminalSnap(size) {
-  const win = getTerminalWindow();
-  if (!win || win.isMaximized() || win.isFullScreen() || !size) return;
+/* 每个终端窗口各自的拖动 / 对齐状态：will-resize 每帧触发，连续 350ms 没再收到即松手；
+   拖动期间不改尺寸（避免打乱 macOS 拖拽跟踪），挂起的对齐请求松手后交渲染层重测。 */
+const terminalSnapState = new WeakMap(); // win -> { resizingUntil, idleTimer, pending }
+
+function snapStateFor(win) {
+  let state = terminalSnapState.get(win);
+  if (!state) {
+    state = { resizingUntil: 0, idleTimer: null, pending: false };
+    terminalSnapState.set(win, state);
+  }
+  return state;
+}
+
+function isTerminalWindow(win) {
+  return Boolean(win) && terminalWindows.has(win) && !win.isDestroyed();
+}
+
+function isTerminalWebContents(id) {
+  for (const win of terminalWindows) {
+    if (!win.isDestroyed() && win.webContents.id === id) return true;
+  }
+  return false;
+}
+
+function terminalWindowsList() {
+  return Array.from(terminalWindows).filter((win) => !win.isDestroyed());
+}
+
+function getTerminalWindowForWebContents(id) {
+  for (const win of terminalWindows) {
+    if (!win.isDestroyed() && win.webContents.id === id) return win;
+  }
+  return null;
+}
+
+function applyTerminalSnap(win, size) {
+  if (!isTerminalWindow(win) || win.isMaximized() || win.isFullScreen() || !size) return;
   const [width, height] = win.getContentSize();
   win.setContentSize(size.width || width, size.height || height);
 }
 
-function flushPendingTerminalSnap() {
-  terminalResizeIdleTimer = null;
-  if (!terminalSnapPending || Date.now() < terminalResizingUntil) return;
-  terminalSnapPending = false;
-  // 拖动期间挂起的请求可能已经过期（用户又拖了一段），交给渲染层重新测量再对齐。
-  const win = getTerminalWindow();
-  if (win && !win.isDestroyed()) win.webContents.send(IPC.TERMINAL_RECALIBRATE);
+function flushPendingTerminalSnap(win) {
+  const state = snapStateFor(win);
+  state.idleTimer = null;
+  if (!state.pending || Date.now() < state.resizingUntil) return;
+  state.pending = false;
+  if (isTerminalWindow(win)) win.webContents.send(IPC.TERMINAL_RECALIBRATE);
 }
 
-function markTerminalResizing() {
-  const first = Date.now() >= terminalResizingUntil;
-  terminalResizingUntil = Date.now() + 350;
-  if (terminalResizeIdleTimer) clearTimeout(terminalResizeIdleTimer);
-  terminalResizeIdleTimer = setTimeout(flushPendingTerminalSnap, 380);
-  // 告诉渲染层「正在拖动」：拖动期间它不会发对齐请求（中途改尺寸会打乱系统拖拽跟踪），
-  // 直到鼠标重新回到内容区（说明松手了）才继续。
-  if (first) {
-    const win = getTerminalWindow();
-    if (win && !win.isDestroyed()) win.webContents.send(IPC.TERMINAL_DRAG_ACTIVE);
-  }
+function markTerminalResizing(win) {
+  const state = snapStateFor(win);
+  const first = Date.now() >= state.resizingUntil;
+  state.resizingUntil = Date.now() + 350;
+  if (state.idleTimer) clearTimeout(state.idleTimer);
+  state.idleTimer = setTimeout(() => flushPendingTerminalSnap(win), 380);
+  if (first && isTerminalWindow(win)) win.webContents.send(IPC.TERMINAL_DRAG_ACTIVE);
 }
 
 /* 渲染层按实测余量请求对齐尺寸（行 / 列都要刚好装下整格）：拖动中先挂起，
    松手后（或本来就空闲时）立即执行。 */
-function requestTerminalSnap(payload) {
-  const win = getTerminalWindow();
-  if (!win || win.isMaximized() || win.isFullScreen()) return { ok: false };
+function requestTerminalSnap(win, payload) {
+  if (!isTerminalWindow(win) || win.isMaximized() || win.isFullScreen()) return { ok: false };
   const [currentWidth, currentHeight] = win.getContentSize();
   const minWidth = Math.round(win.getMinimumSize()[0]) || 0;
   const minHeight = Math.round(win.getMinimumSize()[1]) || 0;
@@ -77,12 +105,41 @@ function requestTerminalSnap(payload) {
     size.height = wantedHeight;
   }
   if (!Object.keys(size).length) return { ok: false, width: currentWidth, height: currentHeight };
-  if (Date.now() < terminalResizingUntil) {
-    terminalSnapPending = true;
+  const state = snapStateFor(win);
+  if (Date.now() < state.resizingUntil) {
+    state.pending = true;
     return { ok: true, deferred: true, size };
   }
-  applyTerminalSnap(size);
+  applyTerminalSnap(win, size);
   return { ok: true, size };
+}
+
+/* 打开内嵌文件面板时把终端窗口「只放大不缩小」到至少给定的内容尺寸（受屏幕工作区限制）。
+   用于保证文件管理有足够空间；不写回设置里的窗口大小（suppress），但窗口的新尺寸会照常记入几何记忆。 */
+function ensureTerminalContentSize(win, wanted) {
+  if (!isTerminalWindow(win) || win.isMaximized() || win.isFullScreen()) return { ok: false };
+  const width = Math.round(Number(wanted && wanted.width)) || 0;
+  const height = Math.round(Number(wanted && wanted.height)) || 0;
+  const [currentWidth, currentHeight] = win.getContentSize();
+  const targetWidth = Math.max(currentWidth, width);
+  const targetHeight = Math.max(currentHeight, height);
+  if (targetWidth === currentWidth && targetHeight === currentHeight) {
+    return { ok: true, width: currentWidth, height: currentHeight };
+  }
+  let area = { width: targetWidth, height: targetHeight };
+  try {
+    area = screen.getDisplayMatching(win.getBounds()).workAreaSize;
+  } catch (err) {
+    /* ignore */
+  }
+  const nextWidth = Math.min(targetWidth, area.width);
+  const nextHeight = Math.min(targetHeight, area.height);
+  suppressTerminalSizeSave = true;
+  win.setContentSize(nextWidth, nextHeight);
+  setTimeout(() => {
+    suppressTerminalSizeSave = false;
+  }, 500);
+  return { ok: true, width: nextWidth, height: nextHeight };
 }
 
 /* The terminal window size is a user setting (设置 → 终端 → 窗口大小); the value is
@@ -121,12 +178,13 @@ function terminalBoundsForOpen() {
 function applyTerminalWindowSize() {
   const size = terminalWindowSize();
   rememberTerminalSize(size);
-  const win = getTerminalWindow();
-  if (!win || win.isMaximized() || win.isFullScreen()) return;
-  const [width, height] = win.getSize();
-  if (width === size.width && height === size.height) return;
   suppressTerminalSizeSave = true;
-  win.setSize(size.width, size.height);
+  for (const win of terminalWindowsList()) {
+    if (win.isMaximized() || win.isFullScreen()) continue;
+    const [width, height] = win.getSize();
+    if (width === size.width && height === size.height) continue;
+    win.setSize(size.width, size.height);
+  }
   setTimeout(() => {
     suppressTerminalSizeSave = false;
   }, 500);
@@ -142,9 +200,8 @@ function rememberTerminalSize(size) {
   writeJson(TERMINAL_WINDOW_FILE, terminalState);
 }
 
-function saveTerminalWindowSize() {
-  const win = getTerminalWindow();
-  if (!win || suppressTerminalSizeSave || win.isMaximized() || win.isFullScreen()) return;
+function saveTerminalWindowSize(win) {
+  if (!isTerminalWindow(win) || suppressTerminalSizeSave || win.isMaximized() || win.isFullScreen()) return;
   const [width, height] = win.getSize();
   if (settings.get('terminalWindowWidth') === width && settings.get('terminalWindowHeight') === height) return;
   settings.set({ terminalWindowWidth: width, terminalWindowHeight: height });
@@ -153,12 +210,11 @@ function saveTerminalWindowSize() {
 /* 把窗口此刻的真实几何（位置 + 尺寸 + 所在屏幕）落盘；顺带把尺寸写回设置（既有行为）。
    落盘时读窗口当前值，而不是早先捕获的快照 —— 否则「刚拖动完又改了窗口大小」会被
    旧快照覆盖。 */
-function saveTerminalGeometry() {
-  const win = getTerminalWindow();
-  if (!win || win.isMaximized() || win.isFullScreen()) return;
+function saveTerminalGeometry(win) {
+  if (!isTerminalWindow(win) || win.isMaximized() || win.isFullScreen()) return;
   // 设置写回自带 suppress 保护（避免程序化 setSize 触发回写循环），
-  // 几何记忆不受影响：位置 / 尺寸总是记窗口此刻的真实值。
-  saveTerminalWindowSize();
+  // 几何记忆不受影响：位置 / 尺寸总是记窗口此刻的真实值（多窗口共用一份记忆，最后动的那扇为准）。
+  saveTerminalWindowSize(win);
   const bounds = win.getBounds();
   const next = {
     display: displaySignature(screen.getDisplayMatching(bounds)),
@@ -171,11 +227,11 @@ function saveTerminalGeometry() {
 }
 
 /* 拖动 / 缩放：停顿 400ms 落盘；窗口关闭时立刻落盘（见 openTerminalWindow 的 close）。 */
-function scheduleTerminalGeometrySave() {
+function scheduleTerminalGeometrySave(win) {
   if (terminalGeometryTimer) clearTimeout(terminalGeometryTimer);
   terminalGeometryTimer = setTimeout(() => {
     terminalGeometryTimer = null;
-    saveTerminalGeometry();
+    saveTerminalGeometry(win);
   }, 400);
 }
 
@@ -201,35 +257,57 @@ function terminalCloseAction() {
   return settings.get('terminalCloseAction') === 'hide' ? 'hide' : 'destroy';
 }
 
-/* 关闭按钮 / Cmd-W：按设置隐藏或销毁。 */
-function closeTerminalWindow() {
-  const win = getTerminalWindow();
+/* 是否同时存在多扇终端窗口（>1）。多窗口时：关闭一律销毁、快捷键失效。 */
+function hasMultipleTerminals() {
+  return terminalWindowsList().length > 1;
+}
+
+/* 单扇时是否走「隐藏」：设置 = hide 且只有这一扇终端窗口。多窗口一律销毁。 */
+function shouldHideOnClose() {
+  return terminalCloseAction() === 'hide' && !hasMultipleTerminals();
+}
+
+/* 关闭按钮 / Cmd-W：单扇按「关闭按钮行为」隐藏或销毁；多扇一律销毁。 */
+function closeTerminalWindow(target) {
+  const win = isTerminalWindow(target) ? target : getTerminalWindow();
   if (!win) return null;
-  if (terminalCloseAction() === 'hide') {
+  if (shouldHideOnClose()) {
     win.hide();
     return win;
   }
-  destroyTerminalWindow();
+  destroyTerminalWindow(win);
   return null;
 }
 
 /* 强制销毁（会话结束 exit / iTerm 交接 / 关闭行为=destroy）：先落盘几何再 destroy，
    destroy 不触发 close 事件，因此不会被「隐藏」行为拦下。 */
-function destroyTerminalWindow() {
-  const win = getTerminalWindow();
+function destroyTerminalWindow(target) {
+  const win = isTerminalWindow(target) ? target : getTerminalWindow();
   if (!win) return;
-  saveTerminalGeometry();
+  saveTerminalGeometry(win);
   win.destroy();
 }
 
-/* 全局快捷键：已展示且在前台 → 隐藏；否则打开 / 聚焦（Steam 式悬浮 + 快速开关）。 */
+/* 全局快捷键（Steam 式开关）：
+   - 同时存在多扇终端窗口 → 失效（不响应）。
+   - 只有一扇 → 在前台时按「关闭按钮行为」隐藏或销毁（多次按同样遵循），否则拉回前台。
+   - 一扇都没有 → 新开一扇（窗口永不跨桌面移动）。 */
 function toggleTerminalWindow() {
-  const win = getTerminalWindow();
-  if (win && win.isVisible() && win.isFocused()) {
-    win.hide();
-    return win;
+  const wins = terminalWindowsList();
+  if (wins.length > 1) return null;
+  const win = wins[0] || null;
+  if (!win) return openTerminalWindow();
+  if (win.isVisible() && win.isFocused()) {
+    if (terminalCloseAction() === 'hide') {
+      win.hide();
+      return win;
+    }
+    destroyTerminalWindow(win);
+    return null;
   }
-  return openTerminalWindow();
+  win.show();
+  win.focus();
+  return win;
 }
 
 /* 终端窗口的置顶开关（头部图钉按钮 / settings.json 的 terminalAlwaysOnTop）。 */
@@ -238,11 +316,19 @@ function terminalAlwaysOnTop() {
 }
 
 function applyTerminalAlwaysOnTop() {
-  const win = getTerminalWindow();
-  if (!win) return terminalAlwaysOnTop();
-  if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
-  else win.setAlwaysOnTop(false);
-  return terminalAlwaysOnTop();
+  const on = terminalAlwaysOnTop();
+  for (const win of terminalWindowsList()) {
+    if (on) win.setAlwaysOnTop(true, 'screen-saver');
+    else win.setAlwaysOnTop(false);
+  }
+  return on;
+}
+
+function getFocusedTerminalWindow() {
+  for (const win of terminalWindows) {
+    if (!win.isDestroyed() && win.isFocused()) return win;
+  }
+  return null;
 }
 
 // electron-liquid-glass is a macOS-only native addon (NSGlassEffectView, macOS
@@ -484,21 +570,12 @@ function openSettingsWindow(section) {
 }
 
 /* Always-on-top terminal: floats above other apps and above full-screen spaces
-   (Steam-overlay style), so it can be used without leaving a full-screen app. */
+   (Steam-overlay style). 每次调用都新开一扇窗口，落在当前桌面 / 鼠标所在屏幕；
+   窗口一旦打开就留在那个桌面，不会被拉去别的桌面（Steam 式独立窗口）。 */
 function openTerminalWindow() {
-  if (terminalWindow && !terminalWindow.isDestroyed()) {
-    // Re-opening: pull the window to the space the user is on now. Toggling
-    // canJoinAllSpaces off again keeps it from following later space switches.
-    terminalWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-    terminalWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
-    terminalWindow.show();
-    terminalWindow.focus();
-    return terminalWindow;
-  }
-
   // 有同屏记忆就用记忆里的屏幕 / 位置 / 尺寸，否则默认尺寸居中（见 terminalBoundsForOpen）。
   const bounds = terminalBoundsForOpen();
-  terminalWindow = new BrowserWindow({
+  const win = new BrowserWindow({
     x: bounds.x,
     y: bounds.y,
     width: bounds.width,
@@ -521,57 +598,220 @@ function openTerminalWindow() {
       spellcheck: false,
     },
   });
+  terminalWindows.add(win);
+  lastTerminalWindow = win;
+  const ownerId = win.webContents.id;
+
   // Pinching / Cmd+wheel must not scale the page (title bar + icons); the terminal
   // font is zoomed instead (see menu.js and the renderer's terminal:zoom handler).
-  terminalWindow.webContents.setVisualZoomLevelLimits(1, 1);
-  terminalWindow.webContents.on('zoom-changed', (event, zoomDirection) => {
+  win.webContents.setVisualZoomLevelLimits(1, 1);
+  win.webContents.on('zoom-changed', (event, zoomDirection) => {
     if (typeof event.preventDefault === 'function') event.preventDefault();
-    terminalWindow.webContents.send(IPC.TERMINAL_ZOOM, zoomDirection === 'in' ? 'in' : 'out');
+    win.webContents.send(IPC.TERMINAL_ZOOM, zoomDirection === 'in' ? 'in' : 'out');
   });
-  applyTerminalAlwaysOnTop();
-  // Steam-like: the window is pinned on top and may float above a full-screen app,
-  // but it must NOT join every space — it stays on the desktop it was opened on.
-  // (false = no NSWindowCollectionBehaviorCanJoinAllSpaces, true = FullScreenAuxiliary)
-  terminalWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
+  if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
+  else win.setAlwaysOnTop(false);
+  // Steam-like: pinned on top + may float above a full-screen app, but must NOT join
+  // every space — it stays on the desktop it was opened on.
+  win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
   // 系统红绿灯藏起来，改用头栏里自绘的小红绿灯（20px 头栏放不下系统的标准尺寸）。
-  if (typeof terminalWindow.setWindowButtonVisibility === 'function') {
-    terminalWindow.setWindowButtonVisibility(false);
+  if (typeof win.setWindowButtonVisibility === 'function') {
+    win.setWindowButtonVisibility(false);
   }
-  terminalWindow.loadFile(path.join(RENDERER_DIR, 'terminal.html'));
-  terminalWindow.on('resize', scheduleTerminalGeometrySave);
-  terminalWindow.on('move', scheduleTerminalGeometrySave);
+  win.loadFile(path.join(RENDERER_DIR, 'terminal.html'));
+  win.on('focus', () => {
+    lastTerminalWindow = win;
+  });
+  win.on('resize', () => scheduleTerminalGeometrySave(win));
+  win.on('move', () => scheduleTerminalGeometrySave(win));
   // 只用来标记「正在拖动」：不拦截、不改尺寸，松手后再执行挂起的对齐请求
-  terminalWindow.on('will-resize', markTerminalResizing);
+  win.on('will-resize', () => markTerminalResizing(win));
   // 实际生效的几何（恢复时可能被夹取过）也记下来，保证记忆与窗口一致。
-  scheduleTerminalGeometrySave();
-  terminalWindow.once('ready-to-show', () => {
-    terminalWindow.show();
-    terminalWindow.focus();
+  scheduleTerminalGeometrySave(win);
+  win.once('ready-to-show', () => {
+    win.show();
+    win.focus();
   });
   // 关闭按钮 / Cmd-W：按「关闭按钮行为」隐藏或销毁；隐藏时窗口还活着（会话保留），
   // 会话结束（exit）与 iTerm 交接走 destroyTerminalWindow()，不受这里拦截。
-  terminalWindow.on('close', (event) => {
-    if (terminalCloseAction() === 'hide') {
+  win.on('close', (event) => {
+    // 单扇时按「关闭按钮行为」隐藏；多扇时一律销毁（不拦）。
+    if (shouldHideOnClose()) {
       event.preventDefault();
-      saveTerminalGeometry();
-      terminalWindow.hide();
+      saveTerminalGeometry(win);
+      win.hide();
       return;
     }
-    saveTerminalGeometry();
+    saveTerminalGeometry(win);
   });
-  terminalWindow.on('closed', () => {
-    terminalWindow = null;
-    if (terminalGeometryTimer) {
-      clearTimeout(terminalGeometryTimer);
-      terminalGeometryTimer = null;
-    }
+  win.on('closed', () => {
+    // 窗口销毁 = 会话结束：该窗口的 SFTP 连接一并关闭（延迟 require 避免依赖环）。
+    require('./services/sftp-service').closeForOwner(ownerId);
+    terminalWindows.delete(win);
+    if (lastTerminalWindow === win) lastTerminalWindow = null;
   });
-  return terminalWindow;
+  return win;
 }
 
 function getTerminalWindow() {
-  if (!terminalWindow || terminalWindow.isDestroyed()) return null;
-  return terminalWindow;
+  if (isTerminalWindow(lastTerminalWindow)) return lastTerminalWindow;
+  for (const win of terminalWindows) {
+    if (!win.isDestroyed()) return win;
+  }
+  return null;
+}
+
+/* ------------------------------- 独立文件窗口 -------------------------------
+   与终端窗口同为悬浮 panel：置顶、可浮在全屏之上但不跟随桌面切换。只放文件
+   管理（无终端），连接独立于终端窗口（不随 ssh 关闭而关闭）。 */
+
+let fileWindowState = readJson(FILE_WINDOW_FILE, null);
+
+function fileWindowSize() {
+  return {
+    width: clampNumber(FILE_WINDOW.width, FILE_WINDOW.minWidth, 10000, 900),
+    height: clampNumber(FILE_WINDOW.height, FILE_WINDOW.minHeight, 10000, 600),
+  };
+}
+
+function fileWindowBoundsForOpen() {
+  const size = fileWindowSize();
+  const saved = fileWindowState && fileWindowState.bounds ? fileWindowState : null;
+  const min = { width: FILE_WINDOW.minWidth, height: FILE_WINDOW.minHeight };
+  const matched = saved ? displayBySignature(screen.getAllDisplays(), saved.display) : null;
+  if (matched) return clampBounds(saved.bounds, matched, size, min);
+  return clampBounds(null, anchorDisplay(), size, min);
+}
+
+function saveFileWindowGeometry() {
+  const win = getFileWindow();
+  if (!win || win.isMaximized() || win.isFullScreen()) return;
+  const bounds = win.getBounds();
+  const next = {
+    display: displaySignature(screen.getDisplayMatching(bounds)),
+    bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
+  };
+  if (!next.display) return;
+  if (JSON.stringify(next) === JSON.stringify(fileWindowState)) return;
+  fileWindowState = next;
+  writeJson(FILE_WINDOW_FILE, fileWindowState);
+}
+
+function scheduleFileWindowGeometrySave() {
+  if (fileWindowGeometryTimer) clearTimeout(fileWindowGeometryTimer);
+  fileWindowGeometryTimer = setTimeout(() => {
+    fileWindowGeometryTimer = null;
+    saveFileWindowGeometry();
+  }, 400);
+}
+
+function fileWindowAlwaysOnTop() {
+  return settings.get('fileWindowAlwaysOnTop') !== false;
+}
+
+function applyFileWindowAlwaysOnTop() {
+  const win = getFileWindow();
+  if (!win) return fileWindowAlwaysOnTop();
+  if (fileWindowAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
+  else win.setAlwaysOnTop(false);
+  return fileWindowAlwaysOnTop();
+}
+
+function getFileWindow() {
+  if (!fileWindow || fileWindow.isDestroyed()) return null;
+  return fileWindow;
+}
+
+function getFileWindowTarget() {
+  return fileWindowTarget;
+}
+
+function openFileWindow(target) {
+  if (target != null) fileWindowTarget = String(target || '');
+  if (fileWindow && !fileWindow.isDestroyed()) {
+    fileWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+    fileWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
+    fileWindow.show();
+    fileWindow.focus();
+    if (target != null) fileWindow.webContents.send(IPC.FILE_WINDOW_TARGET, fileWindowTarget);
+    return fileWindow;
+  }
+
+  const bounds = fileWindowBoundsForOpen();
+  fileWindow = new BrowserWindow({
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    minWidth: FILE_WINDOW.minWidth,
+    minHeight: FILE_WINDOW.minHeight,
+    title: 'Ships Files',
+    titleBarStyle: 'hiddenInset',
+    show: false,
+    resizable: true,
+    minimizable: true,
+    maximizable: true,
+    fullscreenable: false,
+    alwaysOnTop: true,
+    webPreferences: {
+      preload: path.join(PRELOAD_DIR, 'main-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      spellcheck: false,
+    },
+  });
+  fileWindowOwnerId = fileWindow.webContents.id;
+  fileWindow.webContents.setVisualZoomLevelLimits(1, 1);
+  fileWindow.webContents.on('zoom-changed', (event, zoomDirection) => {
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+    fileWindow.webContents.send(IPC.FILE_WINDOW_ZOOM, zoomDirection === 'in' ? 'in' : 'out');
+  });
+  applyFileWindowAlwaysOnTop();
+  fileWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
+  if (typeof fileWindow.setWindowButtonVisibility === 'function') {
+    fileWindow.setWindowButtonVisibility(false);
+  }
+  fileWindow.loadFile(path.join(RENDERER_DIR, 'file-window.html'));
+  fileWindow.on('resize', scheduleFileWindowGeometrySave);
+  fileWindow.on('move', scheduleFileWindowGeometrySave);
+  scheduleFileWindowGeometrySave();
+  fileWindow.once('ready-to-show', () => {
+    fileWindow.show();
+    fileWindow.focus();
+  });
+  fileWindow.on('close', () => saveFileWindowGeometry());
+  fileWindow.on('closed', () => {
+    require('./services/sftp-service').closeForOwner(fileWindowOwnerId);
+    fileWindowOwnerId = null;
+    fileWindow = null;
+    if (fileWindowGeometryTimer) {
+      clearTimeout(fileWindowGeometryTimer);
+      fileWindowGeometryTimer = null;
+    }
+  });
+  return fileWindow;
+}
+
+function closeFileWindow() {
+  const win = getFileWindow();
+  if (!win) return null;
+  saveFileWindowGeometry();
+  win.destroy();
+  return null;
+}
+
+function forgetFileWindowGeometry() {
+  fileWindowState = null;
+  if (fileWindowGeometryTimer) {
+    clearTimeout(fileWindowGeometryTimer);
+    fileWindowGeometryTimer = null;
+  }
+  try {
+    fs.rmSync(FILE_WINDOW_FILE, { force: true });
+  } catch (err) {
+    logger.warn('remove file-window.json failed:', err.message);
+  }
 }
 
 function closeSettingsWindow() {
@@ -584,11 +824,11 @@ function getSettingsWindow() {
 }
 
 function broadcast(channel, payload) {
-  // The always-on-top terminal window mirrors settings too (font size / scrollback /
-  // theme / locale), so it must receive settings-changed broadcasts as well.
-  const wins = [getMainWindow(), getSettingsWindow(), getTerminalWindow()];
+  // The always-on-top terminal windows mirror settings too (font size / scrollback /
+  // theme / locale); every open terminal window gets the broadcast.
+  const wins = [getMainWindow(), getSettingsWindow(), getFileWindow(), ...terminalWindowsList()];
   for (const win of wins) {
-    if (win) win.webContents.send(channel, payload);
+    if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
   }
 }
 
@@ -606,6 +846,7 @@ settings.on('changed', (_data, keys) => {
     applyTerminalWindowSize();
   }
   if (keys.includes('terminalAlwaysOnTop')) applyTerminalAlwaysOnTop();
+  if (keys.includes('fileWindowAlwaysOnTop')) applyFileWindowAlwaysOnTop();
 });
 
 module.exports = {
@@ -620,12 +861,23 @@ module.exports = {
   getSettingsWindow,
   openTerminalWindow,
   getTerminalWindow,
+  getFocusedTerminalWindow,
+  getTerminalWindowForWebContents,
+  isTerminalWindow,
+  isTerminalWebContents,
   forgetTerminalGeometry,
   requestTerminalSnap,
+  ensureTerminalContentSize,
   terminalCloseAction,
   closeTerminalWindow,
   destroyTerminalWindow,
   toggleTerminalWindow,
+  openFileWindow,
+  getFileWindow,
+  getFileWindowTarget,
+  closeFileWindow,
+  forgetFileWindowGeometry,
+  applyFileWindowAlwaysOnTop,
   broadcast,
   setBlurSuppressed,
   applyPin,
