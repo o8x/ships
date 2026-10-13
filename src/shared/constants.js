@@ -20,6 +20,7 @@ const IPC = {
   WINDOW_OPEN_SETTINGS: 'window:open-settings',
   WINDOW_CLOSE_SETTINGS: 'window:close-settings',
   WINDOW_CONTROL: 'window:control',
+  LOG_WRITE: 'log:write',
   THEME_CHANGED: 'theme:changed',
 
   GEO_LOOKUP: 'geo:lookup',
@@ -74,6 +75,7 @@ const IPC = {
   FILE_WINDOW_INFO: 'file-window:info',
   FILE_WINDOW_CLOSE: 'file-window:close',
   FILE_WINDOW_SET_TOP: 'file-window:set-top',
+  FILE_WINDOW_SNAP_SIZE: 'file-window:snap-size',
   FILE_WINDOW_ZOOM: 'file-window:zoom',
   FILE_WINDOW_TARGET: 'file-window:target',
 
@@ -135,6 +137,9 @@ const FILE_WINDOW = Object.assign(
   ships.fileWindow || {}
 );
 
+// 日志保留天数（按天写文件，惰性删除更早的日志）。
+const LOG_RETENTION_DAYS = Number.isFinite(ships.logRetentionDays) ? ships.logRetentionDays : 7;
+
 // macOS only: NSVisualEffectMaterial used when the native frosted glass is on.
 // 'hud' gives the strongly see-through, low-opacity look of the system HUD
 // (Control Center style); 'content'/'under-window' are effectively opaque/gray.
@@ -179,6 +184,7 @@ module.exports = {
   SETTINGS_WINDOW,
   TERMINAL_WINDOW,
   FILE_WINDOW,
+  LOG_RETENTION_DAYS,
   VIBRANCY,
   DEFAULT_SETTINGS,
 };

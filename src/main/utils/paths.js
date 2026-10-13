@@ -15,8 +15,22 @@ const TERMINAL_WINDOW_FILE = path.join(DATA_DIR, 'terminal-window.json');
 const FILE_WINDOW_FILE = path.join(DATA_DIR, 'file-window.json');
 const FILE_LAYOUT_FILE = path.join(DATA_DIR, 'file-layout.json');
 const FILE_WINDOW_LAYOUT_FILE = path.join(DATA_DIR, 'file-window-layout.json');
-const LOG_FILE = path.join(DATA_DIR, 'ships.log');
+// 日志按天写入 logs/ 目录下的 ships-YYYY-MM-DD.log（见 logger.js）。
+const LOG_DIR = path.join(DATA_DIR, 'logs');
 const SSH_CONFIG_FILE = process.env.SHIPS_SSH_CONFIG || path.join(os.homedir(), '.ssh', 'config');
+
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
+function logFileForDate(date) {
+  const d = date instanceof Date ? date : new Date();
+  return path.join(LOG_DIR, `ships-${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}.log`);
+}
+
+function todayLogFile() {
+  return logFileForDate(new Date());
+}
 
 const DATA_FILES = [
   SETTINGS_FILE,
@@ -25,7 +39,7 @@ const DATA_FILES = [
   FILE_WINDOW_FILE,
   FILE_LAYOUT_FILE,
   FILE_WINDOW_LAYOUT_FILE,
-  LOG_FILE,
+  LOG_DIR,
 ];
 
 function describeDataFiles() {
@@ -40,7 +54,9 @@ module.exports = {
   FILE_WINDOW_FILE,
   FILE_LAYOUT_FILE,
   FILE_WINDOW_LAYOUT_FILE,
-  LOG_FILE,
+  LOG_DIR,
+  todayLogFile,
+  logFileForDate,
   SSH_CONFIG_FILE,
   DATA_FILES,
   describeDataFiles,

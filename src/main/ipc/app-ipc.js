@@ -1,9 +1,11 @@
 'use strict';
 
+const fs = require('fs');
 const { app, shell, BrowserWindow, dialog } = require('electron');
 const os = require('os');
 const { IPC, VERSION, TERMINAL_WINDOW } = require('../../shared/constants');
-const { DATA_DIR, LOG_FILE, describeDataFiles } = require('../utils/paths');
+const logger = require('../utils/logger');
+const { DATA_DIR, LOG_DIR, todayLogFile, describeDataFiles } = require('../utils/paths');
 
 function registerAppIpc(ipcMain) {
   ipcMain.handle(IPC.APP_INFO, () => ({
@@ -23,8 +25,16 @@ function registerAppIpc(ipcMain) {
   });
 
   ipcMain.handle(IPC.OPEN_LOG, async () => {
-    if (shell.showItemInFolder) shell.showItemInFolder(LOG_FILE);
-    const err = await shell.openPath(LOG_FILE);
+    // 日志按天分文件：打开今天那一个（不存在就建个空文件；失败则退回日志目录）。
+    const file = todayLogFile();
+    try {
+      fs.mkdirSync(LOG_DIR, { recursive: true });
+      if (!fs.existsSync(file)) fs.writeFileSync(file, '', 'utf8');
+    } catch (err) {
+      /* ignore */
+    }
+    if (shell.showItemInFolder) shell.showItemInFolder(file);
+    const err = await shell.openPath(fs.existsSync(file) ? file : LOG_DIR);
     return err ? { ok: false, error: err } : { ok: true };
   });
 
@@ -56,6 +66,11 @@ function registerAppIpc(ipcMain) {
     const result = win ? await dialog.showOpenDialog(win, dialogOptions) : await dialog.showOpenDialog(dialogOptions);
     if (result.canceled || !result.filePaths.length) return { paths: [] };
     return { paths: result.filePaths };
+  });
+
+  // 渲染层请求写日志：控制台 + ships.log（窗口尺寸 / 字体 / 行高等调试信息）。
+  ipcMain.on(IPC.LOG_WRITE, (_event, text) => {
+    logger.info(String(text == null ? '' : text));
   });
 }
 

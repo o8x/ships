@@ -27,14 +27,12 @@
   const FONT_MIN = 13;
   const FONT_MAX = 24;
 
-  const topBtn = document.getElementById('btn-top');
   const lightClose = document.getElementById('light-close');
   const lightMinimize = document.getElementById('light-minimize');
   const lightZoom = document.getElementById('light-zoom');
   const actions = document.getElementById('file-actions');
   const rootEl = document.getElementById('file-root');
 
-  let alwaysOnTop = true;
   let fontSize = FONT_DEFAULT;
   let manager = null;
   let picker = null;
@@ -52,8 +50,6 @@
   }
 
   function renderHeader() {
-    topBtn.innerHTML = alwaysOnTop ? Icons.pin(15) : Icons.pinOff(15);
-    topBtn.style.color = alwaysOnTop ? 'var(--color-accent)' : '';
     lightClose.innerHTML = Icons.trafficClose(6);
     lightMinimize.innerHTML = Icons.trafficMinimize(6);
     lightZoom.innerHTML = Icons.trafficZoom(6);
@@ -107,7 +103,6 @@
     const [settings, info] = await Promise.all([window.ships.getSettings(), window.ships.fileWindow.info()]);
     i18n.setLocale((settings && settings.locale) || 'zh');
     window.ShipsTheme.set(settings || {});
-    alwaysOnTop = !settings || settings.fileWindowAlwaysOnTop !== false;
     renderHeader();
     fontSize = Math.max(FONT_MIN, Math.min(FONT_MAX, (settings && settings.terminalFontSize) || FONT_DEFAULT));
     applyFontSize(fontSize);
@@ -132,22 +127,45 @@
     window.ships.onSettingsChanged((next) => {
       i18n.setLocale((next && next.locale) || 'zh');
       window.ShipsTheme.set(next || {});
-      alwaysOnTop = !next || next.fileWindowAlwaysOnTop !== false;
       renderHeader();
       refreshPicker();
     });
   }
 
-  topBtn.addEventListener('click', async () => {
-    const result = await window.ships.fileWindow.setAlwaysOnTop(!alwaysOnTop);
-    alwaysOnTop = Boolean(result && result.ok ? result.alwaysOnTop : !alwaysOnTop);
-    renderHeader();
-  });
   lightClose.addEventListener('click', () => window.ships.windowControl('close'));
   lightMinimize.addEventListener('click', () => window.ships.windowControl('minimize'));
   lightZoom.addEventListener('click', () => window.ships.windowControl('zoom'));
   window.addEventListener('focus', syncWindowFocus);
   window.addEventListener('blur', syncWindowFocus);
+
+  /* 拖拽窗口后把「文件列表区域」高度收到文件行的整数倍（行高随字号），
+     松手（resize 停顿 200ms）时执行，避免底部露出半行。 */
+  let snapTimer = null;
+  function snapListHeight() {
+    const listEl = document.querySelector('#file-root .fm-list');
+    if (!listEl) return;
+    const row = listEl.querySelector('.fm-row');
+    let rowHeight = row ? row.getBoundingClientRect().height : 0;
+    if (!rowHeight) {
+      const root = document.getElementById('file-root');
+      const fs = root ? parseFloat(getComputedStyle(root).fontSize) || 12 : 12;
+      rowHeight = 1.95 * fs;
+    }
+    if (!rowHeight) return;
+    const cs = getComputedStyle(listEl);
+    const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const usable = listEl.clientHeight - padY;
+    const leftover = usable - Math.floor(usable / rowHeight) * rowHeight;
+    if (leftover <= 1 || leftover >= rowHeight - 1) return;
+    const desired = Math.round(window.innerHeight - leftover);
+    if (window.ships.fileWindow && typeof window.ships.fileWindow.snapSize === 'function') {
+      window.ships.fileWindow.snapSize(desired);
+    }
+  }
+  window.addEventListener('resize', () => {
+    clearTimeout(snapTimer);
+    snapTimer = setTimeout(snapListHeight, 200);
+  });
   syncWindowFocus();
 
   boot().catch((err) => console.error(err));

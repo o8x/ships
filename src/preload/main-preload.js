@@ -22,6 +22,7 @@ const api = {
   openSettings: (section) => ipcRenderer.send(IPC.WINDOW_OPEN_SETTINGS, section),
   openDataFolder: () => ipcRenderer.invoke(IPC.OPEN_DATA_FOLDER),
   openExternal: (url) => ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url),
+  log: (text) => ipcRenderer.send(IPC.LOG_WRITE, text),
   geoLookup: (ip) => ipcRenderer.invoke(IPC.GEO_LOOKUP, ip),
   clipboard: {
     list: () => ipcRenderer.invoke(IPC.CLIPBOARD_LIST),
@@ -82,6 +83,7 @@ const api = {
     info: () => ipcRenderer.invoke(IPC.FILE_WINDOW_INFO),
     close: () => ipcRenderer.invoke(IPC.FILE_WINDOW_CLOSE),
     setAlwaysOnTop: (value) => ipcRenderer.invoke(IPC.FILE_WINDOW_SET_TOP, { value }),
+    snapSize: (height) => ipcRenderer.invoke(IPC.FILE_WINDOW_SNAP_SIZE, { height }),
     onTarget: (cb) => on(IPC.FILE_WINDOW_TARGET, cb),
     onZoom: (cb) => on(IPC.FILE_WINDOW_ZOOM, cb),
   },

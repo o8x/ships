@@ -36,6 +36,12 @@ function registerFileWindowIpc(ipcMain) {
     return { ok: true, alwaysOnTop: value };
   });
 
+  // 拖拽窗口后把内容高度收到「文件行整数倍」（渲染层按实测余量请求）。
+  ipcMain.handle(IPC.FILE_WINDOW_SNAP_SIZE, (event, payload) => {
+    if (!isFileSender(event)) return { ok: false };
+    return wm.snapFileWindowContentSize(wm.getFileWindow(), payload && payload.height);
+  });
+
   // scope: 'panel'（内嵌面板，默认）| 'window'（独立文件窗口）—— 两份独立记录。
   ipcMain.handle(IPC.FILES_LAYOUT_GET, (_event, payload) => layout.get(payload && payload.scope));
   ipcMain.handle(IPC.FILES_LAYOUT_SET, (_event, payload) =>

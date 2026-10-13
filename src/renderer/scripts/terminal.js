@@ -12,8 +12,10 @@
       terminalWin: {
         sshPlaceholder: 'SSH',
         sshFailed: '连接失败：{error}',
-        exported: '已导出到 {path}',
-        exportFailed: '导出失败：{error}',
+        linesOn: '隐藏行号',
+        linesOff: '显示行号',
+        copyAll: '复制全部内容',
+        copiedAll: '已复制终端全部内容到剪贴板',
         failed: '无法启动终端会话：{error}',
         noTerminal: 'xterm 未能加载，无法显示终端',
       },
@@ -22,8 +24,10 @@
       terminalWin: {
         sshPlaceholder: 'SSH',
         sshFailed: 'Connect failed: {error}',
-        exported: 'Exported to {path}',
-        exportFailed: 'Export failed: {error}',
+        linesOn: 'Hide line numbers',
+        linesOff: 'Show line numbers',
+        copyAll: 'Copy all',
+        copiedAll: 'Copied the whole terminal buffer to the clipboard',
         failed: 'Cannot start the terminal session: {error}',
         noTerminal: 'xterm failed to load',
       },
@@ -42,10 +46,11 @@
      （滚轮时标题跟着上下动）。父元素无内边距时测量值即真实可用区。 */
   const host = document.getElementById('term-fit');
   const hostBox = document.getElementById('term-host');
+  const gutterEl = document.getElementById('term-gutter');
+  const linesBtn = document.getElementById('btn-lines');
   const filesBtn = document.getElementById('btn-files');
-  const topBtn = document.getElementById('btn-top');
   const itermBtn = document.getElementById('btn-iterm');
-  const exportBtn = document.getElementById('btn-export');
+  const copyBtn = document.getElementById('btn-copy');
   const lightClose = document.getElementById('light-close');
   const lightMinimize = document.getElementById('light-minimize');
   const lightZoom = document.getElementById('light-zoom');
@@ -61,10 +66,11 @@
   let lastRows = 0;
   let fontSize = FONT_DEFAULT;
   let settingsFontSize = FONT_DEFAULT;
-  let alwaysOnTop = true;
+  let showLines = false; // 左侧行号（默认关闭）
   let shellPath = '';
   let sshPicker = null;
   let sizeBadgeTimer = null;
+  let metricsTimer = null;
   let lastMetricsKey = '';
   // 主进程标记「正在拖动窗口」：期间一律不发对齐请求（中途改尺寸会打乱 macOS 拖拽跟踪）
   let dragSuspected = false;
@@ -93,6 +99,33 @@
 
   function write(text) {
     if (term) term.write(text);
+    scheduleGutter();
+  }
+
+  /* 左侧行号（默认关闭）：给可见的每一行编号（两位，不足补 0），随滚动 / 重绘更新。 */
+  let gutterRaf = null;
+  function renderGutter() {
+    if (!gutterEl || !term) return;
+    if (!showLines) {
+      gutterEl.textContent = '';
+      gutterEl.classList.add('hidden');
+      return;
+    }
+    gutterEl.classList.remove('hidden');
+    // 按「当前窗口」编号：第一行永远是 1（不随滚动变化）。
+    gutterEl.textContent = '';
+    for (let i = 0; i < term.rows; i += 1) {
+      const number = String(i + 1).padStart(2, '0');
+      gutterEl.appendChild(el('div', { class: 'term-gutter-line' }, number));
+    }
+  }
+
+  function scheduleGutter() {
+    if (gutterRaf) return;
+    gutterRaf = requestAnimationFrame(() => {
+      gutterRaf = null;
+      renderGutter();
+    });
   }
 
   /* 文件夹按钮随文件面板的状态变化：无 ssh 目标时禁用、连接中变暗、展开时高亮。 */
@@ -191,45 +224,70 @@
     fitColumns();
     syncPtySize();
     snapExactSize();
+    updateRowHeightVar();
+    scheduleGutter();
     if (sizeEl && !sizeEl.classList.contains('hidden')) {
       sizeEl.textContent = `${term.cols}×${term.rows}`;
     }
   }
 
+  /* 行号栏每行的高度 = 终端实测单元格高度（写 CSS 变量 --term-row-h）。 */
+  function updateRowHeightVar() {
+    const { height } = readCellSize();
+    if (height) document.documentElement.style.setProperty('--term-row-h', `${height}px`);
+  }
+
   /* 按实测余量对齐窗口高度：终端网格取整后底部会剩 leftover（0 ~ 行高-1）。
      拖动过程中不干预（下边框严格跟手），停手 150ms 后由这里把差额补掉，
      让最后一行紧贴窗口下边缘。余量 < 1px 时不动。 */
+  /* 单元格尺寸：优先用 xterm 的渲染尺寸（css.cell，稳定、不随列数变化）；
+     退化时才用「屏幕宽 / 列数」——后者会随列数取整而抖动，导致窗口反复微调。
+     返回 CSS px 的 { width, height }。 */
+  function readCellSize() {
+    if (!term || !host) return { width: 0, height: 0 };
+    const dims = term._core && term._core._renderService && term._core._renderService.dimensions;
+    let width = dims && dims.css && dims.css.cell ? dims.css.cell.width : 0;
+    let height = dims && dims.css && dims.css.cell ? dims.css.cell.height : 0;
+    const rowsEl = host.querySelector('.xterm-rows');
+    const firstRow = rowsEl && rowsEl.firstElementChild;
+    if (!height && firstRow) height = firstRow.getBoundingClientRect().height;
+    if (!width) {
+      const screenEl = host.querySelector('.xterm-screen');
+      width = screenEl && term.cols ? screenEl.getBoundingClientRect().width / term.cols : 0;
+    }
+    return { width, height };
+  }
+
   /* FitAddon 只要 scrollback > 0 就固定预留 14px（给 overview ruler），会把终端挤得比
      窗口窄、右侧空出一条白边（我们本来就隐藏滚动条）。这里按真实可用宽度自己算列数。 */
   function fitColumns() {
     if (!term || !term.cols || !host) return;
-    const screenEl = host.querySelector('.xterm-screen');
-    if (!screenEl) return;
-    const cellWidth = screenEl.getBoundingClientRect().width / term.cols;
+    const { width: cellWidth } = readCellSize();
     if (!cellWidth) return;
     const cols = Math.max(2, Math.floor(host.clientWidth / cellWidth));
     if (cols !== term.cols) term.resize(cols, term.rows);
   }
 
-  /* 行 / 列取整后底部与右侧会各剩一条带（0 ~ 单元格尺寸）。拖动时不动作（主进程会挂起），
-     松手后按实测余量把窗口收到刚好装下整格。 */
+  /* 把窗口内容尺寸对齐到「终端区 = 列宽×列数 / 行高×行数 + chrome」：
+     - 余量为正（底部 / 右侧剩一条带）→ 收窗口；
+     - 余量为负（最后一行 / 列被裁掉一点）→ 放窗口。
+     chrome = 窗口内容尺寸 − 终端区尺寸（头栏 / 分隔线 / 文件面板 / 状态栏等固定部分）。 */
   function snapExactSize() {
-    if (!term || !term.rows || !host) return;
-    if (dragSuspected) return; // 拖动中：等松手（鼠标回到内容区）后再对齐
-    // 文件面板打开时不做整格对齐：面板高度是窗口的百分比，收窗口会让面板跟着变、
-    // 终端可用高度并非等量减少，会与对齐互相牵动导致窗口持续缩水。
-    if (filesApi && filesApi.isOpen()) return;
-    const rowsEl = host.querySelector('.xterm-rows');
-    const firstRow = rowsEl && rowsEl.firstElementChild;
-    const cellHeight = firstRow ? firstRow.getBoundingClientRect().height : 0;
-    if (!cellHeight) return;
-    const screenEl = host.querySelector('.xterm-screen');
-    const cellWidth = screenEl && term.cols ? screenEl.getBoundingClientRect().width / term.cols : 0;
+    if (!term || !term.rows || !term.cols || !host) return;
+    if (dragSuspected) return; // 拖动中：等松手（主进程会发 recalibrate）后再对齐
+    const { width: cellWidth, height: cellHeight } = readCellSize();
+    if (!cellHeight || !cellWidth) return;
+    const chromeHeight = window.innerHeight - host.clientHeight;
+    const chromeWidth = window.innerWidth - host.clientWidth;
+    // 四舍五入到最近的整行 / 整列：余量超过半格就补一行 / 一列，否则收掉余量。
+    const rowsTarget = Math.max(1, Math.round(host.clientHeight / cellHeight));
+    const colsTarget = Math.max(1, Math.round(host.clientWidth / cellWidth));
+    const targetHeight = Math.round(chromeHeight + rowsTarget * cellHeight);
+    const targetWidth = Math.round(chromeWidth + colsTarget * cellWidth);
     const payload = {};
-    const leftoverHeight = host.clientHeight - term.rows * cellHeight;
-    if (leftoverHeight > 1) payload.height = Math.round(window.innerHeight - leftoverHeight);
-    const leftoverWidth = cellWidth ? host.clientWidth - term.cols * cellWidth : 0;
-    if (leftoverWidth > 1) payload.width = Math.round(window.innerWidth - leftoverWidth);
+    // 变化需 ≥2px 才动，避免 1px 的取整抖动（cell 尺寸稳定后本不该抖，加个死区更保险）。
+    if (Math.abs(targetHeight - window.innerHeight) >= 2) payload.height = targetHeight;
+    if (Math.abs(targetWidth - window.innerWidth) >= 2) payload.width = targetWidth;
     if (!Object.keys(payload).length) return;
     const snap = window.ships && window.ships.terminal && window.ships.terminal.snapSize;
     if (typeof snap === 'function') snap(payload);
@@ -269,18 +327,46 @@
     applyFontSize(fontSize);
   }
 
-  /* Cmd +/+/- zoom the terminal font only (menu.js / zoom-changed route here) — the
-     page zoom stays at 1 so the title bar and icons keep their size. */
+  /* Cmd +/+/-（menu.js / zoom-changed 路由到这里）：直接修改**设置里的字号**（写回 settings，
+     持久化，重开终端也生效），不改页面缩放因子 —— 页面缩放固定为 1，头栏与图标尺寸不变。 */
   function zoomFont(direction) {
-    if (!term) return;
-    if (direction === 'reset') fontSize = FONT_DEFAULT;
-    else fontSize = Math.max(FONT_MIN, Math.min(FONT_MAX, fontSize + (direction === 'in' ? 1 : -1)));
-    applyFontSize(fontSize);
+    let value;
+    if (direction === 'reset') value = FONT_DEFAULT;
+    else value = fontSize + (direction === 'in' ? 1 : -1);
+    value = Math.max(FONT_MIN, Math.min(FONT_MAX, value));
+    if (value === fontSize) return;
+    window.ships.setSettings({ terminalFontSize: value });
   }
 
   function scheduleResize() {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(fitIfNeeded, 150);
+  }
+
+  /* 窗口尺寸变化时把「字体大小 / 行高 / 窗口大小」写到控制台与 ships.log（节流 250ms）。 */
+  function logWindowMetrics() {
+    if (!term || !host) return;
+    const { width: cellWidth, height: cellHeight } = readCellSize();
+    const lineHeight = Math.round(cellHeight * 100) / 100;
+    const colWidth = Math.round(cellWidth * 100) / 100;
+    const message =
+      `[term-metrics] font=${term.options.fontSize}px lineHeight=${lineHeight}px colWidth=${colWidth}px ` +
+      `window=${window.outerWidth}x${window.outerHeight} content=${window.innerWidth}x${window.innerHeight} ` +
+      `cols=${term.cols} rows=${term.rows}`;
+    if (window.ships && typeof window.ships.log === 'function') window.ships.log(message);
+  }
+
+  /* 窗口尺寸变化：立刻标记「正在调整」抑制对齐，等停顿 300ms（= 松手）后重新 fit 并按
+     「终端区 = 行高×行数 / 列宽×列数 + chrome」对齐，同时打印度量日志。
+     不再依赖 will-resize / recalibrate（不同平台/版本不一定触发）。 */
+  function onWindowResize() {
+    dragSuspected = true;
+    clearTimeout(metricsTimer);
+    metricsTimer = setTimeout(() => {
+      dragSuspected = false;
+      fitIfNeeded(true);
+      logWindowMetrics();
+    }, 120);
   }
 
   async function startSession() {
@@ -311,11 +397,13 @@
   }
 
   function renderHeader() {
+    linesBtn.innerHTML = (showLines ? Icons.eyeOff : Icons.eye)(15);
+    linesBtn.style.color = showLines ? 'var(--color-accent)' : '';
+    linesBtn.setAttribute('data-tip', i18n.t(showLines ? 'terminalWin.linesOn' : 'terminalWin.linesOff'));
     filesBtn.innerHTML = Icons.folder(15);
-    topBtn.innerHTML = alwaysOnTop ? Icons.pin(15) : Icons.pinOff(15);
-    topBtn.style.color = alwaysOnTop ? 'var(--color-accent)' : '';
     itermBtn.innerHTML = Icons.terminal(15);
-    exportBtn.innerHTML = Icons.download(15);
+    copyBtn.innerHTML = Icons.copy(15);
+    copyBtn.setAttribute('data-tip', i18n.t('terminalWin.copyAll'));
     // 自绘小红绿灯的符号（尺寸交给 CSS，见 #term-lights svg）
     lightClose.innerHTML = Icons.trafficClose(6);
     lightMinimize.innerHTML = Icons.trafficMinimize(6);
@@ -408,6 +496,9 @@
       if (sessionId) window.ships.terminal.input(sessionId, data);
       else startSession();
     });
+    // 行号随滚动 / 重绘更新。
+    term.onScroll(() => scheduleGutter());
+    if (typeof term.onRender === 'function') term.onRender(() => scheduleGutter());
     startSession();
   }
 
@@ -439,7 +530,12 @@
 
   const offZoom = window.ships.terminal.onZoom((direction) => zoomFont(direction));
   // 拖动结束后主进程请我们重新测量一次（拖动期间不允许改窗口尺寸）→ 重新 fit 并按实测余量对齐
-  const offRecalibrate = window.ships.terminal.onRecalibrate(() => fitIfNeeded(true));
+  // 拖动结束（主进程在拖拽空闲后发）：清除「拖动中」标记再重新测量 + 按整格对齐，
+  // 这样即便鼠标不再移动、行数也没变化，松手后也会收回到 lineHeight×rows（宽度同理）。
+  const offRecalibrate = window.ships.terminal.onRecalibrate(() => {
+    dragSuspected = false;
+    fitIfNeeded(true);
+  });
   const offDragActive =
     typeof window.ships.terminal.onDragActive === 'function'
       ? window.ships.terminal.onDragActive(() => {
@@ -502,20 +598,23 @@
   lightZoom.addEventListener('click', () => window.ships.windowControl('zoom'));
   window.addEventListener('focus', syncWindowFocus);
   window.addEventListener('blur', syncWindowFocus);
+  window.addEventListener('resize', onWindowResize);
   syncWindowFocus();
-  topBtn.addEventListener('click', async () => {
-    const result = await window.ships.terminal.setAlwaysOnTop(!alwaysOnTop);
-    alwaysOnTop = Boolean(result && result.ok ? result.alwaysOnTop : !alwaysOnTop);
-    renderHeader();
-  });
-  exportBtn.addEventListener('click', async () => {
-    const result = await window.ships.terminal.export({ text: bufferText() });
-    if (result && result.ok) {
-      write(`\r\n${ANSI.meta}${i18n.t('terminalWin.exported', { path: result.path })}${ANSI.reset}\r\n`);
-    } else if (result && !result.canceled) {
-      write(`\r\n${ANSI.error}${i18n.t('terminalWin.exportFailed', { error: result.error || 'error' })}${ANSI.reset}\r\n`);
-    }
-  });
+  if (linesBtn) {
+    linesBtn.addEventListener('click', () => {
+      showLines = !showLines;
+      document.body.classList.toggle('show-lines', showLines);
+      renderHeader();
+      // 左侧让出行号栏宽度 → 重新 fit + 对齐。
+      fitIfNeeded(true);
+    });
+  }
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      // 复制全部 buffer 到剪贴板（不弹通知）。
+      window.ships.terminal.copyText(bufferText());
+    });
+  }
 
   window.addEventListener('beforeunload', () => {
     offZoom();
@@ -531,7 +630,6 @@
     const [settings, info] = await Promise.all([window.ships.getSettings(), window.ships.getInfo()]);
     i18n.setLocale((settings && settings.locale) || 'zh');
     window.ShipsTheme.set(settings || {});
-    alwaysOnTop = !settings || settings.terminalAlwaysOnTop !== false;
     renderHeader();
     sshPicker = setupSshPicker();
     refreshSshPicker();
@@ -546,7 +644,6 @@
     window.ships.onSettingsChanged((next) => {
       i18n.setLocale((next && next.locale) || 'zh');
       window.ShipsTheme.set(next || {});
-      alwaysOnTop = !next || next.terminalAlwaysOnTop !== false;
       renderHeader();
       refreshSshPicker();
       if (term) term.options.theme = themeColors();

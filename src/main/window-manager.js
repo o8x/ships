@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { BrowserWindow, screen } = require('electron');
+const { BrowserWindow, screen, nativeTheme } = require('electron');
 const { WINDOW, SETTINGS_WINDOW, TERMINAL_WINDOW, FILE_WINDOW, VIBRANCY, IPC } = require('../shared/constants');
 const settings = require('./services/settings-service');
 const { TERMINAL_WINDOW_FILE, FILE_WINDOW_FILE } = require('./utils/paths');
@@ -63,16 +63,39 @@ function getTerminalWindowForWebContents(id) {
   return null;
 }
 
+/* 窗口底色：与 styles/constants.css 的 `--color-bg` 一致（浅 #ffffff / 深 #1c1c1e）。
+   拖动 / 缩放期间页面来不及重绘时，OS 会先显示窗口底色 —— 不设就会露出系统默认白底
+   （深色模式下尤其明显）。 */
+function effectiveThemeIsDark() {
+  const theme = settings.get('theme') || 'system';
+  if (theme === 'dark') return true;
+  if (theme === 'light') return false;
+  return nativeTheme.shouldUseDarkColors;
+}
+
+function themeBackgroundColor() {
+  return effectiveThemeIsDark() ? '#1c1c1e' : '#ffffff';
+}
+
+function applyThemeBackgrounds() {
+  const color = themeBackgroundColor();
+  for (const win of [getSettingsWindow(), getFileWindow(), ...terminalWindowsList()]) {
+    if (win && !win.isDestroyed()) win.setBackgroundColor(color);
+  }
+}
+
 function applyTerminalSnap(win, size) {
   if (!isTerminalWindow(win) || win.isMaximized() || win.isFullScreen() || !size) return;
   const [width, height] = win.getContentSize();
   win.setContentSize(size.width || width, size.height || height);
 }
 
+/* 拖拽空闲（松手）后：无论期间有没有挂起的对齐请求，都请渲染层重新测量并对齐。
+   渲染层借这个信号清除「拖动中」标记 —— 否则拖完若鼠标不再移动，永远收不到 mousemove，
+   就再也不会对齐了（行数没变时尤其明显）。 */
 function flushPendingTerminalSnap(win) {
   const state = snapStateFor(win);
   state.idleTimer = null;
-  if (!state.pending || Date.now() < state.resizingUntil) return;
   state.pending = false;
   if (isTerminalWindow(win)) win.webContents.send(IPC.TERMINAL_RECALIBRATE);
 }
@@ -80,9 +103,9 @@ function flushPendingTerminalSnap(win) {
 function markTerminalResizing(win) {
   const state = snapStateFor(win);
   const first = Date.now() >= state.resizingUntil;
-  state.resizingUntil = Date.now() + 350;
+  state.resizingUntil = Date.now() + 160;
   if (state.idleTimer) clearTimeout(state.idleTimer);
-  state.idleTimer = setTimeout(() => flushPendingTerminalSnap(win), 380);
+  state.idleTimer = setTimeout(() => flushPendingTerminalSnap(win), 180);
   if (first && isTerminalWindow(win)) win.webContents.send(IPC.TERMINAL_DRAG_ACTIVE);
 }
 
@@ -420,6 +443,15 @@ function createMainWindow() {
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   if (mainWindow.setMovable) mainWindow.setMovable(Boolean(settings.get('pinWindow')));
   mainWindow.loadFile(path.join(RENDERER_DIR, 'index.html'));
+  // 页面缩放固定为 1（Electron 会按 origin 记住缩放，历史缩放会让布局 / 尺寸计算错位）。
+  mainWindow.webContents.setZoomFactor(1);
+  mainWindow.webContents.on('did-finish-load', () => {
+    try {
+      mainWindow.webContents.setZoomFactor(1);
+    } catch (err) {
+      /* ignore */
+    }
+  });
 
   if (mode === 'liquid') {
     const win = mainWindow;
@@ -547,6 +579,7 @@ function openSettingsWindow(section) {
     fullscreenable: false,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 14, y: 16 },
+    backgroundColor: themeBackgroundColor(),
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'settings-preload.js'),
       contextIsolation: true,
@@ -557,6 +590,14 @@ function openSettingsWindow(section) {
   });
 
   settingsWindow.loadFile(path.join(RENDERER_DIR, 'settings.html'));
+  settingsWindow.webContents.setZoomFactor(1);
+  settingsWindow.webContents.on('did-finish-load', () => {
+    try {
+      settingsWindow.webContents.setZoomFactor(1);
+    } catch (err) {
+      /* ignore */
+    }
+  });
   settingsWindow.once('ready-to-show', () => {
     settingsWindow.show();
     settingsWindow.focus();
@@ -575,6 +616,20 @@ function openSettingsWindow(section) {
 function openTerminalWindow() {
   // 有同屏记忆就用记忆里的屏幕 / 位置 / 尺寸，否则默认尺寸居中（见 terminalBoundsForOpen）。
   const bounds = terminalBoundsForOpen();
+  // 已有多扇时逐扇偏移一段，避免完全盖在一起（并夹回该屏幕工作区）。
+  const openCount = terminalWindowsList().length;
+  if (openCount > 0) {
+    const display = screen.getDisplayMatching({
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+    });
+    const area = display.workArea;
+    const offset = openCount * 26;
+    bounds.x = Math.min(Math.max(area.x, bounds.x + offset), area.x + area.width - bounds.width);
+    bounds.y = Math.min(Math.max(area.y, bounds.y + offset), area.y + area.height - bounds.height);
+  }
   const win = new BrowserWindow({
     x: bounds.x,
     y: bounds.y,
@@ -584,6 +639,7 @@ function openTerminalWindow() {
     minHeight: TERMINAL_WINDOW.minHeight,
     title: 'Ships Terminal',
     titleBarStyle: 'hiddenInset',
+    backgroundColor: themeBackgroundColor(),
     show: false,
     resizable: true,
     minimizable: true,
@@ -604,9 +660,21 @@ function openTerminalWindow() {
 
   // Pinching / Cmd+wheel must not scale the page (title bar + icons); the terminal
   // font is zoomed instead (see menu.js and the renderer's terminal:zoom handler).
+  // 页面缩放固定为 1：否则 renderer 的 CSS px 与窗口内容尺寸（DIP）不再相等，
+  // 整格对齐（按 innerWidth/Height 计算）会算错。Electron 会按 origin 记住缩放，
+  // 这里每次加载都强制归 1。
   win.webContents.setVisualZoomLevelLimits(1, 1);
+  win.webContents.setZoomFactor(1);
+  win.webContents.on('did-finish-load', () => {
+    try {
+      win.webContents.setZoomFactor(1);
+    } catch (err) {
+      /* ignore */
+    }
+  });
   win.webContents.on('zoom-changed', (event, zoomDirection) => {
     if (typeof event.preventDefault === 'function') event.preventDefault();
+    win.webContents.setZoomLevel(0);
     win.webContents.send(IPC.TERMINAL_ZOOM, zoomDirection === 'in' ? 'in' : 'out');
   });
   if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
@@ -747,6 +815,7 @@ function openFileWindow(target) {
     minHeight: FILE_WINDOW.minHeight,
     title: 'Ships Files',
     titleBarStyle: 'hiddenInset',
+    backgroundColor: themeBackgroundColor(),
     show: false,
     resizable: true,
     minimizable: true,
@@ -763,8 +832,17 @@ function openFileWindow(target) {
   });
   fileWindowOwnerId = fileWindow.webContents.id;
   fileWindow.webContents.setVisualZoomLevelLimits(1, 1);
+  fileWindow.webContents.setZoomFactor(1);
+  fileWindow.webContents.on('did-finish-load', () => {
+    try {
+      fileWindow.webContents.setZoomFactor(1);
+    } catch (err) {
+      /* ignore */
+    }
+  });
   fileWindow.webContents.on('zoom-changed', (event, zoomDirection) => {
     if (typeof event.preventDefault === 'function') event.preventDefault();
+    fileWindow.webContents.setZoomLevel(0);
     fileWindow.webContents.send(IPC.FILE_WINDOW_ZOOM, zoomDirection === 'in' ? 'in' : 'out');
   });
   applyFileWindowAlwaysOnTop();
@@ -791,6 +869,28 @@ function openFileWindow(target) {
     }
   });
   return fileWindow;
+}
+
+function isFileWindow(win) {
+  return Boolean(win) && win === fileWindow && !win.isDestroyed();
+}
+
+/* 独立文件窗口：按渲染层实测余量把内容高度收到「文件行整数倍」相应的高度。 */
+function snapFileWindowContentSize(win, height) {
+  if (!isFileWindow(win) || win.isMaximized() || win.isFullScreen()) return { ok: false };
+  const target = Math.round(Number(height));
+  if (!Number.isFinite(target) || target <= 0) return { ok: false };
+  const [width, current] = win.getContentSize();
+  if (target === current) return { ok: true, height: current };
+  let areaHeight = target;
+  try {
+    areaHeight = screen.getDisplayMatching(win.getBounds()).workAreaSize.height;
+  } catch (err) {
+    /* ignore */
+  }
+  const next = Math.max(FILE_WINDOW.minHeight, Math.min(target, areaHeight));
+  win.setContentSize(width, next);
+  return { ok: true, height: next };
 }
 
 function closeFileWindow() {
@@ -839,15 +939,20 @@ function setBlurSuppressed(value) {
 // 设置 → 终端 → 窗口大小：改完立即作用到已打开的终端窗口。
 settings.on('changed', (_data, keys) => {
   if (!Array.isArray(keys)) {
+    applyThemeBackgrounds();
     applyTerminalWindowSize();
     return;
   }
+  if (keys.includes('theme')) applyThemeBackgrounds();
   if (keys.includes('terminalWindowWidth') || keys.includes('terminalWindowHeight')) {
     applyTerminalWindowSize();
   }
   if (keys.includes('terminalAlwaysOnTop')) applyTerminalAlwaysOnTop();
   if (keys.includes('fileWindowAlwaysOnTop')) applyFileWindowAlwaysOnTop();
 });
+
+// 跟随系统主题时，系统外观变化也要重设窗口底色。
+nativeTheme.on('updated', applyThemeBackgrounds);
 
 module.exports = {
   setTray,
@@ -875,6 +980,8 @@ module.exports = {
   openFileWindow,
   getFileWindow,
   getFileWindowTarget,
+  isFileWindow,
+  snapFileWindowContentSize,
   closeFileWindow,
   forgetFileWindowGeometry,
   applyFileWindowAlwaysOnTop,

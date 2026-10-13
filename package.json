@@ -55,6 +55,7 @@
     },
     "sshBuiltinTerminal": true,
     "sftpDownloadDir": "~/Downloads",
+    "logRetentionDays": 7,
     "fileWindow": {
       "width": 900,
       "height": 600,

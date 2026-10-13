@@ -2,7 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { LOG_FILE } = require('./paths');
+const { LOG_DIR, todayLogFile } = require('./paths');
+const { LOG_RETENTION_DAYS } = require('../../shared/constants');
 
 const DEBUG =
   process.env.SHIPS_DEBUG === '1' || process.argv.includes('--debug');
@@ -16,12 +17,42 @@ function stringify(value) {
   }
 }
 
-// Always appended to ships.log (used for user-requested flows like SSH detection).
+/* 惰性清理：每天首次写日志时删掉保留期（默认 7 天）之前的日志文件。
+   文件名形如 ships-YYYY-MM-DD.log，按文件名里的日期判断。 */
+let lastPruneDay = '';
+function pruneOldLogs() {
+  const now = new Date();
+  const day = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+  if (day === lastPruneDay) return;
+  lastPruneDay = day;
+  const cutoff = Date.now() - LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  let entries = [];
+  try {
+    entries = fs.readdirSync(LOG_DIR);
+  } catch (err) {
+    return;
+  }
+  for (const name of entries) {
+    const match = /^ships-(\d{4})-(\d{2})-(\d{2})\.log$/.exec(name);
+    if (!match) continue;
+    const stamp = new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00`).getTime();
+    if (Number.isFinite(stamp) && stamp < cutoff) {
+      try {
+        fs.rmSync(path.join(LOG_DIR, name), { force: true });
+      } catch (err) {
+        /* ignore */
+      }
+    }
+  }
+}
+
+// Always appended to today's log file (used for user-requested flows like SSH detection).
 function file(...args) {
   const line = `${new Date().toISOString()} ${args.map(stringify).join(' ')}\n`;
   try {
-    fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true });
-    fs.appendFileSync(LOG_FILE, line, 'utf8');
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+    pruneOldLogs();
+    fs.appendFileSync(todayLogFile(), line, 'utf8');
   } catch (err) {
     /* ignore log write failures */
   }
@@ -50,4 +81,4 @@ function error(...args) {
   file('[error]', ...args);
 }
 
-module.exports = { DEBUG, debug, info, warn, error, file, LOG_FILE };
+module.exports = { DEBUG, debug, info, warn, error, file, LOG_DIR, todayLogFile };
