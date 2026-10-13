@@ -69,6 +69,7 @@ const api = {
     connect: (target) => ipcRenderer.invoke(IPC.SFTP_CONNECT, { target }),
     list: (id, path) => ipcRenderer.invoke(IPC.SFTP_LIST, { id, path }),
     download: (id, path) => ipcRenderer.invoke(IPC.SFTP_DOWNLOAD, { id, path }),
+    open: (id, path) => ipcRenderer.invoke(IPC.SFTP_OPEN, { id, path }),
     upload: (id, localPath, remoteDir) => ipcRenderer.invoke(IPC.SFTP_UPLOAD, { id, localPath, remoteDir }),
     close: (id) => ipcRenderer.invoke(IPC.SFTP_CLOSE, { id }),
     transferCommand: (id, path, recursive) => ipcRenderer.invoke(IPC.SFTP_TRANSFER_COMMAND, { id, path, recursive }),

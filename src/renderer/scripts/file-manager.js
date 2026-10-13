@@ -38,6 +38,7 @@
         perm: '权限',
         upload: '上传',
         download: '下载',
+        open: '打开',
         copyTransfer: '复制传输命令',
         copiedCommand: '已复制：{command}',
         copyFailed: '复制传输命令失败',
@@ -50,6 +51,7 @@
         downloading: '正在下载 {name}…',
         downloaded: '已下载到 {path}',
         downloadFailed: '下载失败：{error}',
+        opened: '已在文件管理器中定位 {path}',
         uploading: '正在上传 {name}…',
         uploaded: '已上传 {name}',
         uploadFailed: '上传失败：{error}',
@@ -77,6 +79,7 @@
         perm: 'Perm',
         upload: 'Upload',
         download: 'Download',
+        open: 'Open',
         copyTransfer: 'Copy transfer command',
         copiedCommand: 'Copied: {command}',
         copyFailed: 'Failed to copy transfer command',
@@ -89,6 +92,7 @@
         downloading: 'Downloading {name}…',
         downloaded: 'Saved to {path}',
         downloadFailed: 'Download failed: {error}',
+        opened: 'Revealed in Finder: {path}',
         uploading: 'Uploading {name}…',
         uploaded: 'Uploaded {name}',
         uploadFailed: 'Upload failed: {error}',
@@ -499,6 +503,7 @@
           renderList();
           scrollTreeToSelected();
           openContextMenu(event.clientX, event.clientY, [
+            { label: i18n.t('filesUi.open'), run: () => openFile(path, entry.name) },
             { label: i18n.t('filesUi.download'), run: () => downloadFile(path, entry.name) },
             { label: i18n.t('filesUi.copyTransfer'), run: () => copyTransferCommand(path, false) },
           ]);
@@ -583,6 +588,16 @@
       const result = await window.ships.sftp.download(state.id, path);
       setProgress(null);
       if (result && result.ok) setStatus(i18n.t('filesUi.downloaded', { path: result.path }), false);
+      else setStatus(i18n.t('filesUi.downloadFailed', { error: (result && result.error) || 'error' }), true);
+    }
+
+    /* 右键「打开」：先下载到下载目录，完成后由主进程在系统文件管理器中定位该文件。 */
+    async function openFile(path, name) {
+      setProgress({ name, transferred: 0, total: 0, direction: 'download' });
+      setStatus(i18n.t('filesUi.downloading', { name }), false);
+      const result = await window.ships.sftp.open(state.id, path);
+      setProgress(null);
+      if (result && result.ok) setStatus(i18n.t('filesUi.opened', { path: result.path }), false);
       else setStatus(i18n.t('filesUi.downloadFailed', { error: (result && result.error) || 'error' }), true);
     }
 

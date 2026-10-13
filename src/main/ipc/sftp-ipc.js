@@ -4,7 +4,7 @@
 // allowed to own an SFTP session (the terminal window's embedded panel or the
 // detached file window).
 
-const { clipboard } = require('electron');
+const { clipboard, shell } = require('electron');
 const { IPC } = require('../../shared/constants');
 const sftp = require('../services/sftp-service');
 const wm = require('../window-manager');
@@ -34,6 +34,23 @@ function registerSftpIpc(ipcMain) {
     return sftp.download(payload && payload.id, payload && payload.path, (progress) =>
       sender.send(IPC.SFTP_PROGRESS, Object.assign({ id: payload && payload.id }, progress))
     );
+  });
+
+  // 右键「打开」：先下载到设置的下载目录，完成后在系统文件管理器中定位该文件。
+  ipcMain.handle(IPC.SFTP_OPEN, async (event, payload) => {
+    if (!isAllowedSender(event)) return { ok: false, error: 'forbidden' };
+    const sender = event.sender;
+    const result = await sftp.download(payload && payload.id, payload && payload.path, (progress) =>
+      sender.send(IPC.SFTP_PROGRESS, Object.assign({ id: payload && payload.id }, progress))
+    );
+    if (result && result.ok && result.path) {
+      try {
+        shell.showItemInFolder(result.path);
+      } catch (err) {
+        /* ignore reveal failures */
+      }
+    }
+    return result;
   });
 
   ipcMain.handle(IPC.SFTP_UPLOAD, (event, payload) => {

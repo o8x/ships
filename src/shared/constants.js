@@ -63,6 +63,7 @@ const IPC = {
   SFTP_CONNECT: 'sftp:connect',
   SFTP_LIST: 'sftp:list',
   SFTP_DOWNLOAD: 'sftp:download',
+  SFTP_OPEN: 'sftp:open',
   SFTP_UPLOAD: 'sftp:upload',
   SFTP_CLOSE: 'sftp:close',
   SFTP_TRANSFER_COMMAND: 'sftp:transfer-command',
