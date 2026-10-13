@@ -1,0 +1,10 @@
+* text=auto eol=lf
+
+*.png binary
+*.icns binary
+*.ico binary
+*.zip binary
+*.dmg binary
+
+debug.* linguist-generated
+src/renderer/styles/tailwind.build.css linguist-generated
