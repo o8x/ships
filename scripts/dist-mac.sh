@@ -19,4 +19,6 @@ else
   export CSC_IDENTITY_AUTO_DISCOVERY=false
 fi
 
-exec npx electron-builder --mac --arm64
+# --publish never: releases are published by CI (softprops/action-gh-release),
+# not by electron-builder's implicit CI auto-publish.
+exec npx electron-builder --mac --arm64 --publish never
