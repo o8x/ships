@@ -310,11 +310,12 @@ input[type='color'].swatch::-webkit-color-swatch {
 .select-trigger:hover {
   background: var(--color-surface-3);
 }
-/* 头栏尺寸变体：终端窗口小头栏里的 SSH 下拉（字号 / 高度由 #term-actions 规则按头栏字号推） */
+/* 头栏尺寸变体：终端窗口小头栏里的 SSH 下拉（字号 / 高度由 #term-actions 规则按头栏字号推）。
+   小头栏用更小的圆角，观感更紧凑。 */
 .select-trigger.select-compact {
   padding: 0 6px;
   gap: 4px;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-control-sm);
 }
 .select-trigger.open {
   border-color: var(--color-accent);
