@@ -7,6 +7,7 @@
 const { clipboard, shell } = require('electron');
 const { IPC } = require('../../shared/constants');
 const sftp = require('../services/sftp-service');
+const vscode = require('../services/vscode-service');
 const wm = require('../window-manager');
 
 function isAllowedSender(event) {
@@ -18,6 +19,14 @@ function isAllowedSender(event) {
 }
 
 function registerSftpIpc(ipcMain) {
+  /* 下载到本地下载目录，过程中把进度回传给发起窗口。 */
+  function downloadToLocal(event, payload) {
+    const sender = event.sender;
+    return sftp.download(payload && payload.id, payload && payload.path, (progress) =>
+      sender.send(IPC.SFTP_PROGRESS, Object.assign({ id: payload && payload.id }, progress))
+    );
+  }
+
   ipcMain.handle(IPC.SFTP_CONNECT, (event, payload) => {
     if (!isAllowedSender(event)) return { ok: false, error: 'forbidden' };
     return sftp.connect(payload && payload.target, event.sender.id);
@@ -30,19 +39,13 @@ function registerSftpIpc(ipcMain) {
 
   ipcMain.handle(IPC.SFTP_DOWNLOAD, (event, payload) => {
     if (!isAllowedSender(event)) return { ok: false, error: 'forbidden' };
-    const sender = event.sender;
-    return sftp.download(payload && payload.id, payload && payload.path, (progress) =>
-      sender.send(IPC.SFTP_PROGRESS, Object.assign({ id: payload && payload.id }, progress))
-    );
+    return downloadToLocal(event, payload);
   });
 
   // 右键「打开」：先下载到设置的下载目录，完成后在系统文件管理器中定位该文件。
   ipcMain.handle(IPC.SFTP_OPEN, async (event, payload) => {
     if (!isAllowedSender(event)) return { ok: false, error: 'forbidden' };
-    const sender = event.sender;
-    const result = await sftp.download(payload && payload.id, payload && payload.path, (progress) =>
-      sender.send(IPC.SFTP_PROGRESS, Object.assign({ id: payload && payload.id }, progress))
-    );
+    const result = await downloadToLocal(event, payload);
     if (result && result.ok && result.path) {
       try {
         shell.showItemInFolder(result.path);
@@ -50,6 +53,16 @@ function registerSftpIpc(ipcMain) {
         /* ignore reveal failures */
       }
     }
+    return result;
+  });
+
+  // 右键「用 VS Code 打开」：先下载，完成后用 Visual Studio Code 打开该文件。
+  ipcMain.handle(IPC.SFTP_OPEN_VSCODE, async (event, payload) => {
+    if (!isAllowedSender(event)) return { ok: false, error: 'forbidden' };
+    const result = await downloadToLocal(event, payload);
+    if (!result || !result.ok || !result.path) return result;
+    const opened = await vscode.openPath(result.path);
+    if (!opened || !opened.ok) return { ok: false, error: (opened && opened.error) || 'vscode-failed', path: result.path };
     return result;
   });
 

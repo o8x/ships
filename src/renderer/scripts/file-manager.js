@@ -12,6 +12,11 @@
   const FILE_TYPE_ICONS = constants.FILE_TYPE_ICONS || {};
   const FILE_NAME_ICONS = constants.FILE_NAME_ICONS || {};
   const DEFAULT_FILE_ICON = constants.DEFAULT_FILE_ICON || 'file';
+  // 完成提示（已下载 / 已上传 / 已定位 / 已复制）在状态栏保留多久后惰性清除。
+  const STATUS_TTL_MS = constants.FILE_STATUS_TTL_MS || 30000;
+  // 双击打开方式：超过该体积、或属于非文本类型时用系统默认程序，否则用 VS Code。
+  const VSCODE_MAX_BYTES = constants.FILE_VSCODE_MAX_BYTES || 10 * 1024 * 1024;
+  const NON_TEXT_EXTENSIONS = new Set(constants.NON_TEXT_EXTENSIONS || []);
 
   const DEFAULT_LAYOUT = {
     treeWidth: 300,
@@ -39,6 +44,7 @@
         upload: '上传',
         download: '下载',
         open: '打开',
+        openVSCode: '用 VS Code 打开',
         copyTransfer: '复制传输命令',
         copiedCommand: '已复制：{command}',
         copyFailed: '复制传输命令失败',
@@ -52,6 +58,7 @@
         downloaded: '已下载到 {path}',
         downloadFailed: '下载失败：{error}',
         opened: '已在文件管理器中定位 {path}',
+        openedVSCode: '已用 VS Code 打开 {path}',
         uploading: '正在上传 {name}…',
         uploaded: '已上传 {name}',
         uploadFailed: '上传失败：{error}',
@@ -80,6 +87,7 @@
         upload: 'Upload',
         download: 'Download',
         open: 'Open',
+        openVSCode: 'Open in VS Code',
         copyTransfer: 'Copy transfer command',
         copiedCommand: 'Copied: {command}',
         copyFailed: 'Failed to copy transfer command',
@@ -93,6 +101,7 @@
         downloaded: 'Saved to {path}',
         downloadFailed: 'Download failed: {error}',
         opened: 'Revealed in Finder: {path}',
+        openedVSCode: 'Opened in VS Code: {path}',
         uploading: 'Uploading {name}…',
         uploaded: 'Uploaded {name}',
         uploadFailed: 'Upload failed: {error}',
@@ -164,6 +173,17 @@
       if (icon) return icon;
     }
     return DEFAULT_FILE_ICON;
+  }
+
+  /* 双击打开方式：体积超过 10M、或属于图片 / PDF / Word 等非文本类型时用系统默认程序
+     「打开」，否则用 VS Code 打开。 */
+  function prefersNativeOpen(entry) {
+    const size = Number(entry && entry.size) || 0;
+    if (size > VSCODE_MAX_BYTES) return true;
+    const name = String((entry && entry.name) || '').toLowerCase();
+    const dot = name.lastIndexOf('.');
+    const ext = dot > 0 && dot < name.length - 1 ? name.slice(dot + 1) : '';
+    return NON_TEXT_EXTENSIONS.has(ext);
   }
 
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -261,21 +281,33 @@
     wrap.append(main, statusBar);
     root.appendChild(wrap);
 
-    /* path row: [refresh][home][input][cd][popout] (cd/popout only when provided) */
+    /* path row: [popout][refresh][home][cd][input]
+       分离为独立窗口（仅内嵌面板）放刷新左侧，cd 到目录（仅内嵌面板）放 home 右侧 —— 四个图标排成一排。 */
+    const popBtn = onPopOut
+      ? el('button', { class: 'icon-btn fm-path-btn', type: 'button', 'data-tip': i18n.t('filesUi.popOut') })
+      : null;
+    if (popBtn) {
+      popBtn.innerHTML = Icons.external(14);
+      popBtn.addEventListener('click', () => onPopOut(state.target));
+    }
     const refreshBtn = el('button', { class: 'icon-btn fm-path-btn', type: 'button', 'data-tip': i18n.t('filesUi.refresh') });
     refreshBtn.innerHTML = Icons.refresh(14);
     const homeBtn = el('button', { class: 'icon-btn fm-path-btn', type: 'button', 'data-tip': i18n.t('filesUi.home') });
     homeBtn.innerHTML = Icons.home(14);
-    const pathInput = el('input', { class: 'fm-path-input', type: 'text', spellcheck: 'false', autocomplete: 'off', placeholder: i18n.t('filesUi.pathPlaceholder') });
-    pathRow.append(refreshBtn, homeBtn, pathInput);
-    if (onCd) {
-      const cdBtn = el('button', { class: 'icon-btn fm-path-btn', type: 'button', 'data-tip': i18n.t('filesUi.cdHere') });
+    const cdBtn = onCd
+      ? el('button', { class: 'icon-btn fm-path-btn', type: 'button', 'data-tip': i18n.t('filesUi.cdHere') })
+      : null;
+    if (cdBtn) {
       cdBtn.innerHTML = Icons.terminal(14);
       cdBtn.addEventListener('click', () => {
         if (state.connected && state.cwd) onCd(state.cwd);
       });
-      pathRow.appendChild(cdBtn);
     }
+    const pathInput = el('input', { class: 'fm-path-input', type: 'text', spellcheck: 'false', autocomplete: 'off', placeholder: i18n.t('filesUi.pathPlaceholder') });
+    for (const btn of [popBtn, refreshBtn, homeBtn, cdBtn]) {
+      if (btn) pathRow.appendChild(btn);
+    }
+    pathRow.appendChild(pathInput);
     /* list head cells */
     function headCell(label, cls, resizeKey) {
       const cell = el('div', { class: `fm-head-cell ${cls}` }, label || '');
@@ -287,27 +319,9 @@
       return cell;
     }
 
-    /* 上传按钮 +（内嵌面板才有的）分离为独立窗口按钮：直接放在**时间列的列表头里**（不单独开列）。 */
-    const uploadBtn = el('button', { class: 'icon-btn fm-action-btn', type: 'button', 'data-tip': i18n.t('filesUi.upload') });
-    uploadBtn.innerHTML = Icons.arrowUp(13);
-    uploadBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      chooseAndUpload();
-    });
-    const headActions = el('div', { class: 'fm-head-actions' });
-    headActions.appendChild(uploadBtn);
-    if (onPopOut) {
-      const popBtn = el('button', { class: 'icon-btn fm-action-btn', type: 'button', 'data-tip': i18n.t('filesUi.popOut') });
-      popBtn.innerHTML = Icons.external(13);
-      popBtn.addEventListener('click', (event) => {
-        event.stopPropagation();
-        onPopOut(state.target);
-      });
-      headActions.appendChild(popBtn);
-    }
-    // 时间列表头 = 「时间」标签 + 操作按钮（同一列内）
+    // 时间列表头 = 只有「时间」标签（上传已在目录树节点右键菜单，分离按钮已移到路径行）。
     const timeCell = el('div', { class: 'fm-head-cell fm-head-time' });
-    timeCell.append(el('span', { class: 'fm-head-time-label' }, i18n.t('filesUi.time')), headActions);
+    timeCell.append(el('span', { class: 'fm-head-time-label' }, i18n.t('filesUi.time')));
     const timeResize = el('div', { class: 'fm-col-resize' });
     timeResize.addEventListener('mousedown', (event) => startColResize(event, 'time'));
     timeCell.appendChild(timeResize);
@@ -330,9 +344,42 @@
     applyLayout();
 
     /* ---------------------------- status helpers -------------------------- */
+    let statusTimer = null;
+    function clearStatusTimer() {
+      if (statusTimer) {
+        clearTimeout(statusTimer);
+        statusTimer = null;
+      }
+    }
+    /* 状态栏日志：同时写渲染层控制台与主进程（控制台 + 当天文件日志）。
+       仅在渲染进程无 window.ships.log（如独立测试）时降级为仅 console。 */
+    function writeLog(text) {
+      try {
+        console.log(text);
+      } catch (err) {
+        /* ignore */
+      }
+      try {
+        if (window.ships && typeof window.ships.log === 'function') window.ships.log(text);
+      } catch (err) {
+        /* ignore */
+      }
+    }
+    /* 所有状态栏提示：保留 STATUS_TTL_MS 后惰性清除（下一次设置会重置计时），
+       并同步写控制台日志与文件日志。 */
     function setStatus(message, isError) {
-      statusMsg.textContent = message || '';
+      clearStatusTimer();
+      const text = message || '';
+      statusMsg.textContent = text;
       statusMsg.style.color = isError ? 'var(--color-danger)' : '';
+      if (text) {
+        writeLog(`[file-manager] ${text}`);
+        statusTimer = setTimeout(() => {
+          statusTimer = null;
+          statusMsg.textContent = '';
+          statusMsg.style.color = '';
+        }, STATUS_TTL_MS);
+      }
     }
     function setStatusPath(path) {
       statusPath.textContent = path || '';
@@ -398,6 +445,7 @@
         setStatusPath(path);
         renderTree();
         openContextMenu(event.clientX, event.clientY, [
+          { label: i18n.t('filesUi.upload'), run: () => chooseAndUpload(path) },
           { label: i18n.t('filesUi.copyTransfer'), run: () => copyTransferCommand(path, true) },
         ]);
       });
@@ -496,6 +544,11 @@
           // 点文件时把左侧目录树滚动定位到它所在的目录节点。
           scrollTreeToSelected();
         });
+        // 双击：小体积文本文件用 VS Code 打开；大文件 / 图片 / PDF / Word 等非文本用系统默认程序打开。
+        row.addEventListener('dblclick', () => {
+          if (prefersNativeOpen(entry)) openFile(path, entry.name);
+          else openWithVSCode(path, entry.name);
+        });
         row.addEventListener('contextmenu', (event) => {
           event.preventDefault();
           state.selected = path;
@@ -504,6 +557,7 @@
           scrollTreeToSelected();
           openContextMenu(event.clientX, event.clientY, [
             { label: i18n.t('filesUi.open'), run: () => openFile(path, entry.name) },
+            { label: i18n.t('filesUi.openVSCode'), run: () => openWithVSCode(path, entry.name) },
             { label: i18n.t('filesUi.download'), run: () => downloadFile(path, entry.name) },
             { label: i18n.t('filesUi.copyTransfer'), run: () => copyTransferCommand(path, false) },
           ]);
@@ -578,7 +632,7 @@
     async function copyTransferCommand(path, recursive) {
       if (!state.connected || !path) return;
       const result = await window.ships.sftp.transferCommand(state.id, path, Boolean(recursive));
-      if (result && result.ok) setStatus(i18n.t('filesUi.copiedCommand', { command: result.command }), false);
+      if (result && result.ok) setStatus(i18n.t('filesUi.copiedCommand', { command: result.command }));
       else setStatus(i18n.t('filesUi.copyFailed'), true);
     }
 
@@ -587,7 +641,7 @@
       setStatus(i18n.t('filesUi.downloading', { name }), false);
       const result = await window.ships.sftp.download(state.id, path);
       setProgress(null);
-      if (result && result.ok) setStatus(i18n.t('filesUi.downloaded', { path: result.path }), false);
+      if (result && result.ok) setStatus(i18n.t('filesUi.downloaded', { path: result.path }));
       else setStatus(i18n.t('filesUi.downloadFailed', { error: (result && result.error) || 'error' }), true);
     }
 
@@ -597,20 +651,31 @@
       setStatus(i18n.t('filesUi.downloading', { name }), false);
       const result = await window.ships.sftp.open(state.id, path);
       setProgress(null);
-      if (result && result.ok) setStatus(i18n.t('filesUi.opened', { path: result.path }), false);
+      if (result && result.ok) setStatus(i18n.t('filesUi.opened', { path: result.path }));
       else setStatus(i18n.t('filesUi.downloadFailed', { error: (result && result.error) || 'error' }), true);
     }
 
-    /* 上传一组本地路径（拖拽与「上传」按钮共用）；逐个上传并更新进度。 */
-    async function uploadLocalPaths(paths) {
+    /* 右键「用 VS Code 打开」：先下载，完成后由主进程用 VS Code 打开该文件。 */
+    async function openWithVSCode(path, name) {
+      setProgress({ name, transferred: 0, total: 0, direction: 'download' });
+      setStatus(i18n.t('filesUi.downloading', { name }), false);
+      const result = await window.ships.sftp.openVSCode(state.id, path);
+      setProgress(null);
+      if (result && result.ok) setStatus(i18n.t('filesUi.openedVSCode', { path: result.path }));
+      else setStatus(i18n.t('filesUi.downloadFailed', { error: (result && result.error) || 'error' }), true);
+    }
+
+    /* 上传一组本地路径（拖拽 / 目录右键「上传」共用）；逐个上传并更新进度。 */
+    async function uploadLocalPaths(paths, targetDir) {
       if (!state.connected || !paths || !paths.length) return;
+      const dir = targetDir || state.cwd;
       for (const localPath of paths) {
         const name = String(localPath).split('/').pop() || localPath;
         setStatus(i18n.t('filesUi.uploading', { name }), false);
         setProgress({ name, transferred: 0, total: 0, direction: 'upload' });
-        const result = await window.ships.sftp.upload(state.id, localPath, state.cwd);
+        const result = await window.ships.sftp.upload(state.id, localPath, dir);
         setProgress(null);
-        if (result && result.ok) setStatus(i18n.t('filesUi.uploaded', { name: result.name }), false);
+        if (result && result.ok) setStatus(i18n.t('filesUi.uploaded', { name: result.name }));
         else setStatus(i18n.t('filesUi.uploadFailed', { error: (result && result.error) || 'error' }), true);
       }
       loadList(state.cwd);
@@ -625,11 +690,11 @@
       uploadLocalPaths(paths);
     }
 
-    /* 上传按钮：打开系统文件选择窗口，选中后上传到当前目录。 */
-    async function chooseAndUpload() {
+    /* 目录树节点右键「上传」：打开系统文件选择窗口，选中后上传到该目录。 */
+    async function chooseAndUpload(targetDir) {
       if (!state.connected) return;
       const result = await window.ships.openFiles();
-      if (result && result.paths && result.paths.length) uploadLocalPaths(result.paths);
+      if (result && result.paths && result.paths.length) uploadLocalPaths(result.paths, targetDir);
     }
 
     async function connect() {
@@ -816,6 +881,7 @@
     function destroy() {
       if (offProgress) offProgress();
       closeContextMenu();
+      clearStatusTimer();
       document.removeEventListener('mousedown', onDocDown, true);
       window.removeEventListener('keydown', onKeyDown, true);
       resetConnection();

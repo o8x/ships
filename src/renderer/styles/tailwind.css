@@ -332,6 +332,7 @@ input[type='color'].swatch::-webkit-color-swatch {
   box-shadow: var(--shadow-popover);
 }
 .select-option {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -512,9 +513,19 @@ body.term-window .select-menu .select-option svg {
   width: var(--term-header-font-size);
   height: var(--term-header-font-size);
 }
-/* 条目之间留 2px 间距 */
+/* 条目之间留 4px 间距，并在中间画一条两侧内缩的分隔线（不贯穿整宽）。 */
 body.term-window .select-menu .select-option + .select-option {
-  margin-top: 2px;
+  margin-top: 4px;
+}
+body.term-window .select-menu .select-option + .select-option::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: -2.5px;
+  height: 1px;
+  background: var(--color-border);
+  pointer-events: none;
 }
 /* 终端窗口头栏的 SSH 下拉菜单：条目高度 14px、字号与下拉本体一致（固定 11px）。 */
 body.term-window:not(.file-window) .select-menu .select-option {
@@ -790,33 +801,16 @@ body.term-window:not(.file-window) .select-menu .select-option svg {
   font-size: 0.92em;
   color: var(--color-fg-muted);
 }
-/* 时间列表头：左边「时间」标签，右边放上传 / 分离按钮（同一列内，不单独开列） */
+/* 时间列表头：只有「时间」标签（上传已在目录树右键菜单，分离按钮已移到路径行） */
 .fm-head-time {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 4px;
 }
 .fm-head-time-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.fm-head-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-  flex: 0 0 auto;
-}
-.fm-action-btn {
-  width: 1.7em;
-  height: 1.7em;
-  flex: 0 0 auto;
-}
-.fm-action-btn svg {
-  width: 1em;
-  height: 1em;
 }
 /* 文件 / 目录右键菜单：字号 / 高度 / 内边距与头部 SSH 下拉（select-menu / select-option）一致 */
 .fm-menu {
@@ -831,6 +825,7 @@ body.term-window:not(.file-window) .select-menu .select-option svg {
   animation: ships-pop 0.12s ease both;
 }
 .fm-menu-item {
+  position: relative;
   display: block;
   width: 100%;
   height: max(18px, calc(var(--term-header-font-size) + 6px));
@@ -843,8 +838,19 @@ body.term-window:not(.file-window) .select-menu .select-option svg {
   text-align: left;
   cursor: default;
 }
+/* 条目之间留 4px 间距，并在中间画一条两侧内缩的分隔线（不贯穿整宽）。 */
 .fm-menu-item + .fm-menu-item {
-  margin-top: 2px;
+  margin-top: 4px;
+}
+.fm-menu-item + .fm-menu-item::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: -2.5px;
+  height: 1px;
+  background: var(--color-border);
+  pointer-events: none;
 }
 .fm-menu-item:hover {
   background: var(--color-surface-2);

@@ -3,6 +3,26 @@
 window.ShipsConstants = {
   FALLBACK_VERSION: '0.0.0',
   COPY_FEEDBACK_MS: 1200,
+  // 文件管理状态栏：所有提示的保留时长（到点惰性清除）。
+  FILE_STATUS_TTL_MS: 30000,
+  // 双击文件的默认打开方式：超过该体积、或属于下面的非文本类型时用系统默认程序「打开」，
+  // 否则用 VS Code 打开。
+  FILE_VSCODE_MAX_BYTES: 10 * 1024 * 1024,
+  NON_TEXT_EXTENSIONS: [
+    // 图片
+    'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico', 'tif', 'tiff', 'heic', 'avif',
+    // 文档（Word / Excel / PPT / PDF 等）
+    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'rtf',
+    'pages', 'numbers', 'key',
+    // 音视频
+    'mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg', 'mp4', 'mov', 'mkv', 'avi', 'webm', 'mpg', 'mpeg',
+    // 压缩 / 镜像
+    'zip', 'gz', 'tgz', 'bz2', 'xz', 'zst', 'tar', '7z', 'rar', 'dmg', 'iso',
+    // 可执行 / 二进制
+    'exe', 'dll', 'so', 'dylib', 'bin', 'app', 'pkg', 'deb', 'rpm',
+    // 字体
+    'ttf', 'otf', 'woff', 'woff2', 'eot',
+  ],
   DEBOUNCE_MS: 120,
   ACCENT_PRESETS: ['#2e6bfc', '#7c3aed', '#e5484d', '#f59e0b', '#10b981', '#0ea5e9', '#ec4899'],
   JSON_HIGHLIGHT_MAX_BYTES: 1024 * 1024,
