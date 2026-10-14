@@ -44,6 +44,8 @@
         ballSizeHint: '圆形悬浮球的边长（宽高强制 1:1，40–200px）',
         ballIcon: '悬浮球图标',
         ballIconHint: '从 assets/icons/ball 中选择悬浮球显示的图标，实时生效',
+        ballDarkIcon: '悬浮球图标使用暗色',
+        ballDarkIconHint: '开启后图标为浅色（默认）、关闭为黑色；不跟随全局主题',
         seconds: '秒',
         reset: '重置',
         resetHint: '恢复终端相关设置为默认值，并清除记住的窗口屏幕 / 位置 / 大小',
@@ -92,6 +94,8 @@
         ballSizeHint: 'Edge length of the round ball (forced 1:1, 40–200px)',
         ballIcon: 'Ball icon',
         ballIconHint: 'Pick the floating ball icon from assets/icons/ball (applies live)',
+        ballDarkIcon: 'Dark ball icon',
+        ballDarkIconHint: 'On = light icon (default), Off = black; independent of the app theme',
         seconds: 's',
         reset: 'Reset',
         resetHint: 'Restore the terminal settings to their defaults and forget the remembered screen / position / size',
@@ -392,6 +396,17 @@
     });
     wrap.appendChild(
       row(i18n.t('terminalSettings.ballIcon'), i18n.t('terminalSettings.ballIconHint'), ballIconSelect.el)
+    );
+
+    /* 悬浮球图标颜色：暗色模式（浅色图标）/ 黑色；不跟随全局主题 */
+    const ballDarkSwitch = switchControl(ctx.settings.terminalBallDarkIcon !== false, (value) =>
+      ctx.patch({ terminalBallDarkIcon: value })
+    );
+    syncers.push((next) => {
+      ballDarkSwitch.classList.toggle('on', next.terminalBallDarkIcon !== false);
+    });
+    wrap.appendChild(
+      row(i18n.t('terminalSettings.ballDarkIcon'), i18n.t('terminalSettings.ballDarkIconHint'), ballDarkSwitch)
     );
 
     /* 全局快捷键：在任意界面按下即可拉起置顶终端窗口 */
