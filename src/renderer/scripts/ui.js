@@ -325,12 +325,19 @@ window.ShipsUI = (function createUI() {
         menu.style.minWidth = `${rect.width}px`;
         menu.style.maxWidth = `${rect.width}px`;
       }
-      const menuRect = menu.getBoundingClientRect();
-      let left = options.align === 'right' ? rect.right - menuRect.width : rect.left;
-      left = Math.max(6, Math.min(left, window.innerWidth - menuRect.width - 6));
+      // 用 offsetWidth/Height（不受入场动画 transform 影响，getBoundingClientRect 会被 scale 影响）。
+      const menuWidth = menu.offsetWidth;
+      const menuHeight = menu.offsetHeight;
+      // matchTrigger：菜单与触发器同宽且左边缘对齐（不受 align 影响）。
+      let left = options.matchTrigger
+        ? rect.left
+        : options.align === 'right'
+          ? rect.right - menuWidth
+          : rect.left;
+      left = Math.max(6, Math.min(left, window.innerWidth - menuWidth - 6));
       let top = rect.bottom + 4;
-      if (top + menuRect.height > window.innerHeight - 6) {
-        top = Math.max(6, rect.top - menuRect.height - 4);
+      if (top + menuHeight > window.innerHeight - 6) {
+        top = Math.max(6, rect.top - menuHeight - 4);
       }
       menu.style.left = `${left}px`;
       menu.style.top = `${top}px`;
