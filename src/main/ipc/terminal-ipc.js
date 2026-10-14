@@ -26,6 +26,7 @@ const TERMINAL_SETTING_KEYS = [
   'sftpDownloadDir',
   'terminalBallEnabled',
   'terminalBallDelayMs',
+  'terminalBallSize',
 ];
 
 function terminalDefaults() {

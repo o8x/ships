@@ -40,6 +40,8 @@
         ballEnableHint: '终端窗口失去焦点一段时间后缩成圆形悬浮球，点击球 / 按快捷键放大回来',
         ballDelay: '缩成悬浮球延迟',
         ballDelayHint: '失去焦点后多久缩成球（期间焦点回来则取消）',
+        ballSize: '悬浮球大小',
+        ballSizeHint: '圆形悬浮球的边长（宽高强制 1:1，40–200px）',
         seconds: '秒',
         reset: '重置',
         resetHint: '恢复终端相关设置为默认值，并清除记住的窗口屏幕 / 位置 / 大小',
@@ -84,6 +86,8 @@
         ballEnableHint: 'Shrink the terminal into a round floating ball after it loses focus; click it or press the hotkey to bring it back',
         ballDelay: 'Ball shrink delay',
         ballDelayHint: 'How long after losing focus before shrinking (cancelled if focus returns)',
+        ballSize: 'Ball size',
+        ballSizeHint: 'Edge length of the round ball (forced 1:1, 40–200px)',
         seconds: 's',
         reset: 'Reset',
         resetHint: 'Restore the terminal settings to their defaults and forget the remembered screen / position / size',
@@ -341,6 +345,25 @@
     });
     wrap.appendChild(
       row(i18n.t('terminalSettings.ballDelay'), i18n.t('terminalSettings.ballDelayHint'), ballDelaySelect.el)
+    );
+
+    const ballSizeField = field(null, {
+      class: 'field w-[86px] shrink-0 font-mono',
+      type: 'number',
+      min: '40',
+      max: '200',
+    });
+    ballSizeField.input.value = String(ctx.settings.terminalBallSize || 75);
+    ballSizeField.input.addEventListener('change', () => {
+      const value = Math.max(40, Math.min(200, Number(ballSizeField.input.value) || 75));
+      ballSizeField.input.value = String(value);
+      ctx.patch({ terminalBallSize: value });
+    });
+    syncers.push((next) => {
+      ballSizeField.input.value = String(next.terminalBallSize || 75);
+    });
+    wrap.appendChild(
+      row(i18n.t('terminalSettings.ballSize'), i18n.t('terminalSettings.ballSizeHint'), ballSizeField.input)
     );
 
     /* 全局快捷键：在任意界面按下即可拉起置顶终端窗口 */

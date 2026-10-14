@@ -13,8 +13,16 @@ const logger = require('./utils/logger');
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
 const PRELOAD_DIR = path.join(__dirname, '..', 'preload');
 
-// 终端窗口「悬浮球」尺寸（失去焦点时缩成的圆形窗口，见 §3.9-12）。
-const BALL_SIZE = Number(TERMINAL_WINDOW.ballSize) || 100;
+// 终端窗口「悬浮球」尺寸（设置 → 终端，宽高强制 1:1，默认 75px，见 §3.9-12）。
+const BALL_SIZE_DEFAULT = Number(TERMINAL_WINDOW.ballSize) || 75;
+const BALL_SIZE_MIN = 40;
+const BALL_SIZE_MAX = 200;
+
+function ballSize() {
+  const value = Number(settings.get('terminalBallSize'));
+  if (!Number.isFinite(value)) return BALL_SIZE_DEFAULT;
+  return Math.max(BALL_SIZE_MIN, Math.min(BALL_SIZE_MAX, Math.round(value)));
+}
 
 let mainWindow = null;
 let settingsWindow = null;
@@ -361,21 +369,22 @@ function toggleTerminalWindow() {
 }
 
 /* --------------------------- 终端窗口「悬浮球」 ---------------------------
-   失去焦点（延迟一段时间、期间焦点回来就取消）后把窗口缩小成 BALL_SIZE 的圆形无标题栏窗口
-   （CSS 画圆形），点击 / 快捷键再放大回原样。
+   失去焦点（延迟一段时间、期间焦点回来就取消）后把窗口缩小成 ballSize()
+   的圆形无标题栏窗口（CSS 画圆形），点击 / 快捷键再放大回原样。
    - 窗口以 frame:false + transparent:true 创建，圆形由 CSS 固定尺寸呈现（不随窗口变形为椭圆）。
-   - 缩小 / 放大用 JS 逐帧插值动画（时长可控，比系统 animate 更慢更顺）。
+   - 球缩到**窗口右上角**；若用户没拖动过球，放大时**原样恢复**原窗口 bounds（多次缩放位置不变）。
+   - 缩小 / 放大用 JS 逐帧插值动画（时长可控、ease-in-out，比系统 animate 更慢更顺）。
    - 期间不改动几何记忆（terminal-window.json）。
    - 拖动由渲染层指针事件触发，主进程按光标位置移动窗口（这样「点击 vs 拖动」可区分）。 */
 let ballDragTimer = null;
-const BALL_ANIM_MS = 420;
+const BALL_ANIM_MS = 560;
 
 function terminalBallEnabled() {
   return settings.get('terminalBallEnabled') !== false;
 }
 function terminalBallDelayMs() {
   const value = Number(settings.get('terminalBallDelayMs'));
-  return Number.isFinite(value) && value >= 0 ? value : 5000;
+  return Number.isFinite(value) && value >= 0 ? value : 3000;
 }
 
 function isBallMode(win) {
@@ -389,15 +398,19 @@ function clearBallTimer(win) {
   }
 }
 
-function ballBoundsFor(win) {
-  const b = win.getBounds();
-  const area = screen.getDisplayMatching(b).workArea;
-  const x = Math.min(Math.max(Math.round(b.x + b.width / 2 - BALL_SIZE / 2), area.x), area.x + area.width - BALL_SIZE);
-  const y = Math.min(Math.max(Math.round(b.y + b.height / 2 - BALL_SIZE / 2), area.y), area.y + area.height - BALL_SIZE);
-  return { x, y, width: BALL_SIZE, height: BALL_SIZE };
+function clampToWorkArea(bounds) {
+  const area = screen.getDisplayMatching(bounds).workArea;
+  const x = Math.min(Math.max(bounds.x, area.x), area.x + area.width - bounds.width);
+  const y = Math.min(Math.max(bounds.y, area.y), area.y + area.height - bounds.height);
+  return { x: Math.round(x), y: Math.round(y), width: bounds.width, height: bounds.height };
 }
 
-/* 逐帧把窗口 bounds 插值到 target（ease-out cubic），完成后回调 done。 */
+/* 球 = 窗口右上角的一个 size×size 正方形。 */
+function ballBoundsFor(orig, size) {
+  return clampToWorkArea({ x: orig.x + orig.width - size, y: orig.y, width: size, height: size });
+}
+
+/* 逐帧把窗口 bounds 插值到 target（ease-in-out cubic），完成后回调 done。 */
 function animateWindowBounds(win, target, durationMs, done) {
   if (win.__boundsAnim) {
     clearInterval(win.__boundsAnim);
@@ -410,7 +423,7 @@ function animateWindowBounds(win, target, durationMs, done) {
     return;
   }
   const start = Date.now();
-  const ease = (t) => 1 - Math.pow(1 - t, 3);
+  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
   win.__boundsAnim = setInterval(() => {
     if (win.isDestroyed()) {
       clearInterval(win.__boundsAnim);
@@ -435,23 +448,31 @@ function animateWindowBounds(win, target, durationMs, done) {
 
 function enterBallMode(win) {
   if (!isTerminalWindow(win) || win.__ballActive || win.__exitingBall || win.isDestroyed()) return;
+  const size = ballSize();
   win.__ballActive = true;
-  win.__ballBounds = win.getBounds();
+  win.__ballOrig = win.getBounds();
+  win.__ballMoved = false;
+  win.__ballBounds = ballBoundsFor(win.__ballOrig, size);
   if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
-  win.setMinimumSize(BALL_SIZE, BALL_SIZE);
+  win.setMinimumSize(size, size);
   if (typeof win.setResizable === 'function') win.setResizable(false);
-  // 先切成球（固定尺寸圆形），再把窗口从当前尺寸收缩到球大小 —— 球始终是圆的。
-  win.webContents.send(IPC.TERMINAL_BALL, { active: true, size: BALL_SIZE });
-  animateWindowBounds(win, ballBoundsFor(win), BALL_ANIM_MS);
-  logger.file(`[terminal] entered ball mode (${win.id})`);
+  // 先切成球（固定尺寸正圆、位于窗口右上角），再把窗口从当前尺寸收缩到球大小。
+  win.webContents.send(IPC.TERMINAL_BALL, { active: true, size });
+  animateWindowBounds(win, win.__ballBounds, BALL_ANIM_MS);
+  logger.file(`[terminal] entered ball mode (${win.id}) size=${size}`);
 }
 
 function exitBallMode(win, focus) {
   if (!isTerminalWindow(win) || !win.__ballActive || win.__exitingBall || win.isDestroyed()) return;
   win.__exitingBall = true;
-  const restore = win.__ballBounds;
+  const orig = win.__ballOrig || win.getBounds();
+  const size = ballSize();
+  // 没拖动过球 → 原样恢复；拖动过 → 以球的位置为「右上角」展开回原尺寸（夹回工作区）。
+  const current = win.getBounds();
+  const restore = win.__ballMoved
+    ? clampToWorkArea({ x: current.x + size - orig.width, y: current.y, width: orig.width, height: orig.height })
+    : orig;
   if (typeof win.setResizable === 'function') win.setResizable(true);
-  win.setMinimumSize(TERMINAL_WINDOW.minWidth, TERMINAL_WINDOW.minHeight);
   if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
   else win.setAlwaysOnTop(false);
   if (focus !== false) win.focus();
@@ -459,18 +480,20 @@ function exitBallMode(win, focus) {
     if (win.isDestroyed()) return;
     win.__ballActive = false;
     win.__ballBounds = null;
+    win.__ballOrig = null;
     win.__exitingBall = false;
-    // 放大动画结束后再切回终端（期间保持圆形球，窗口在球周围长大）。
-    win.webContents.send(IPC.TERMINAL_BALL, { active: false, size: BALL_SIZE });
+    // 放大动画结束后再恢复最小尺寸并切回终端（避免最小尺寸把窗口「弹」大导致抖动）。
+    win.setMinimumSize(TERMINAL_WINDOW.minWidth, TERMINAL_WINDOW.minHeight);
+    win.webContents.send(IPC.TERMINAL_BALL, { active: false, size });
     saveTerminalGeometry(win);
     logger.file(`[terminal] exited ball mode (${win.id})`);
   };
-  if (restore) animateWindowBounds(win, restore, BALL_ANIM_MS, finish);
-  else finish();
+  animateWindowBounds(win, restore, BALL_ANIM_MS, finish);
 }
 
 function startBallDrag(win, x, y) {
   if (!isTerminalWindow(win) || !win.__ballActive || win.__exitingBall) return;
+  win.__ballMoved = true;
   const b = win.getBounds();
   const offX = Number(x) - b.x;
   const offY = Number(y) - b.y;
@@ -801,6 +824,9 @@ function openTerminalWindow() {
     frame: false,
     transparent: true,
     hasShadow: false,
+    // macOS：让「悬浮球」在其它应用（含全屏应用）之上时，**第一次点击**就直接落到窗口内容，
+    // 而不是先激活应用、需要点两次才能展开。
+    acceptFirstMouse: true,
     show: false,
     resizable: true,
     minimizable: true,
