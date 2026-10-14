@@ -505,19 +505,26 @@ body.show-lines #term-host {
 }
 
 /* 终端窗口头栏下拉的菜单（菜单挂在 body 上，用 body.term-window 限定范围）：
-   固定 135px 宽（与下拉同宽），条目高 20px、上下各 1px 边距，无分隔线。 */
+   固定 135px 宽（与下拉同宽、左右对齐），条目高 20px、四周留 3px（菜单 padding + 条目间距），无分隔线。 */
 body.term-window .select-menu {
   width: 135px;
-  padding: 0;
+  padding: 3px;
   border-radius: var(--radius-card);
 }
 body.term-window .select-menu .select-option {
-  width: auto;
+  width: 100%;
   height: 20px;
+  margin: 0;
   padding: 0 8px;
-  margin: 3px;
   border-radius: 5px;
   font-size: 12px;
+}
+body.term-window .select-menu .select-option .select-option-label {
+  min-width: 0;
+}
+/* 条目之间留 3px（与四周留白一致）。 */
+body.term-window .select-menu .select-option + .select-option {
+  margin-top: 3px;
 }
 body.term-window .select-menu .select-option svg {
   width: 12px;
