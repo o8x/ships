@@ -380,7 +380,7 @@ input[type='color'].swatch::-webkit-color-swatch {
   border-radius: var(--radius-window);
   border: 1px solid var(--color-border);
 }
-/* 悬浮球：固定尺寸的圆形，锚在窗口**右上角**。背景透明（只留图标），图标完全不透明。 */
+/* 悬浮球：固定尺寸的圆形，锚在窗口**右上角**。半透明磨砂底 + 不透明图标。 */
 #term-ball {
   position: fixed;
   top: 0;
@@ -391,8 +391,10 @@ input[type='color'].swatch::-webkit-color-swatch {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: transparent;
-  border: none;
+  background: color-mix(in srgb, var(--color-surface) 38%, transparent);
+  border: 1px solid color-mix(in srgb, #fff 40%, var(--color-border));
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
@@ -405,9 +407,9 @@ input[type='color'].swatch::-webkit-color-swatch {
 [data-ball='on'] #term-shell {
   display: none;
 }
-/* 悬浮球背景始终透明（只显示图标）；Liquid Glass 开关不再给球加底色。 */
+/* Liquid Glass 开关不改变球底（始终半透明磨砂）。 */
 [data-ball='on'][data-ball-glass='glass'] #term-ball {
-  background: transparent;
+  background: color-mix(in srgb, var(--color-surface) 38%, transparent);
 }
 #term-ball:active {
   cursor: grabbing;
@@ -438,13 +440,29 @@ input[type='color'].swatch::-webkit-color-swatch {
   height: 18px;
 }
 /* 下拉里带图标的选项 / 触发器（悬浮球图标选择）。 */
-.select-option-icon svg,
+.select-option-icon {
+  pointer-events: none;
+  flex: 0 0 auto;
+}
 .select-trigger .select-option-icon svg {
   width: 18px;
   height: 18px;
 }
-.select-option .select-option-icon {
-  flex: 0 0 auto;
+.select-option .select-option-icon svg {
+  width: 28px;
+  height: 28px;
+}
+/* 图标下拉（如悬浮球图标）：窄菜单、居中显示大图标。 */
+.select-menu-icons {
+  min-width: 0;
+  width: 56px;
+}
+.select-menu-icons .select-option {
+  width: 100%;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 4px;
 }
 /* 球上右键 → 悬浮垃圾桶图标（半透明）；再点一下球即销毁终端。 */
 .term-ball-trash {

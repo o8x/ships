@@ -383,7 +383,8 @@
       })),
       value: ctx.settings.terminalBallIcon || 'ball.svg',
       align: 'right',
-      className: 'w-[90px] shrink-0',
+      className: 'w-[64px] shrink-0',
+      menuClassName: 'select-menu-icons',
       onChange: (value) => ctx.patch({ terminalBallIcon: value }),
     });
     syncers.push((next) => {

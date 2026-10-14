@@ -260,7 +260,7 @@ window.ShipsUI = (function createUI() {
 
   /* Custom select (self-drawn, avoids native <select>). */
   function createSelect(config) {
-    const options = { onChange: () => {}, className: '', align: 'left', matchTrigger: false };
+    const options = { onChange: () => {}, className: '', menuClassName: '', align: 'left', matchTrigger: false };
     Object.assign(options, config || {});
     let items = (options.options || []).slice();
     let current = options.value;
@@ -300,7 +300,7 @@ window.ShipsUI = (function createUI() {
         trigger.classList.remove('open');
         document.removeEventListener('mousedown', onDocDown, true);
         window.removeEventListener('resize', close);
-        window.removeEventListener('scroll', close, true);
+        window.removeEventListener('scroll', onScroll, true);
       }
     }
 
@@ -308,9 +308,15 @@ window.ShipsUI = (function createUI() {
       if (menu && !menu.contains(event.target) && !trigger.contains(event.target)) close();
     }
 
+    // 只有「菜单外部」的滚动才关闭菜单；在菜单里滚轮翻看选项不应关闭。
+    function onScroll(event) {
+      if (menu && event.target && (event.target === menu || menu.contains(event.target))) return;
+      close();
+    }
+
     function open() {
       if (menu) return;
-      menu = el('div', { class: 'select-menu' });
+      menu = el('div', { class: `select-menu ${options.menuClassName || ''}` });
       for (const item of items) {
         const opt = el('button', { type: 'button', class: 'select-option', dataset: { value: item.value } });
         if (item.icon) {
@@ -357,7 +363,7 @@ window.ShipsUI = (function createUI() {
 
       document.addEventListener('mousedown', onDocDown, true);
       window.addEventListener('resize', close);
-      window.addEventListener('scroll', close, true);
+      window.addEventListener('scroll', onScroll, true);
     }
 
     trigger.addEventListener('click', () => (menu ? close() : open()));
