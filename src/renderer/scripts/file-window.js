@@ -94,6 +94,7 @@
       value: '',
       align: 'right',
       className: 'select-compact shrink-0',
+      matchTrigger: true,
       onChange: (alias) => setTarget(alias),
     });
     actions.insertBefore(picker.el, actions.firstChild);

@@ -260,7 +260,7 @@ window.ShipsUI = (function createUI() {
 
   /* Custom select (self-drawn, avoids native <select>). */
   function createSelect(config) {
-    const options = { onChange: () => {}, className: '', align: 'left' };
+    const options = { onChange: () => {}, className: '', align: 'left', matchTrigger: false };
     Object.assign(options, config || {});
     let items = (options.options || []).slice();
     let current = options.value;
@@ -319,6 +319,12 @@ window.ShipsUI = (function createUI() {
       trigger.classList.add('open');
 
       const rect = trigger.getBoundingClientRect();
+      // 头栏 SSH 下拉：菜单宽度严格等于触发器宽度，保证与本体左右对齐。
+      if (options.matchTrigger) {
+        menu.style.width = `${rect.width}px`;
+        menu.style.minWidth = `${rect.width}px`;
+        menu.style.maxWidth = `${rect.width}px`;
+      }
       const menuRect = menu.getBoundingClientRect();
       let left = options.align === 'right' ? rect.right - menuRect.width : rect.left;
       left = Math.max(6, Math.min(left, window.innerWidth - menuRect.width - 6));

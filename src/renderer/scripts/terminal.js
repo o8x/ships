@@ -414,6 +414,7 @@
       value: '',
       align: 'right',
       className: 'select-compact shrink-0',
+      matchTrigger: true,
       onChange: (alias) => {
         void connectSshHost(alias);
       },
