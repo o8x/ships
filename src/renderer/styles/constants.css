@@ -30,6 +30,9 @@
   --footer-height: 34px;
   --tabbar-height: 46px;
 
+  /* 悬浮球内图标「输出弹簧跳动」单次循环时长（终端持续有输出时循环播放，见 tailwind.css） */
+  --term-ball-bounce-duration: 1.15s;
+
   /* 终端窗口头栏：高 22px（刚好放下自绘的小红绿灯），字号 = 终端字号 + 1
      —— terminal.js 的 applyFontSize() 会改写 --term-header-font-size（默认终端 12 → 13）。 */
   --term-header-height: 22px;
