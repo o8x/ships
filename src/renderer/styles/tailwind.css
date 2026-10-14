@@ -512,9 +512,10 @@ body.term-window .select-menu {
   border-radius: var(--radius-card);
 }
 body.term-window .select-menu .select-option {
+  width: auto;
   height: 20px;
   padding: 0 8px;
-  margin: 2px;
+  margin: 3px;
   border-radius: 5px;
   font-size: 12px;
 }
