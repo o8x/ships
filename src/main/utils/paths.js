@@ -15,6 +15,8 @@ const TERMINAL_WINDOW_FILE = path.join(DATA_DIR, 'terminal-window.json');
 const FILE_WINDOW_FILE = path.join(DATA_DIR, 'file-window.json');
 const FILE_LAYOUT_FILE = path.join(DATA_DIR, 'file-layout.json');
 const FILE_WINDOW_LAYOUT_FILE = path.join(DATA_DIR, 'file-window-layout.json');
+// 文件面板按 ssh 目标（用户名@主机）记录最近 cd 到的目录（见 cd-history-service）。
+const CD_HISTORY_FILE = path.join(DATA_DIR, 'cd-history.json');
 // 日志按天写入 LOG_DIR 下的 ships-YYYY-MM-DD.log（见 logger.js）。
 // macOS 放到 ~/Library/Logs/Ships：Console.app 的「日志报告」会收录该目录（与 JetBrains/CLion 一致），
 // 与用户数据目录分离；其它平台退回应用数据目录下的 logs/。
@@ -44,6 +46,7 @@ const DATA_FILES = [
   FILE_WINDOW_FILE,
   FILE_LAYOUT_FILE,
   FILE_WINDOW_LAYOUT_FILE,
+  CD_HISTORY_FILE,
   LOG_DIR,
 ];
 
@@ -59,6 +62,7 @@ module.exports = {
   FILE_WINDOW_FILE,
   FILE_LAYOUT_FILE,
   FILE_WINDOW_LAYOUT_FILE,
+  CD_HISTORY_FILE,
   LOG_DIR,
   todayLogFile,
   logFileForDate,

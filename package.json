@@ -55,6 +55,7 @@
     },
     "sshBuiltinTerminal": true,
     "sftpDownloadDir": "~/Downloads",
+  "cdHistoryMax": 10,
     "logRetentionDays": 7,
     "fileWindow": {
       "width": 900,

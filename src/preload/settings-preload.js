@@ -20,6 +20,7 @@ const api = {
   openDataFolder: () => ipcRenderer.invoke(IPC.OPEN_DATA_FOLDER),
   openLog: () => ipcRenderer.invoke(IPC.OPEN_LOG),
   openConsole: () => ipcRenderer.invoke(IPC.OPEN_CONSOLE),
+  clearData: () => ipcRenderer.invoke(IPC.CLEAR_DATA),
   openExternal: (url) => ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url),
   closeSettings: () => ipcRenderer.send(IPC.WINDOW_CLOSE_SETTINGS),
   openDevTools: (target) => ipcRenderer.invoke(IPC.DEVTOOLS_OPEN, target),

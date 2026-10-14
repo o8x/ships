@@ -5,7 +5,16 @@ const { app, shell, BrowserWindow, dialog } = require('electron');
 const os = require('os');
 const { IPC, VERSION, TERMINAL_WINDOW } = require('../../shared/constants');
 const logger = require('../utils/logger');
-const { DATA_DIR, LOG_DIR, describeDataFiles } = require('../utils/paths');
+const {
+  DATA_DIR,
+  LOG_DIR,
+  describeDataFiles,
+  TERMINAL_WINDOW_FILE,
+  FILE_WINDOW_FILE,
+  FILE_LAYOUT_FILE,
+  FILE_WINDOW_LAYOUT_FILE,
+  CD_HISTORY_FILE,
+} = require('../utils/paths');
 
 function registerAppIpc(ipcMain) {
   ipcMain.handle(IPC.APP_INFO, () => ({
@@ -49,6 +58,26 @@ function registerAppIpc(ipcMain) {
       }
     }
     return { ok: false, error: 'not-found' };
+  });
+
+  // 一键清理「非业务数据」：窗口位置 / 尺寸、文件管理列宽与面板高度、cd 历史等。
+  // 不动 settings.json（偏好 / 业务设置）、日志与 ~/.ssh/config。
+  ipcMain.handle(IPC.CLEAR_DATA, () => {
+    const files = [
+      TERMINAL_WINDOW_FILE,
+      FILE_WINDOW_FILE,
+      FILE_LAYOUT_FILE,
+      FILE_WINDOW_LAYOUT_FILE,
+      CD_HISTORY_FILE,
+    ];
+    for (const file of files) {
+      try {
+        fs.rmSync(file, { force: true });
+      } catch (err) {
+        /* ignore */
+      }
+    }
+    return { ok: true };
   });
 
   ipcMain.handle(IPC.OPEN_EXTERNAL, async (_event, url) => {

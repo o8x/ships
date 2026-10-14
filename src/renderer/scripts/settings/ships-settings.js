@@ -32,6 +32,10 @@
         clipboardPoll: '剪贴板轮询间隔',
         clipboardPollHint: '检测系统剪贴板变化的频率',
         dataFolder: '数据文件夹',
+        clearData: '清理数据',
+        clearDataHint: '清除窗口位置 / 大小、列宽与 cd 历史等非业务数据',
+        clearDataAction: '清除',
+        clearDataConfirm: '确认清理？',
         open: '打开',
         about: '关于',
         version: '版本',
@@ -68,6 +72,10 @@
         clipboardPoll: 'Clipboard poll interval',
         clipboardPollHint: 'How often to check the system clipboard',
         dataFolder: 'Data folder',
+        clearData: 'Clear data',
+        clearDataHint: 'Remove window position / size, column widths and cd history (non-business data)',
+        clearDataAction: 'Clear',
+        clearDataConfirm: 'Clear data?',
         open: 'Open',
         about: 'About',
         version: 'Version',
@@ -215,6 +223,45 @@
     folderBtn.addEventListener('click', () => window.ships.openDataFolder());
     generalSection.appendChild(
       row(i18n.t('settingsPage.dataFolder'), (info && info.dataDir) || '', folderBtn)
+    );
+
+    // 一键清理「非业务数据」（窗口位置 / 大小、列宽、cd 历史等）：二次确认后执行。
+    let clearingData = false;
+    const clearControlWrap = el('div', { class: 'flex shrink-0 items-center gap-1' });
+    function renderClearControl() {
+      clearControlWrap.innerHTML = '';
+      if (clearingData) {
+        clearControlWrap.appendChild(
+          el('span', { class: 'text-[11px] text-danger' }, i18n.t('settingsPage.clearDataConfirm'))
+        );
+        const yes = el('button', { class: 'icon-btn h-7 w-7', type: 'button' });
+        yes.innerHTML = Icons.check(15);
+        yes.style.color = 'var(--color-danger)';
+        yes.addEventListener('click', () => {
+          window.ships.clearData().finally(() => {
+            clearingData = false;
+            renderClearControl();
+          });
+        });
+        const no = el('button', { class: 'icon-btn h-7 w-7', type: 'button' });
+        no.innerHTML = Icons.x(15);
+        no.addEventListener('click', () => {
+          clearingData = false;
+          renderClearControl();
+        });
+        clearControlWrap.append(yes, no);
+      } else {
+        const button = el('button', { class: 'btn shrink-0', type: 'button' }, i18n.t('settingsPage.clearDataAction'));
+        button.addEventListener('click', () => {
+          clearingData = true;
+          renderClearControl();
+        });
+        clearControlWrap.appendChild(button);
+      }
+    }
+    renderClearControl();
+    generalSection.appendChild(
+      row(i18n.t('settingsPage.clearData'), i18n.t('settingsPage.clearDataHint'), clearControlWrap)
     );
 
     const aboutSection = section(i18n.t('settingsPage.about'));

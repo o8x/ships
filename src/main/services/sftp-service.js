@@ -180,6 +180,15 @@ function get(id) {
   return entry;
 }
 
+/* 会话的稳定标识（用户名@主机），用于按 ssh 目标关联 cd 历史等本地数据。 */
+function sessionKey(id) {
+  const entry = get(id);
+  if (!entry) return '';
+  const resolved = entry.resolved || {};
+  const host = String(resolved.host || entry.target || '');
+  return resolved.username ? `${resolved.username}@${host}` : host;
+}
+
 function close(id) {
   const entry = sessions.get(id);
   if (!entry) return { ok: true };
@@ -374,6 +383,7 @@ module.exports = {
   close,
   closeAll,
   closeForOwner,
+  sessionKey,
   _resolveTarget: resolveTarget,
   _normalizeRemote: normalizeRemote,
 };

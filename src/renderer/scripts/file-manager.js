@@ -45,6 +45,9 @@
         download: '下载',
         open: '打开',
         openVSCode: '用 VS Code 打开',
+        copyPath: '复制路径',
+        copiedPath: '已复制路径：{path}',
+        cdHistory: '最近访问',
         copyTransfer: '复制传输命令',
         copiedCommand: '已复制：{command}',
         copyFailed: '复制传输命令失败',
@@ -88,6 +91,9 @@
         download: 'Download',
         open: 'Open',
         openVSCode: 'Open in VS Code',
+        copyPath: 'Copy path',
+        copiedPath: 'Copied path: {path}',
+        cdHistory: 'Recent',
         copyTransfer: 'Copy transfer command',
         copiedCommand: 'Copied: {command}',
         copyFailed: 'Failed to copy transfer command',
@@ -222,6 +228,9 @@
     if (value === '-') return '';
     if (value.startsWith('~/')) return normalizePosix(`${home || ''}${value.slice(1)}`);
     if (value.startsWith('/')) return normalizePosix(value);
+    // 相对路径：无法可靠得知 shell 的真实当前目录（shellCwd 只是估计值），
+    // 因此含 `..` 的相对路径（如 `cd ..` / `cd ../x`）不跟随，避免导航到错误目录。
+    if (value.split('/').includes('..')) return '';
     return normalizePosix(`${cwd || home || '/'}/${value}`);
   }
 
@@ -300,7 +309,10 @@
     if (cdBtn) {
       cdBtn.innerHTML = Icons.terminal(14);
       cdBtn.addEventListener('click', () => {
-        if (state.connected && state.cwd) onCd(state.cwd);
+        if (state.connected && state.cwd) {
+          recordCd(state.cwd);
+          onCd(state.cwd);
+        }
       });
     }
     const pathInput = el('input', { class: 'fm-path-input', type: 'text', spellcheck: 'false', autocomplete: 'off', placeholder: i18n.t('filesUi.pathPlaceholder') });
@@ -446,6 +458,7 @@
         renderTree();
         openContextMenu(event.clientX, event.clientY, [
           { label: i18n.t('filesUi.upload'), run: () => chooseAndUpload(path) },
+          { label: i18n.t('filesUi.copyPath'), run: () => copyPath(path) },
           { label: i18n.t('filesUi.copyTransfer'), run: () => copyTransferCommand(path, true) },
         ]);
       });
@@ -559,6 +572,7 @@
             { label: i18n.t('filesUi.open'), run: () => openFile(path, entry.name) },
             { label: i18n.t('filesUi.openVSCode'), run: () => openWithVSCode(path, entry.name) },
             { label: i18n.t('filesUi.download'), run: () => downloadFile(path, entry.name) },
+            { label: i18n.t('filesUi.copyPath'), run: () => copyPath(path) },
             { label: i18n.t('filesUi.copyTransfer'), run: () => copyTransferCommand(path, false) },
           ]);
         });
@@ -621,13 +635,28 @@
       const ok = await navigate(target, true);
       if (ok) {
         state.shellCwd = state.cwd;
+        recordCd(state.cwd);
         // 展开该路径的所有上级，让目标目录节点出现在树里，再滚动定位过去。
         await expandTo(state.cwd);
         scrollTreeToSelected();
       }
     }
 
+    /* 记录「cd 历史」（按 ssh 目标关联，见 cd-history-service）：仅记录 via cd 到达的目录。 */
+    function recordCd(path) {
+      if (!state.connected || !path) return;
+      window.ships.sftp.cdHistory.add(state.id, path).catch(() => {});
+    }
+
     /* ------------------------------- actions ------------------------------ */
+    /* 右键「复制路径」：把远端绝对路径写入系统剪贴板，状态栏回显。 */
+    async function copyPath(path) {
+      if (!state.connected || !path) return;
+      const result = await window.ships.sftp.copyPath(path);
+      if (result && result.ok) setStatus(i18n.t('filesUi.copiedPath', { path }));
+      else setStatus(i18n.t('filesUi.copyFailed'), true);
+    }
+
     /* 右键「复制传输命令」：按会话连接信息生成 scp 命令并复制到剪贴板，状态栏回显。 */
     async function copyTransferCommand(path, recursive) {
       if (!state.connected || !path) return;
@@ -734,6 +763,7 @@
     }
 
     function resetConnection() {
+      closeHistoryMenu();
       if (state.id) window.ships.sftp.close(state.id);
       state.id = '';
       state.connecting = false;
@@ -852,12 +882,64 @@
     }
     const onDocDown = (event) => {
       if (contextMenu && !contextMenu.contains(event.target)) closeContextMenu();
+      if (historyMenu && !historyMenu.contains(event.target)) closeHistoryMenu();
     };
     const onKeyDown = (event) => {
       if (event.key === 'Escape') closeContextMenu();
     };
     document.addEventListener('mousedown', onDocDown, true);
     window.addEventListener('keydown', onKeyDown, true);
+
+    /* cd 历史下拉：点路径输入框时列出该 ssh 目标最近 cd 到的目录（用户名@主机 关联）。
+       点条目 → 文件浏览器与终端（ssh）同时前往该目录。 */
+    let historyMenu = null;
+    function closeHistoryMenu() {
+      if (historyMenu) {
+        historyMenu.remove();
+        historyMenu = null;
+      }
+    }
+    function goToHistory(dir) {
+      navigate(dir).then((ok) => {
+        if (!ok) return;
+        state.shellCwd = state.cwd;
+        recordCd(dir);
+        if (onCd) onCd(dir);
+      });
+    }
+    function openHistoryMenu() {
+      if (!state.connected) return;
+      window.ships.sftp.cdHistory.list(state.id).then((result) => {
+        if (!result || !result.ok || !Array.isArray(result.entries) || !result.entries.length) return;
+        if (document.activeElement !== pathInput) return;
+        closeHistoryMenu();
+        const menu = el('div', { class: 'fm-menu fm-history-menu' });
+        menu.appendChild(el('div', { class: 'fm-menu-title' }, i18n.t('filesUi.cdHistory')));
+        for (const dir of result.entries) {
+          const item = el('button', { class: 'fm-menu-item', type: 'button' });
+          item.textContent = dir;
+          // 保持输入框焦点，避免 blur 抢在 click 之前关掉菜单。
+          item.addEventListener('mousedown', (event) => event.preventDefault());
+          item.addEventListener('click', () => {
+            closeHistoryMenu();
+            goToHistory(dir);
+          });
+          menu.appendChild(item);
+        }
+        document.body.appendChild(menu);
+        const rect = pathInput.getBoundingClientRect();
+        menu.style.minWidth = `${Math.max(180, rect.width)}px`;
+        menu.style.left = `${Math.max(4, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 4))}px`;
+        const below = rect.bottom + 4;
+        menu.style.top =
+          below + menu.offsetHeight > window.innerHeight - 4
+            ? `${Math.max(4, rect.top - menu.offsetHeight - 4)}px`
+            : `${below}px`;
+        historyMenu = menu;
+      });
+    }
+    pathInput.addEventListener('focus', openHistoryMenu);
+    pathInput.addEventListener('input', closeHistoryMenu);
 
     const offProgress = window.ships.sftp.onProgress((payload) => {
       if (!payload || payload.id !== state.id) return;
@@ -881,6 +963,7 @@
     function destroy() {
       if (offProgress) offProgress();
       closeContextMenu();
+      closeHistoryMenu();
       clearStatusTimer();
       document.removeEventListener('mousedown', onDocDown, true);
       window.removeEventListener('keydown', onKeyDown, true);

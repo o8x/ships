@@ -7,6 +7,7 @@
 const { clipboard, shell } = require('electron');
 const { IPC } = require('../../shared/constants');
 const sftp = require('../services/sftp-service');
+const cdHistory = require('../services/cd-history-service');
 const vscode = require('../services/vscode-service');
 const wm = require('../window-manager');
 
@@ -80,6 +81,29 @@ function registerSftpIpc(ipcMain) {
     const result = sftp.transferCommand(payload && payload.id, payload && payload.path, Boolean(payload && payload.recursive));
     if (result && result.ok) clipboard.writeText(result.command);
     return result;
+  });
+
+  // 右键「复制路径」：把远端绝对路径写入系统剪贴板。
+  ipcMain.handle(IPC.SFTP_COPY_PATH, (event, payload) => {
+    if (!isAllowedSender(event)) return { ok: false };
+    const p = payload && payload.path;
+    if (!p) return { ok: false };
+    clipboard.writeText(String(p));
+    return { ok: true, path: String(p) };
+  });
+
+  // cd 历史（按 ssh 目标 = 用户名@主机 关联）：记录 / 读取最近 cd 到的目录。
+  ipcMain.handle(IPC.CD_HISTORY_LIST, (event, payload) => {
+    if (!isAllowedSender(event)) return { ok: false, entries: [] };
+    const key = sftp.sessionKey(payload && payload.id);
+    return { ok: true, entries: key ? cdHistory.list(key) : [] };
+  });
+
+  ipcMain.handle(IPC.CD_HISTORY_ADD, (event, payload) => {
+    if (!isAllowedSender(event)) return { ok: false, entries: [] };
+    const key = sftp.sessionKey(payload && payload.id);
+    if (!key) return { ok: false, entries: [] };
+    return { ok: true, entries: cdHistory.add(key, payload && payload.path) };
   });
 
   ipcMain.handle(IPC.SFTP_CLOSE, (event, payload) => {

@@ -74,6 +74,11 @@ const api = {
     upload: (id, localPath, remoteDir) => ipcRenderer.invoke(IPC.SFTP_UPLOAD, { id, localPath, remoteDir }),
     close: (id) => ipcRenderer.invoke(IPC.SFTP_CLOSE, { id }),
     transferCommand: (id, path, recursive) => ipcRenderer.invoke(IPC.SFTP_TRANSFER_COMMAND, { id, path, recursive }),
+    copyPath: (path) => ipcRenderer.invoke(IPC.SFTP_COPY_PATH, { path }),
+    cdHistory: {
+      list: (id) => ipcRenderer.invoke(IPC.CD_HISTORY_LIST, { id }),
+      add: (id, path) => ipcRenderer.invoke(IPC.CD_HISTORY_ADD, { id, path }),
+    },
     onProgress: (cb) => on(IPC.SFTP_PROGRESS, cb),
   },
   filesLayout: {

@@ -15,6 +15,7 @@ const IPC = {
   OPEN_DATA_FOLDER: 'app:open-data-folder',
   OPEN_LOG: 'app:open-log',
   OPEN_CONSOLE: 'app:open-console',
+  CLEAR_DATA: 'app:clear-data',
   OPEN_EXTERNAL: 'app:open-external',
 
   WINDOW_HIDE: 'window:hide',
@@ -70,6 +71,10 @@ const IPC = {
   SFTP_CLOSE: 'sftp:close',
   SFTP_TRANSFER_COMMAND: 'sftp:transfer-command',
   SFTP_PROGRESS: 'sftp:progress',
+  SFTP_COPY_PATH: 'sftp:copy-path',
+
+  CD_HISTORY_LIST: 'cd-history:list',
+  CD_HISTORY_ADD: 'cd-history:add',
 
   FILES_LAYOUT_GET: 'files-layout:get',
   FILES_LAYOUT_SET: 'files-layout:set',
@@ -143,6 +148,9 @@ const FILE_WINDOW = Object.assign(
 // 日志保留天数（按天写文件，惰性删除更早的日志）。
 const LOG_RETENTION_DAYS = Number.isFinite(ships.logRetentionDays) ? ships.logRetentionDays : 7;
 
+// 文件面板：每个 ssh 目标（用户名@主机）记录最近 cd 到的目录数（去重、越新越靠前）。
+const CD_HISTORY_MAX = Number.isFinite(ships.cdHistoryMax) ? ships.cdHistoryMax : 10;
+
 // macOS only: NSVisualEffectMaterial used when the native frosted glass is on.
 // 'hud' gives the strongly see-through, low-opacity look of the system HUD
 // (Control Center style); 'content'/'under-window' are effectively opaque/gray.
@@ -191,6 +199,7 @@ module.exports = {
   TERMINAL_WINDOW,
   FILE_WINDOW,
   LOG_RETENTION_DAYS,
+  CD_HISTORY_MAX,
   VIBRANCY,
   DEFAULT_SETTINGS,
 };
