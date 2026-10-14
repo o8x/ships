@@ -24,6 +24,9 @@
     size: 60,
     perm: 90,
     time: 130,
+    // 列排序：sortKey 为空 = 不排序（服务端返回顺序）；sortDir 仅在有 sortKey 时有效。
+    sortKey: '',
+    sortDir: 'asc',
   };
   const MIN_TREE = 140;
   const MIN_COL = 60;
@@ -266,9 +269,9 @@
       // 文件列表多选：selection = 选中的远端路径集合，anchor = Shift 范围选择的锚点
       selection: new Set(),
       anchor: '',
-      // 列表排序：列名（name / size / time）+ 方向
-      sortKey: 'name',
-      sortDir: 'asc',
+      // 列表排序：列名（'' = 不排序 / name / size / time）+ 方向；初始值取持久化布局。
+      sortKey: layoutData.sortKey || '',
+      sortDir: layoutData.sortDir === 'desc' ? 'desc' : 'asc',
       expanded: new Set(),
       children: new Map(),
       progress: null,
@@ -371,15 +374,22 @@
       timeCell
     );
 
+    /* 点击列头循环：升序 → 降序 → 不排序 → 升序…；并持久化到布局文件。 */
     function toggleSort(key) {
-      if (state.sortKey === key) {
-        state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
-      } else {
+      if (state.sortKey !== key) {
         state.sortKey = key;
         state.sortDir = 'asc';
+      } else if (state.sortDir === 'asc') {
+        state.sortDir = 'desc';
+      } else {
+        state.sortKey = '';
+        state.sortDir = 'asc';
       }
+      layoutData.sortKey = state.sortKey;
+      layoutData.sortDir = state.sortDir;
       updateSortIndicators();
       renderList();
+      onLayout({ sortKey: state.sortKey, sortDir: state.sortDir });
     }
 
     function updateSortIndicators() {
@@ -570,9 +580,10 @@
     }
 
     /* -------------------------------- list -------------------------------- */
-    /* 按当前排序列 / 方向对文件排序（名称 / 体积 / 时间；不改动 state.entries 本身）。 */
+    /* 按当前排序列 / 方向对文件排序（'' = 不排序，保持服务端返回顺序；名称 / 体积 / 时间）。 */
     function sortedEntries() {
       const files = state.entries.slice();
+      if (!state.sortKey) return files;
       const dir = state.sortDir === 'desc' ? -1 : 1;
       files.sort((a, b) => {
         let cmp;
@@ -1089,6 +1100,16 @@
 
     function setLayout(patch) {
       Object.assign(layoutData, patch || {});
+      if (
+        patch &&
+        (Object.prototype.hasOwnProperty.call(patch, 'sortKey') ||
+          Object.prototype.hasOwnProperty.call(patch, 'sortDir'))
+      ) {
+        state.sortKey = layoutData.sortKey || '';
+        state.sortDir = layoutData.sortDir === 'desc' ? 'desc' : 'asc';
+        updateSortIndicators();
+        renderList();
+      }
       applyLayout();
     }
 
