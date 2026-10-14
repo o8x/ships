@@ -380,7 +380,7 @@ input[type='color'].swatch::-webkit-color-swatch {
   border-radius: var(--radius-window);
   border: 1px solid var(--color-border);
 }
-/* 悬浮球：固定尺寸的圆形，锚在窗口**右上角**（缩放动画用 shell 的 CSS transform，右上角严格不动）。 */
+/* 悬浮球：固定尺寸的圆形，锚在窗口**右上角**。背景透明（只留图标），图标完全不透明。 */
 #term-ball {
   position: fixed;
   top: 0;
@@ -391,8 +391,8 @@ input[type='color'].swatch::-webkit-color-swatch {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--color-surface) 65%, transparent);
-  border: 1px solid var(--color-border);
+  background: transparent;
+  border: none;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
@@ -405,13 +405,9 @@ input[type='color'].swatch::-webkit-color-swatch {
 [data-ball='on'] #term-shell {
   display: none;
 }
-/* 悬浮球的玻璃效果：Liquid Glass 开启时用 CSS 玻璃观感（半透明 + 模糊 + 高光描边）。 */
+/* 悬浮球背景始终透明（只显示图标）；Liquid Glass 开关不再给球加底色。 */
 [data-ball='on'][data-ball-glass='glass'] #term-ball {
-  background: color-mix(in srgb, var(--color-surface) 26%, transparent);
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
-  backdrop-filter: blur(20px) saturate(1.6);
-  border-color: color-mix(in srgb, #fff 45%, var(--color-border));
-  box-shadow: inset 0 1px 1px color-mix(in srgb, #fff 55%, transparent);
+  background: transparent;
 }
 #term-ball:active {
   cursor: grabbing;
