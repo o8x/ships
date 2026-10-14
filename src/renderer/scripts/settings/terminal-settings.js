@@ -334,14 +334,14 @@
     );
 
     const ballDelaySelect = window.ShipsUI.createSelect({
-      options: [1, 3, 5, 10, 30].map((value) => ({ value: value * 1000, label: `${value} ${i18n.t('terminalSettings.seconds')}` })),
-      value: Number(ctx.settings.terminalBallDelayMs) || 5000,
+      options: [0.5, 1, 2, 3, 5, 10].map((value) => ({ value: value * 1000, label: `${value} ${i18n.t('terminalSettings.seconds')}` })),
+      value: Number(ctx.settings.terminalBallDelayMs) || 500,
       align: 'right',
       className: 'w-[120px] shrink-0',
       onChange: (value) => ctx.patch({ terminalBallDelayMs: Number(value) }),
     });
     syncers.push((next) => {
-      ballDelaySelect.setValue(Number(next.terminalBallDelayMs) || 5000);
+      ballDelaySelect.setValue(Number(next.terminalBallDelayMs) || 500);
     });
     wrap.appendChild(
       row(i18n.t('terminalSettings.ballDelay'), i18n.t('terminalSettings.ballDelayHint'), ballDelaySelect.el)

@@ -649,14 +649,24 @@
   }
 
   window.ships.terminal.onBall((payload) => {
+    const active = Boolean(payload && payload.active);
+    const phase = (payload && payload.phase) || 'settle';
     if (payload && payload.size) {
       document.documentElement.style.setProperty('--term-ball-size', `${payload.size}px`);
     }
-    ballMode = Boolean(payload && payload.active);
-    document.documentElement.dataset.ball = ballMode ? 'on' : 'off';
-    if (!ballMode) {
-      // 放大回来（主进程在缩放动画结束后才通知）：重新 fit / 对齐。
+    if (active) {
+      // enter：球显示、终端保留（收缩动画看得见）；settle：只留球。
+      ballMode = true;
+      document.documentElement.dataset.ball = phase === 'settle' ? 'on' : 'enter';
+    } else if (phase === 'settle') {
+      // 放大结束：切回终端并重新 fit / 对齐。
+      ballMode = false;
+      document.documentElement.dataset.ball = 'off';
       setTimeout(() => fitIfNeeded(true), 40);
+    } else {
+      // grow：放大期间只显示球（窗口从球长大）。
+      ballMode = true;
+      document.documentElement.dataset.ball = 'grow';
     }
   });
 

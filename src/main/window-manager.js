@@ -377,14 +377,14 @@ function toggleTerminalWindow() {
    - 期间不改动几何记忆（terminal-window.json）。
    - 拖动由渲染层指针事件触发，主进程按光标位置移动窗口（这样「点击 vs 拖动」可区分）。 */
 let ballDragTimer = null;
-const BALL_ANIM_MS = 560;
+const BALL_ANIM_MS = 1000;
 
 function terminalBallEnabled() {
   return settings.get('terminalBallEnabled') !== false;
 }
 function terminalBallDelayMs() {
   const value = Number(settings.get('terminalBallDelayMs'));
-  return Number.isFinite(value) && value >= 0 ? value : 3000;
+  return Number.isFinite(value) && value >= 0 ? value : 500;
 }
 
 function isBallMode(win) {
@@ -410,15 +410,19 @@ function ballBoundsFor(orig, size) {
   return clampToWorkArea({ x: orig.x + orig.width - size, y: orig.y, width: size, height: size });
 }
 
-/* 逐帧把窗口 bounds 插值到 target（ease-in-out cubic），完成后回调 done。 */
+/* 逐帧把窗口 bounds 插值到 target（ease-in-out cubic），**锚定右上角**：
+   每帧只插值宽/高，x = right − w、y = top，保证右上角纹丝不动（否则 x 与 width 分别取整
+   会相差 ±1px，球就会抖）。完成后回调 done。 */
 function animateWindowBounds(win, target, durationMs, done) {
   if (win.__boundsAnim) {
     clearInterval(win.__boundsAnim);
     win.__boundsAnim = null;
   }
   const from = win.getBounds();
+  const right = Math.round(target.x + target.width);
+  const top = Math.round(target.y);
   if (!durationMs || durationMs <= 0) {
-    win.setBounds(target);
+    win.setBounds({ x: right - target.width, y: top, width: target.width, height: target.height });
     if (typeof done === 'function') done();
     return;
   }
@@ -432,12 +436,9 @@ function animateWindowBounds(win, target, durationMs, done) {
     }
     const t = Math.min(1, (Date.now() - start) / durationMs);
     const k = ease(t);
-    win.setBounds({
-      x: Math.round(from.x + (target.x - from.x) * k),
-      y: Math.round(from.y + (target.y - from.y) * k),
-      width: Math.round(from.width + (target.width - from.width) * k),
-      height: Math.round(from.height + (target.height - from.height) * k),
-    });
+    const width = Math.round(from.width + (target.width - from.width) * k);
+    const height = Math.round(from.height + (target.height - from.height) * k);
+    win.setBounds({ x: right - width, y: top, width, height });
     if (t >= 1) {
       clearInterval(win.__boundsAnim);
       win.__boundsAnim = null;
@@ -456,9 +457,11 @@ function enterBallMode(win) {
   if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
   win.setMinimumSize(size, size);
   if (typeof win.setResizable === 'function') win.setResizable(false);
-  // 先切成球（固定尺寸正圆、位于窗口右上角），再把窗口从当前尺寸收缩到球大小。
-  win.webContents.send(IPC.TERMINAL_BALL, { active: true, size });
-  animateWindowBounds(win, win.__ballBounds, BALL_ANIM_MS);
+  // 收缩期间：显示球但**保留终端**（能看到终端一路缩进右上角），结束后再隐藏终端只留球。
+  win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'enter' });
+  animateWindowBounds(win, win.__ballBounds, BALL_ANIM_MS, () => {
+    if (!win.isDestroyed()) win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'settle' });
+  });
   logger.file(`[terminal] entered ball mode (${win.id}) size=${size}`);
 }
 
@@ -476,6 +479,8 @@ function exitBallMode(win, focus) {
   if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
   else win.setAlwaysOnTop(false);
   if (focus !== false) win.focus();
+  // 放大期间只显示球（窗口从球长大），结束后再显示终端。
+  win.webContents.send(IPC.TERMINAL_BALL, { active: false, size, phase: 'grow' });
   const finish = () => {
     if (win.isDestroyed()) return;
     win.__ballActive = false;
@@ -484,7 +489,7 @@ function exitBallMode(win, focus) {
     win.__exitingBall = false;
     // 放大动画结束后再恢复最小尺寸并切回终端（避免最小尺寸把窗口「弹」大导致抖动）。
     win.setMinimumSize(TERMINAL_WINDOW.minWidth, TERMINAL_WINDOW.minHeight);
-    win.webContents.send(IPC.TERMINAL_BALL, { active: false, size });
+    win.webContents.send(IPC.TERMINAL_BALL, { active: false, size, phase: 'settle' });
     saveTerminalGeometry(win);
     logger.file(`[terminal] exited ball mode (${win.id})`);
   };

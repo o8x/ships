@@ -397,11 +397,15 @@ input[type='color'].swatch::-webkit-color-swatch {
   user-select: none;
   -webkit-user-select: none;
 }
-[data-ball='on'] #term-ball {
+[data-ball='enter'] #term-ball,
+[data-ball='on'] #term-ball,
+[data-ball='grow'] #term-ball {
   display: flex;
-  animation: ships-ball-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ships-ball-in 0.2s ease both;
 }
-[data-ball='on'] #term-shell {
+/* 收缩期间（enter）保留终端，看得见窗口一路缩进右上角；只留球时不显示终端。 */
+[data-ball='on'] #term-shell,
+[data-ball='grow'] #term-shell {
   display: none;
 }
 #term-ball:active {

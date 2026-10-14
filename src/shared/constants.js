@@ -135,7 +135,7 @@ const TERMINAL_WINDOW = Object.assign(
     scrollback: 10000,
     ballSize: 75,
     ballEnabled: true,
-    ballDelayMs: 3000,
+    ballDelayMs: 500,
   },
   ships.terminalWindow || {}
 );
@@ -189,7 +189,7 @@ const DEFAULT_SETTINGS = {
   sshBuiltinTerminal: ships.sshBuiltinTerminal !== false,
   // 终端窗口失焦缩成「悬浮球」：是否开启 + 延迟（毫秒）+ 球尺寸（px，宽高强制 1:1）
   terminalBallEnabled: TERMINAL_WINDOW.ballEnabled !== false,
-  terminalBallDelayMs: Number.isFinite(TERMINAL_WINDOW.ballDelayMs) ? TERMINAL_WINDOW.ballDelayMs : 3000,
+  terminalBallDelayMs: Number.isFinite(TERMINAL_WINDOW.ballDelayMs) ? TERMINAL_WINDOW.ballDelayMs : 500,
   terminalBallSize: Number.isFinite(TERMINAL_WINDOW.ballSize) ? TERMINAL_WINDOW.ballSize : 75,
   // 内置终端文件面板：下载保存目录（默认 ~/Downloads）
   sftpDownloadDir: ships.sftpDownloadDir || '~/Downloads',
