@@ -755,6 +755,22 @@ body.term-window:not(.file-window) .select-menu .select-option svg {
   position: relative;
   white-space: nowrap;
 }
+/* 可排序列头：点击切换升 / 降序，右侧显示箭头。 */
+.fm-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.fm-sortable:hover {
+  color: var(--color-fg);
+}
+.fm-sort-ind {
+  margin-left: 4px;
+  font-size: 0.85em;
+  color: var(--color-accent);
+}
+.fm-sort-ind:empty {
+  margin-left: 0;
+}
 .fm-col-resize {
   position: absolute;
   top: 0;

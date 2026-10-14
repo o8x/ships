@@ -258,6 +258,9 @@
       pendingCd: null,
       entries: [],
       selected: '',
+      // 列表排序：列名（name / size / time）+ 方向
+      sortKey: 'name',
+      sortDir: 'asc',
       expanded: new Set(),
       children: new Map(),
       progress: null,
@@ -321,8 +324,10 @@
     }
     pathRow.appendChild(pathInput);
     /* list head cells */
-    function headCell(label, cls, resizeKey) {
-      const cell = el('div', { class: `fm-head-cell ${cls}` }, label || '');
+    function headCell(label, cls, resizeKey, sortKey) {
+      const cell = el('div', { class: `fm-head-cell ${cls}` });
+      cell.appendChild(el('span', { class: 'fm-head-label' }, label || ''));
+      if (sortKey) attachSort(cell, sortKey);
       if (resizeKey) {
         const handle = el('div', { class: 'fm-col-resize' });
         handle.addEventListener('mousedown', (event) => startColResize(event, resizeKey));
@@ -331,20 +336,52 @@
       return cell;
     }
 
-    // 时间列表头 = 只有「时间」标签（上传已在目录树节点右键菜单，分离按钮已移到路径行）。
+    // 让列表头单元格可点击排序（不干扰列宽拖动把手）。
+    function attachSort(cell, sortKey) {
+      cell.dataset.sortKey = sortKey;
+      cell.classList.add('fm-sortable');
+      cell.appendChild(el('span', { class: 'fm-sort-ind' }, ''));
+      cell.addEventListener('click', (event) => {
+        if (event.target && event.target.closest && event.target.closest('.fm-col-resize')) return;
+        toggleSort(sortKey);
+      });
+    }
+
+    // 时间列表头 = 「时间」标签（可排序）+ 拖动把手（上传 / 分离按钮已分别移到目录树右键菜单 / 路径行）。
     const timeCell = el('div', { class: 'fm-head-cell fm-head-time' });
     timeCell.append(el('span', { class: 'fm-head-time-label' }, i18n.t('filesUi.time')));
+    attachSort(timeCell, 'time');
     const timeResize = el('div', { class: 'fm-col-resize' });
     timeResize.addEventListener('mousedown', (event) => startColResize(event, 'time'));
     timeCell.appendChild(timeResize);
 
     listHead.append(
       el('div', { class: 'fm-head-cell fm-head-icon' }, ''),
-      headCell(i18n.t('filesUi.name'), 'fm-head-name', 'name'),
-      headCell(i18n.t('filesUi.size'), 'fm-head-size', 'size'),
+      headCell(i18n.t('filesUi.name'), 'fm-head-name', 'name', 'name'),
+      headCell(i18n.t('filesUi.size'), 'fm-head-size', 'size', 'size'),
       headCell(i18n.t('filesUi.perm'), 'fm-head-perm', 'perm'),
       timeCell
     );
+
+    function toggleSort(key) {
+      if (state.sortKey === key) {
+        state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.sortKey = key;
+        state.sortDir = 'asc';
+      }
+      updateSortIndicators();
+      renderList();
+    }
+
+    function updateSortIndicators() {
+      for (const cell of listHead.querySelectorAll('[data-sort-key]')) {
+        const ind = cell.querySelector('.fm-sort-ind');
+        if (!ind) continue;
+        ind.textContent = cell.dataset.sortKey === state.sortKey ? (state.sortDir === 'asc' ? '↑' : '↓') : '';
+      }
+    }
+    updateSortIndicators();
 
     function applyLayout() {
       treePane.style.width = `${layoutData.treeWidth}px`;
@@ -527,6 +564,20 @@
     }
 
     /* -------------------------------- list -------------------------------- */
+    /* 按当前排序列 / 方向对文件排序（名称 / 体积 / 时间；不改动 state.entries 本身）。 */
+    function sortedEntries() {
+      const files = state.entries.slice();
+      const dir = state.sortDir === 'desc' ? -1 : 1;
+      files.sort((a, b) => {
+        let cmp;
+        if (state.sortKey === 'size') cmp = (Number(a.size) || 0) - (Number(b.size) || 0);
+        else if (state.sortKey === 'time') cmp = (Number(a.mtime) || 0) - (Number(b.mtime) || 0);
+        else cmp = String(a.name || '').localeCompare(String(b.name || ''));
+        return cmp * dir;
+      });
+      return files;
+    }
+
     function renderList() {
       listEl.innerHTML = '';
       const files = state.entries;
@@ -538,7 +589,7 @@
         listEl.appendChild(el('div', { class: 'fm-list-hint' }, i18n.t('filesUi.empty')));
         return;
       }
-      for (const entry of files) {
+      for (const entry of sortedEntries()) {
         const path = joinPath(state.cwd, entry.name);
         const row = el('div', { class: 'fm-row' });
         if (state.selected === path) row.classList.add('selected');
