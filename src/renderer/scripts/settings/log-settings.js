@@ -14,6 +14,8 @@
         logRetentionHint: '按天滚动保存，超过保留期的日志文件会被自动删除',
         logsFolder: '日志文件夹',
         logsFolderHint: '打开保存日志的文件夹',
+        openConsole: '打开控制台 App',
+        openConsoleHint: '在系统「控制台」App 中查看 Ships 日志',
         open: '打开',
         days: '天',
       },
@@ -27,6 +29,8 @@
         logRetentionHint: 'Rotated daily; files older than this are removed automatically',
         logsFolder: 'Logs folder',
         logsFolderHint: 'Open the folder that holds the logs',
+        openConsole: 'Open Console.app',
+        openConsoleHint: 'View Ships logs in the system Console app',
         open: 'Open',
         days: 'days',
       },
@@ -61,12 +65,32 @@
 
     // 「同步到控制台 App」仅 macOS 有意义，其它平台不展示。
     if (!info || info.platform === 'darwin') {
-      const consoleSwitch = switchControl(settings.logToConsoleApp, (value) =>
-        patch({ logToConsoleApp: value })
+      // 开启同步后，追加一个「打开控制台 App」入口（关闭时隐藏）。
+      const consoleOpenBtn = el('button', { class: 'btn shrink-0', type: 'button' });
+      consoleOpenBtn.append(
+        el('span', { class: 'inline-flex' }, Icons.monitor(14)),
+        el('span', {}, i18n.t('settingsPage.open'))
       );
+      consoleOpenBtn.addEventListener('click', () => window.ships.openConsole());
+      const consoleOpenRow = row(
+        i18n.t('settingsPage.openConsole'),
+        i18n.t('settingsPage.openConsoleHint'),
+        consoleOpenBtn
+      );
+
+      function syncConsoleOpen(enabled) {
+        consoleOpenRow.classList.toggle('hidden', !enabled);
+      }
+      syncConsoleOpen(Boolean(settings.logToConsoleApp));
+
+      const consoleSwitch = switchControl(settings.logToConsoleApp, (value) => {
+        syncConsoleOpen(value);
+        patch({ logToConsoleApp: value });
+      });
       logsSection.appendChild(
         row(i18n.t('settingsPage.logsToConsole'), i18n.t('settingsPage.logsToConsoleHint'), consoleSwitch.root)
       );
+      logsSection.appendChild(consoleOpenRow);
     }
 
     const retentionSelect = createSelect({

@@ -35,6 +35,22 @@ function registerAppIpc(ipcMain) {
     return err ? { ok: false, error: err } : { ok: true };
   });
 
+  // 打开 macOS「控制台」App（仅在「同步到控制台 App」开启时由设置界面调用）。
+  ipcMain.handle(IPC.OPEN_CONSOLE, async () => {
+    if (process.platform !== 'darwin') return { ok: false, error: 'unsupported' };
+    const candidates = [
+      '/System/Applications/Utilities/Console.app',
+      '/Applications/Utilities/Console.app',
+    ];
+    for (const consolePath of candidates) {
+      if (fs.existsSync(consolePath)) {
+        const err = await shell.openPath(consolePath);
+        return err ? { ok: false, error: err } : { ok: true };
+      }
+    }
+    return { ok: false, error: 'not-found' };
+  });
+
   ipcMain.handle(IPC.OPEN_EXTERNAL, async (_event, url) => {
     if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
       return { ok: false, error: 'invalid url' };
