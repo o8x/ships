@@ -99,13 +99,15 @@ function themeBackgroundColor() {
 
 function applyThemeBackgrounds() {
   const color = themeBackgroundColor();
-  for (const win of [getSettingsWindow(), getFileWindow(), ...terminalWindowsList()]) {
+  // 终端窗口是透明无边框（底色由渲染层 #term-shell 画），不设原生 backgroundColor。
+  for (const win of [getSettingsWindow(), getFileWindow()]) {
     if (win && !win.isDestroyed()) win.setBackgroundColor(color);
   }
 }
 
 function applyTerminalSnap(win, size) {
   if (!isTerminalWindow(win) || win.isMaximized() || win.isFullScreen() || !size) return;
+  if (isBallMode(win)) return; // 悬浮球动画期间不做整格对齐（否则会与缩放动画抢尺寸 → 抖动）
   const [width, height] = win.getContentSize();
   win.setContentSize(size.width || width, size.height || height);
 }
@@ -121,6 +123,7 @@ function flushPendingTerminalSnap(win) {
 }
 
 function markTerminalResizing(win) {
+  if (isBallMode(win)) return; // 悬浮球动画期间的 setBounds 不算「拖动 / 调整尺寸」
   const state = snapStateFor(win);
   const first = Date.now() >= state.resizingUntil;
   state.resizingUntil = Date.now() + 160;
@@ -133,6 +136,7 @@ function markTerminalResizing(win) {
    松手后（或本来就空闲时）立即执行。 */
 function requestTerminalSnap(win, payload) {
   if (!isTerminalWindow(win) || win.isMaximized() || win.isFullScreen()) return { ok: false };
+  if (isBallMode(win)) return { ok: false }; // 悬浮球动画期间不整格对齐
   const [currentWidth, currentHeight] = win.getContentSize();
   const minWidth = Math.round(win.getMinimumSize()[0]) || 0;
   const minHeight = Math.round(win.getMinimumSize()[1]) || 0;

@@ -480,6 +480,7 @@
       fitIfNeeded();
     }
     observer = new ResizeObserver(() => {
+      if (ballMode) return; // 悬浮球缩放动画期间不重绘 / 不显示尺寸徽标
       showSizeBadge();
       scheduleResize();
     });
