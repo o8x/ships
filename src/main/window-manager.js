@@ -462,6 +462,8 @@ function enterBallMode(win) {
     if (win.isDestroyed() || !win.__ballActive) return;
     win.setBounds(win.__ballBounds, false);
     if (typeof win.setResizable === 'function') win.setResizable(false);
+    // setBounds 之后再次重申：球固定在它所在的桌面 / 空间（不加入所有桌面、不跟随切换）。
+    win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
     win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'settle', glass });
   }, Math.round(BALL_ANIM_MS * 0.6));
   logger.file(`[terminal] entered ball mode (${win.id}) size=${size}`);
@@ -495,6 +497,7 @@ function exitBallMode(win, focus) {
     win.setMinimumSize(TERMINAL_WINDOW.minWidth, TERMINAL_WINDOW.minHeight);
     if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
     else win.setAlwaysOnTop(false);
+    win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
     win.webContents.send(IPC.TERMINAL_BALL, { active: false, size, phase: 'settle' });
     saveTerminalGeometry(win);
     if (focus !== false) win.focus();
