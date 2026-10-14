@@ -54,7 +54,8 @@
       "shell": "",
       "ballSize": 75,
       "ballEnabled": true,
-      "ballDelayMs": 200
+      "ballDelayMs": 200,
+      "ballIcon": "ball.svg"
     },
     "sshBuiltinTerminal": true,
     "sftpDownloadDir": "~/Downloads",

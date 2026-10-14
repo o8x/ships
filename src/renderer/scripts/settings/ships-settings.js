@@ -10,7 +10,7 @@
       settingsPage: {
         title: '设置',
         ships: 'Ships 设置',
-        ssh: 'SSH 管理',
+        ssh: 'SSH',
         language: '语言',
         languageHint: '界面显示语言',
         appearance: '外观',

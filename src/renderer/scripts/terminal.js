@@ -649,7 +649,16 @@
     shellEl.style.transform = 'none';
   }
 
-  if (ballIconEl) ballIconEl.innerHTML = Icons.ships ? Icons.ships(46) : '';
+  /* 悬浮球图标：来自设置 settings.terminalBallIcon（assets/icons/ball/ 下的文件名），可实时切换。 */
+  let ballIconName = 'ball.svg';
+  function applyBallIcon(name) {
+    ballIconName = name || 'ball.svg';
+    if (!ballIconEl) return;
+    const data = window.shipsBallIcons || { icons: {} };
+    const svg = data.icons[ballIconName] || data.icons['ball.svg'] || (Icons.ships ? Icons.ships(46) : '');
+    ballIconEl.innerHTML = svg;
+  }
+  applyBallIcon(ballIconName);
   if (ballTrashEl) ballTrashEl.innerHTML = Icons.trash(24);
   if (ballEl) {
     let dragging = false;
@@ -760,6 +769,7 @@
     const [settings, info] = await Promise.all([window.ships.getSettings(), window.ships.getInfo()]);
     i18n.setLocale((settings && settings.locale) || 'zh');
     window.ShipsTheme.set(settings || {});
+    applyBallIcon(settings && settings.terminalBallIcon);
     renderHeader();
     sshPicker = setupSshPicker();
     refreshSshPicker();
@@ -774,6 +784,7 @@
     window.ships.onSettingsChanged((next) => {
       i18n.setLocale((next && next.locale) || 'zh');
       window.ShipsTheme.set(next || {});
+      applyBallIcon(next && next.terminalBallIcon);
       renderHeader();
       refreshSshPicker();
       if (term) term.options.theme = themeColors();

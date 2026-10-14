@@ -426,6 +426,21 @@ input[type='color'].swatch::-webkit-color-swatch {
   width: calc(var(--term-ball-size, 75px) * 0.58);
   height: calc(var(--term-ball-size, 75px) * 0.58);
 }
+/* 设置 → 终端：悬浮球图标选择器的预览框。 */
+.ball-icon-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-control-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+}
+.ball-icon-preview svg {
+  width: 18px;
+  height: 18px;
+}
 /* 球上右键 → 悬浮垃圾桶图标（半透明）；再点一下球即销毁终端。 */
 .term-ball-trash {
   position: absolute;

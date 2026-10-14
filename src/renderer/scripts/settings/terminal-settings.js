@@ -42,6 +42,8 @@
         ballDelayHint: '失去焦点后多久缩成球（期间焦点回来则取消）',
         ballSize: '悬浮球大小',
         ballSizeHint: '圆形悬浮球的边长（宽高强制 1:1，40–200px）',
+        ballIcon: '悬浮球图标',
+        ballIconHint: '从 assets/icons/ball 中选择悬浮球显示的图标，实时生效',
         seconds: '秒',
         reset: '重置',
         resetHint: '恢复终端相关设置为默认值，并清除记住的窗口屏幕 / 位置 / 大小',
@@ -88,6 +90,8 @@
         ballDelayHint: 'How long after losing focus before shrinking (cancelled if focus returns)',
         ballSize: 'Ball size',
         ballSizeHint: 'Edge length of the round ball (forced 1:1, 40–200px)',
+        ballIcon: 'Ball icon',
+        ballIconHint: 'Pick the floating ball icon from assets/icons/ball (applies live)',
         seconds: 's',
         reset: 'Reset',
         resetHint: 'Restore the terminal settings to their defaults and forget the remembered screen / position / size',
@@ -367,6 +371,34 @@
     });
     wrap.appendChild(
       row(i18n.t('terminalSettings.ballSize'), i18n.t('terminalSettings.ballSizeHint'), ballSizeField.input)
+    );
+
+    /* 悬浮球图标：assets/icons/ball/ 下可选，带预览，实时生效 */
+    const ballIconData = window.shipsBallIcons || { names: [], icons: {} };
+    const ballIconPreview = el('span', { class: 'ball-icon-preview' });
+    const applyBallIconPreview = (name) => {
+      const svg = ballIconData.icons[name] || ballIconData.icons['ball.svg'] || '';
+      ballIconPreview.innerHTML = svg;
+    };
+    const ballIconSelect = window.ShipsUI.createSelect({
+      options: ballIconData.names.map((name) => ({ value: name, label: name.replace(/\.svg$/, '') })),
+      value: ctx.settings.terminalBallIcon || 'ball.svg',
+      align: 'right',
+      className: 'w-[140px] shrink-0',
+      onChange: (value) => {
+        applyBallIconPreview(value);
+        ctx.patch({ terminalBallIcon: value });
+      },
+    });
+    applyBallIconPreview(ctx.settings.terminalBallIcon || 'ball.svg');
+    syncers.push((next) => {
+      ballIconSelect.setValue(next.terminalBallIcon || 'ball.svg');
+      applyBallIconPreview(next.terminalBallIcon || 'ball.svg');
+    });
+    const ballIconControl = el('div', { class: 'flex shrink-0 items-center gap-2' });
+    ballIconControl.append(ballIconPreview, ballIconSelect.el);
+    wrap.appendChild(
+      row(i18n.t('terminalSettings.ballIcon'), i18n.t('terminalSettings.ballIconHint'), ballIconControl)
     );
 
     /* 全局快捷键：在任意界面按下即可拉起置顶终端窗口 */

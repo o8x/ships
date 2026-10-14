@@ -2,7 +2,7 @@
 
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 const { IPC } = require('../shared/constants');
-const { loadIcons } = require('./icons');
+const { loadIcons, loadBallIcons } = require('./icons');
 const { get: getFlag } = require('./flags');
 
 function on(channel, cb) {
@@ -109,4 +109,5 @@ const api = {
 
 contextBridge.exposeInMainWorld('ships', api);
 contextBridge.exposeInMainWorld('shipsIcons', loadIcons());
+contextBridge.exposeInMainWorld('shipsBallIcons', loadBallIcons());
 contextBridge.exposeInMainWorld('shipsFlags', { get: (code, shape) => getFlag(code, shape) });

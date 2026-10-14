@@ -137,6 +137,7 @@ const TERMINAL_WINDOW = Object.assign(
     ballSize: 75,
     ballEnabled: true,
     ballDelayMs: 200,
+    ballIcon: 'ball.svg',
   },
   ships.terminalWindow || {}
 );
@@ -192,6 +193,8 @@ const DEFAULT_SETTINGS = {
   terminalBallEnabled: TERMINAL_WINDOW.ballEnabled !== false,
   terminalBallDelayMs: Number.isFinite(TERMINAL_WINDOW.ballDelayMs) ? TERMINAL_WINDOW.ballDelayMs : 200,
   terminalBallSize: Number.isFinite(TERMINAL_WINDOW.ballSize) ? TERMINAL_WINDOW.ballSize : 75,
+  // 悬浮球图标（assets/icons/ball/ 下的文件名）
+  terminalBallIcon: TERMINAL_WINDOW.ballIcon || 'ball.svg',
   // 内置终端文件面板：下载保存目录（默认 ~/Downloads）
   sftpDownloadDir: ships.sftpDownloadDir || '~/Downloads',
   // 独立文件窗口置顶
