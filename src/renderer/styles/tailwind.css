@@ -380,11 +380,11 @@ input[type='color'].swatch::-webkit-color-swatch {
   border-radius: var(--radius-window);
   border: 1px solid var(--color-border);
 }
-/* 悬浮球：固定尺寸的圆形，锚在窗口**右上角**（窗口收缩 / 放大时右上角固定，球不动，像收进角落）。 */
+/* 悬浮球：固定尺寸的圆形，锚在窗口**左上角**（缩小 / 放大都是纯尺寸动画，x/y 不变，不会左右弹跳）。 */
 #term-ball {
   position: fixed;
   top: 0;
-  right: 0;
+  left: 0;
   width: var(--term-ball-size, 75px);
   height: var(--term-ball-size, 75px);
   display: none;

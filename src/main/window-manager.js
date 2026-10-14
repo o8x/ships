@@ -414,9 +414,10 @@ function clampToWorkArea(bounds) {
   return { x: Math.round(x), y: Math.round(y), width: bounds.width, height: bounds.height };
 }
 
-/* 球 = 窗口右上角的一个 size×size 正方形。 */
+/* 球 = 窗口**左上角**的 size×size 方块：这样缩小 / 放大都只是「改宽高、x/y 不变」的纯尺寸动画，
+   原生窗口动画不会让窗口左右平移（否则右上角锚定会让它在展开时先向左弹一下）。 */
 function ballBoundsFor(orig, size) {
-  return clampToWorkArea({ x: orig.x + orig.width - size, y: orig.y, width: size, height: size });
+  return clampToWorkArea({ x: orig.x, y: orig.y, width: size, height: size });
 }
 
 /* 用 macOS 原生窗口动画（`setBounds(bounds, true)`，由合成器逐帧渲染，不卡）完成
@@ -462,7 +463,7 @@ function enterBallMode(win) {
     if (win.isDestroyed() || !win.__ballActive) return;
     if (typeof win.setResizable === 'function') win.setResizable(false);
     win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'settle' });
-  }, Math.round(BALL_ANIM_MS * 0.55));
+  }, Math.round(BALL_ANIM_MS * 0.3));
   logger.file(`[terminal] entered ball mode (${win.id}) size=${size}`);
 }
 
@@ -478,7 +479,7 @@ function exitBallMode(win, focus) {
   // 没拖动过球 → 原样恢复；拖动过 → 以球的位置为「右上角」展开回原尺寸（夹回工作区）。
   const current = win.getBounds();
   const restore = win.__ballMoved
-    ? clampToWorkArea({ x: current.x + size - orig.width, y: current.y, width: orig.width, height: orig.height })
+    ? clampToWorkArea({ x: current.x, y: current.y, width: orig.width, height: orig.height })
     : orig;
   // 放大期间只显示球（窗口从球长大），结束后再切回终端。
   win.webContents.send(IPC.TERMINAL_BALL, { active: false, size, phase: 'grow' });
