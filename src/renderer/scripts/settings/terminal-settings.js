@@ -338,13 +338,13 @@
         value: ms,
         label: ms < 1000 ? `${ms} ms` : `${ms / 1000} ${i18n.t('terminalSettings.seconds')}`,
       })),
-      value: Number(ctx.settings.terminalBallDelayMs) || 500,
+      value: Number(ctx.settings.terminalBallDelayMs) || 200,
       align: 'right',
       className: 'w-[120px] shrink-0',
       onChange: (value) => ctx.patch({ terminalBallDelayMs: Number(value) }),
     });
     syncers.push((next) => {
-      ballDelaySelect.setValue(Number(next.terminalBallDelayMs) || 500);
+      ballDelaySelect.setValue(Number(next.terminalBallDelayMs) || 200);
     });
     wrap.appendChild(
       row(i18n.t('terminalSettings.ballDelay'), i18n.t('terminalSettings.ballDelayHint'), ballDelaySelect.el)
