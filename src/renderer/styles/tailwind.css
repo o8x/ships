@@ -405,6 +405,17 @@ input[type='color'].swatch::-webkit-color-swatch {
 [data-ball='on'] #term-shell {
   display: none;
 }
+/* 悬浮球的玻璃效果：'liquid' = 原生 Liquid Glass（挂在窗口内容之后，球体透明让它透出）；
+   'frost' = vibrancy 回退的毛玻璃（backdrop-filter 模糊背景）。 */
+[data-ball='on'][data-ball-glass='liquid'] #term-ball {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--color-border) 60%, transparent);
+}
+[data-ball='on'][data-ball-glass='frost'] #term-ball {
+  background: color-mix(in srgb, var(--color-surface) 55%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  backdrop-filter: blur(18px) saturate(1.6);
+}
 #term-ball:active {
   cursor: grabbing;
 }
@@ -515,14 +526,15 @@ body.show-lines #term-host {
   --traffic-size: calc(var(--term-header-font-size) * 0.75);
   --traffic-glyph-size: calc(var(--term-header-font-size) * 0.5);
 }
-/* 红绿灯右侧的「固定」按钮（开启后本窗口不缩成悬浮球）。 */
+/* 红绿灯右侧的「固定」按钮（开启后本窗口不缩成悬浮球）——尺寸与红绿灯相近。 */
 #term-pin {
-  width: calc(var(--term-header-font-size) + 6px);
-  height: calc(var(--term-header-font-size) + 6px);
+  width: calc(var(--term-header-font-size) * 1.1);
+  height: calc(var(--term-header-font-size) * 1.1);
+  padding: 0;
 }
 #term-pin svg {
-  width: var(--term-header-font-size);
-  height: var(--term-header-font-size);
+  width: calc(var(--term-header-font-size) * 0.7);
+  height: calc(var(--term-header-font-size) * 0.7);
 }
 .traffic-light {
   display: inline-flex;

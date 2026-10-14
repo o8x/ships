@@ -432,6 +432,27 @@ function ballBoundsFor(orig, size) {
   return clampToWorkArea({ x: orig.x + orig.width - size, y: orig.y, width: size, height: size });
 }
 
+/* 悬浮球是否用玻璃效果：'liquid'（原生 Liquid Glass）/ 'frost'（vibrancy 回退的毛玻璃）/ 'off'。 */
+function ballGlassKind() {
+  const mode = glassMode();
+  if (mode === 'liquid') return 'liquid';
+  if (mode === 'vibrancy') return 'frost';
+  return 'off';
+}
+
+/* 为悬浮球窗口挂上原生 Liquid Glass（圆形，cornerRadius = 半径），只挂一次。 */
+function ensureBallGlass(win, size) {
+  if (win.__ballGlassAdded) return;
+  const lg = getLiquidGlass();
+  if (!lg || !liquidGlassAvailable()) return;
+  try {
+    lg.addView(win.getNativeWindowHandle(), { cornerRadius: Math.round(size / 2) });
+    win.__ballGlassAdded = true;
+  } catch (err) {
+    logger.warn('ball liquid glass addView failed:', err.message);
+  }
+}
+
 function enterBallMode(win) {
   if (!isTerminalWindow(win) || win.__ballActive || win.__exitingBall || win.isDestroyed()) return;
   const size = ballSize();
@@ -440,11 +461,14 @@ function enterBallMode(win) {
   win.__ballMoved = false;
   win.__ballBounds = ballBoundsFor(win.__ballOrig, size);
   if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
+  // 悬浮球固定在它所在的桌面 / 空间，不跟随桌面切换。
+  win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
   win.setMinimumSize(size, size);
   // 窗口保持原尺寸，渲染层用 CSS 把终端从 1 缩到球大小（transform，GPU、不跳）。
   const scaleX = size / win.__ballOrig.width;
   const scaleY = size / win.__ballOrig.height;
-  win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'enter', duration: BALL_ANIM_MS, scaleX, scaleY });
+  const glass = ballGlassKind();
+  win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'enter', duration: BALL_ANIM_MS, scaleX, scaleY, glass });
   // 动画结束后：窗口一次性收到球大小，切到球（此刻终端已被缩到小球大小，衔接无缝）。
   clearBallSettleTimer(win);
   win.__ballSettleTimer = setTimeout(() => {
@@ -452,7 +476,8 @@ function enterBallMode(win) {
     if (win.isDestroyed() || !win.__ballActive) return;
     win.setBounds(win.__ballBounds, false);
     if (typeof win.setResizable === 'function') win.setResizable(false);
-    win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'settle' });
+    if (glass === 'liquid') ensureBallGlass(win, size);
+    win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'settle', glass });
   }, BALL_ANIM_MS);
   logger.file(`[terminal] entered ball mode (${win.id}) size=${size}`);
 }
@@ -825,6 +850,8 @@ function openTerminalWindow() {
     frame: false,
     transparent: true,
     hasShadow: false,
+    // 圆角由 #term-shell 的 CSS 绘制；关掉系统圆角，否则系统会把窗口内容（含 CSS 边框）在四角裁掉一段。
+    roundedCorners: false,
     // macOS：让「悬浮球」在其它应用（含全屏应用）之上时，**第一次点击**就直接落到窗口内容，
     // 而不是先激活应用、需要点两次才能展开。
     acceptFirstMouse: true,
