@@ -308,6 +308,7 @@ function shouldHideOnClose() {
 function closeTerminalWindow(target) {
   const win = isTerminalWindow(target) ? target : getTerminalWindow();
   if (!win) return null;
+  clearBallTimer(win);
   if (shouldHideOnClose()) {
     win.hide();
     return win;
@@ -321,6 +322,13 @@ function closeTerminalWindow(target) {
 function destroyTerminalWindow(target) {
   const win = isTerminalWindow(target) ? target : getTerminalWindow();
   if (!win) return;
+  // 即将销毁：不要因失焦（如 iTerm 交接、会话结束）触发缩球。
+  win.__suppressBall = true;
+  clearBallTimer(win);
+  if (win.__boundsAnim) {
+    clearInterval(win.__boundsAnim);
+    win.__boundsAnim = null;
+  }
   saveTerminalGeometry(win);
   win.destroy();
 }
@@ -353,15 +361,32 @@ function toggleTerminalWindow() {
 }
 
 /* --------------------------- 终端窗口「悬浮球」 ---------------------------
-   失去焦点时把窗口缩小成 BALL_SIZE 的圆形无标题栏窗口（CSS 画圆形），点击 / 快捷键再放大回原样。
-   - 窗口以 frame:false + transparent:true 创建，圆形由 CSS 呈现。
-   - 缩小时临时把最小尺寸降到球大小、禁用缩放；放大时恢复。
+   失去焦点（延迟一段时间、期间焦点回来就取消）后把窗口缩小成 BALL_SIZE 的圆形无标题栏窗口
+   （CSS 画圆形），点击 / 快捷键再放大回原样。
+   - 窗口以 frame:false + transparent:true 创建，圆形由 CSS 固定尺寸呈现（不随窗口变形为椭圆）。
+   - 缩小 / 放大用 JS 逐帧插值动画（时长可控，比系统 animate 更慢更顺）。
    - 期间不改动几何记忆（terminal-window.json）。
    - 拖动由渲染层指针事件触发，主进程按光标位置移动窗口（这样「点击 vs 拖动」可区分）。 */
 let ballDragTimer = null;
+const BALL_ANIM_MS = 420;
+
+function terminalBallEnabled() {
+  return settings.get('terminalBallEnabled') !== false;
+}
+function terminalBallDelayMs() {
+  const value = Number(settings.get('terminalBallDelayMs'));
+  return Number.isFinite(value) && value >= 0 ? value : 5000;
+}
 
 function isBallMode(win) {
   return Boolean(win && !win.isDestroyed() && win.__ballActive);
+}
+
+function clearBallTimer(win) {
+  if (win && win.__ballTimer) {
+    clearTimeout(win.__ballTimer);
+    win.__ballTimer = null;
+  }
 }
 
 function ballBoundsFor(win) {
@@ -372,36 +397,80 @@ function ballBoundsFor(win) {
   return { x, y, width: BALL_SIZE, height: BALL_SIZE };
 }
 
+/* 逐帧把窗口 bounds 插值到 target（ease-out cubic），完成后回调 done。 */
+function animateWindowBounds(win, target, durationMs, done) {
+  if (win.__boundsAnim) {
+    clearInterval(win.__boundsAnim);
+    win.__boundsAnim = null;
+  }
+  const from = win.getBounds();
+  if (!durationMs || durationMs <= 0) {
+    win.setBounds(target);
+    if (typeof done === 'function') done();
+    return;
+  }
+  const start = Date.now();
+  const ease = (t) => 1 - Math.pow(1 - t, 3);
+  win.__boundsAnim = setInterval(() => {
+    if (win.isDestroyed()) {
+      clearInterval(win.__boundsAnim);
+      win.__boundsAnim = null;
+      return;
+    }
+    const t = Math.min(1, (Date.now() - start) / durationMs);
+    const k = ease(t);
+    win.setBounds({
+      x: Math.round(from.x + (target.x - from.x) * k),
+      y: Math.round(from.y + (target.y - from.y) * k),
+      width: Math.round(from.width + (target.width - from.width) * k),
+      height: Math.round(from.height + (target.height - from.height) * k),
+    });
+    if (t >= 1) {
+      clearInterval(win.__boundsAnim);
+      win.__boundsAnim = null;
+      if (typeof done === 'function') done();
+    }
+  }, 16);
+}
+
 function enterBallMode(win) {
-  if (!isTerminalWindow(win) || win.__ballActive || win.isDestroyed()) return;
+  if (!isTerminalWindow(win) || win.__ballActive || win.__exitingBall || win.isDestroyed()) return;
   win.__ballActive = true;
   win.__ballBounds = win.getBounds();
   if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
   win.setMinimumSize(BALL_SIZE, BALL_SIZE);
   if (typeof win.setResizable === 'function') win.setResizable(false);
-  win.webContents.send(IPC.TERMINAL_BALL, { active: true });
-  win.setBounds(ballBoundsFor(win), true);
+  // 先切成球（固定尺寸圆形），再把窗口从当前尺寸收缩到球大小 —— 球始终是圆的。
+  win.webContents.send(IPC.TERMINAL_BALL, { active: true, size: BALL_SIZE });
+  animateWindowBounds(win, ballBoundsFor(win), BALL_ANIM_MS);
   logger.file(`[terminal] entered ball mode (${win.id})`);
 }
 
 function exitBallMode(win, focus) {
-  if (!isTerminalWindow(win) || !win.__ballActive || win.isDestroyed()) return;
+  if (!isTerminalWindow(win) || !win.__ballActive || win.__exitingBall || win.isDestroyed()) return;
+  win.__exitingBall = true;
   const restore = win.__ballBounds;
-  win.__ballActive = false;
-  win.__ballBounds = null;
-  win.webContents.send(IPC.TERMINAL_BALL, { active: false });
   if (typeof win.setResizable === 'function') win.setResizable(true);
   win.setMinimumSize(TERMINAL_WINDOW.minWidth, TERMINAL_WINDOW.minHeight);
   if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
   else win.setAlwaysOnTop(false);
-  if (restore) win.setBounds(restore, true);
   if (focus !== false) win.focus();
-  saveTerminalGeometry(win);
-  logger.file(`[terminal] exited ball mode (${win.id})`);
+  const finish = () => {
+    if (win.isDestroyed()) return;
+    win.__ballActive = false;
+    win.__ballBounds = null;
+    win.__exitingBall = false;
+    // 放大动画结束后再切回终端（期间保持圆形球，窗口在球周围长大）。
+    win.webContents.send(IPC.TERMINAL_BALL, { active: false, size: BALL_SIZE });
+    saveTerminalGeometry(win);
+    logger.file(`[terminal] exited ball mode (${win.id})`);
+  };
+  if (restore) animateWindowBounds(win, restore, BALL_ANIM_MS, finish);
+  else finish();
 }
 
 function startBallDrag(win, x, y) {
-  if (!isTerminalWindow(win) || !win.__ballActive) return;
+  if (!isTerminalWindow(win) || !win.__ballActive || win.__exitingBall) return;
   const b = win.getBounds();
   const offX = Number(x) - b.x;
   const offY = Number(y) - b.y;
@@ -778,13 +847,20 @@ function openTerminalWindow() {
   win.on('focus', () => {
     win.__everFocused = true;
     lastTerminalWindow = win;
+    clearBallTimer(win); // 延迟内焦点回来 → 取消缩球
   });
-  // 失去焦点 → 缩成圆形悬浮球（DevTools 打开时不缩，避免调试时窗口乱跳）。
+  // 失去焦点 → 延迟后缩成圆形悬浮球（延时内焦点回来则取消；DevTools 打开 / iTerm 交接时不动）。
   win.on('blur', () => {
-    if (isQuitting || win.__ballActive || !win.__everFocused) return;
+    if (isQuitting || win.__ballActive || win.__exitingBall || !win.__everFocused) return;
+    if (win.__suppressBall || !win.isVisible()) return;
+    if (!terminalBallEnabled()) return;
     if (win.webContents.isDevToolsOpened && win.webContents.isDevToolsOpened()) return;
     lastTerminalWindow = win;
-    enterBallMode(win);
+    clearBallTimer(win);
+    win.__ballTimer = setTimeout(() => {
+      win.__ballTimer = null;
+      if (!win.isDestroyed() && !win.isFocused() && !win.__suppressBall) enterBallMode(win);
+    }, terminalBallDelayMs());
   });
   win.on('resize', () => scheduleTerminalGeometrySave(win));
   win.on('move', () => scheduleTerminalGeometrySave(win));
@@ -803,6 +879,7 @@ function openTerminalWindow() {
     // 单扇时按「关闭按钮行为」隐藏；多扇时一律销毁（不拦）。
     if (!isQuitting && shouldHideOnClose()) {
       event.preventDefault();
+      clearBallTimer(win);
       saveTerminalGeometry(win);
       win.hide();
       return;

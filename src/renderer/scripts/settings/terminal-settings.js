@@ -36,6 +36,11 @@
         closeActionHint: '点终端窗口左上角关闭按钮（或 Cmd-W）时：隐藏窗口保留会话，或直接销毁结束会话；在终端里输入 exit 结束 shell 时始终销毁窗口',
         closeActionHide: '隐藏窗口',
         closeActionDestroy: '销毁窗口',
+        ballEnable: '自动缩成悬浮球',
+        ballEnableHint: '终端窗口失去焦点一段时间后缩成圆形悬浮球，点击球 / 按快捷键放大回来',
+        ballDelay: '缩成悬浮球延迟',
+        ballDelayHint: '失去焦点后多久缩成球（期间焦点回来则取消）',
+        seconds: '秒',
         reset: '重置',
         resetHint: '恢复终端相关设置为默认值，并清除记住的窗口屏幕 / 位置 / 大小',
         resetConfirm: '确认重置？',
@@ -75,6 +80,11 @@
         closeActionHint: 'When the close button (or Cmd-W) is used: hide the window and keep the session, or destroy it. Ending the shell with exit always destroys the window',
         closeActionHide: 'Hide window',
         closeActionDestroy: 'Destroy window',
+        ballEnable: 'Auto floating ball',
+        ballEnableHint: 'Shrink the terminal into a round floating ball after it loses focus; click it or press the hotkey to bring it back',
+        ballDelay: 'Ball shrink delay',
+        ballDelayHint: 'How long after losing focus before shrinking (cancelled if focus returns)',
+        seconds: 's',
         reset: 'Reset',
         resetHint: 'Restore the terminal settings to their defaults and forget the remembered screen / position / size',
         resetConfirm: 'Reset everything?',
@@ -306,6 +316,31 @@
     });
     wrap.appendChild(
       row(i18n.t('terminalSettings.closeAction'), i18n.t('terminalSettings.closeActionHint'), closeActionSwitch.root)
+    );
+
+    /* 失去焦点缩成悬浮球：开关 + 延迟 */
+    const ballSwitch = switchControl(ctx.settings.terminalBallEnabled !== false, (value) =>
+      ctx.patch({ terminalBallEnabled: value })
+    );
+    syncers.push((next) => {
+      ballSwitch.classList.toggle('on', next.terminalBallEnabled !== false);
+    });
+    wrap.appendChild(
+      row(i18n.t('terminalSettings.ballEnable'), i18n.t('terminalSettings.ballEnableHint'), ballSwitch)
+    );
+
+    const ballDelaySelect = window.ShipsUI.createSelect({
+      options: [1, 3, 5, 10, 30].map((value) => ({ value: value * 1000, label: `${value} ${i18n.t('terminalSettings.seconds')}` })),
+      value: Number(ctx.settings.terminalBallDelayMs) || 5000,
+      align: 'right',
+      className: 'w-[120px] shrink-0',
+      onChange: (value) => ctx.patch({ terminalBallDelayMs: Number(value) }),
+    });
+    syncers.push((next) => {
+      ballDelaySelect.setValue(Number(next.terminalBallDelayMs) || 5000);
+    });
+    wrap.appendChild(
+      row(i18n.t('terminalSettings.ballDelay'), i18n.t('terminalSettings.ballDelayHint'), ballDelaySelect.el)
     );
 
     /* 全局快捷键：在任意界面按下即可拉起置顶终端窗口 */

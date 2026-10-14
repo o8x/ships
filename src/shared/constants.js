@@ -134,6 +134,8 @@ const TERMINAL_WINDOW = Object.assign(
     alwaysOnTop: true,
     scrollback: 10000,
     ballSize: 100,
+    ballEnabled: true,
+    ballDelayMs: 5000,
   },
   ships.terminalWindow || {}
 );
@@ -185,6 +187,9 @@ const DEFAULT_SETTINGS = {
   // 打开置顶终端窗口的全局快捷键（Electron accelerator，空字符串 = 不注册）
   terminalHotkey: TERMINAL_WINDOW.hotkey || 'CommandOrControl+Shift+Z',
   sshBuiltinTerminal: ships.sshBuiltinTerminal !== false,
+  // 终端窗口失焦缩成「悬浮球」：是否开启 + 延迟（毫秒）
+  terminalBallEnabled: TERMINAL_WINDOW.ballEnabled !== false,
+  terminalBallDelayMs: Number.isFinite(TERMINAL_WINDOW.ballDelayMs) ? TERMINAL_WINDOW.ballDelayMs : 5000,
   // 内置终端文件面板：下载保存目录（默认 ~/Downloads）
   sftpDownloadDir: ships.sftpDownloadDir || '~/Downloads',
   // 独立文件窗口置顶

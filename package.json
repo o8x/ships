@@ -52,7 +52,9 @@
       "closeAction": "destroy",
       "fontSize": 12,
       "shell": "",
-      "ballSize": 100
+      "ballSize": 100,
+      "ballEnabled": true,
+      "ballDelayMs": 5000
     },
     "sshBuiltinTerminal": true,
     "sftpDownloadDir": "~/Downloads",

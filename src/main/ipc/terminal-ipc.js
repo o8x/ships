@@ -24,6 +24,8 @@ const TERMINAL_SETTING_KEYS = [
   'terminalCloseAction',
   'sshBuiltinTerminal',
   'sftpDownloadDir',
+  'terminalBallEnabled',
+  'terminalBallDelayMs',
 ];
 
 function terminalDefaults() {
@@ -213,11 +215,14 @@ function registerTerminalIpc(ipcMain) {
 
   /* Hand the session over to iTerm (same command when known) and close the window. */
   ipcMain.handle(IPC.TERMINAL_OPEN_ITERM, async (event) => {
+    const win = wm.getTerminalWindowForWebContents(event.sender.id);
+    // 交接会切到 iTerm → 终端窗口失焦；直接关闭，绝不缩成悬浮球。
+    if (win && !win.isDestroyed()) win.__suppressBall = true;
     const command = overlayLastCommand || `${terminal.loginShell()} -l`;
     const result = await iterm.openCommand(command, 'terminal:handoff');
     if (result && result.ok) {
       // 交接成功 = 会话交给 iTerm：这里必须销毁（而不是按关闭行为隐藏）
-      wm.destroyTerminalWindow(wm.getTerminalWindowForWebContents(event.sender.id));
+      wm.destroyTerminalWindow(win);
     }
     return result && result.ok
       ? { ok: true, command }

@@ -649,11 +649,14 @@
   }
 
   window.ships.terminal.onBall((payload) => {
+    if (payload && payload.size) {
+      document.documentElement.style.setProperty('--term-ball-size', `${payload.size}px`);
+    }
     ballMode = Boolean(payload && payload.active);
     document.documentElement.dataset.ball = ballMode ? 'on' : 'off';
     if (!ballMode) {
-      // 放大回终端：等缩放动画结束后重新 fit / 对齐（球模式期间跳过了 fit）。
-      setTimeout(() => fitIfNeeded(true), 260);
+      // 放大回来（主进程在缩放动画结束后才通知）：重新 fit / 对齐。
+      setTimeout(() => fitIfNeeded(true), 40);
     }
   });
 
