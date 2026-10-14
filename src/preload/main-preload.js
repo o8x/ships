@@ -75,6 +75,7 @@ const api = {
     close: (id) => ipcRenderer.invoke(IPC.SFTP_CLOSE, { id }),
     transferCommand: (id, paths, recursive) => ipcRenderer.invoke(IPC.SFTP_TRANSFER_COMMAND, { id, paths, recursive }),
     copyPath: (paths) => ipcRenderer.invoke(IPC.SFTP_COPY_PATH, { paths }),
+    copyText: (text) => ipcRenderer.invoke(IPC.SFTP_COPY_TEXT, { text }),
     cdHistory: {
       list: (id) => ipcRenderer.invoke(IPC.CD_HISTORY_LIST, { id }),
       add: (id, path) => ipcRenderer.invoke(IPC.CD_HISTORY_ADD, { id, path }),

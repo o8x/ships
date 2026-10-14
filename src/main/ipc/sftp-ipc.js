@@ -94,6 +94,15 @@ function registerSftpIpc(ipcMain) {
     return { ok: true, paths: list };
   });
 
+  // 文件列表 Cmd/Ctrl+C：把选中行以 CSV 写入系统剪贴板。
+  ipcMain.handle(IPC.SFTP_COPY_TEXT, (event, payload) => {
+    if (!isAllowedSender(event)) return { ok: false };
+    const text = payload && payload.text;
+    if (typeof text !== 'string' || !text) return { ok: false };
+    clipboard.writeText(text);
+    return { ok: true };
+  });
+
   // cd 历史（按 ssh 目标 = 用户名@主机 关联）：记录 / 读取最近 cd 到的目录。
   ipcMain.handle(IPC.CD_HISTORY_LIST, (event, payload) => {
     if (!isAllowedSender(event)) return { ok: false, entries: [] };

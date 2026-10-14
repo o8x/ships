@@ -789,6 +789,11 @@ body.term-window:not(.file-window) .select-menu .select-option svg {
   overflow: auto;
   padding: 2px 0;
 }
+/* 列表可聚焦（便于 Cmd/Ctrl+C 复制选中行），但不显示焦点框。 */
+.fm-list:focus,
+.fm-list:focus-visible {
+  outline: none;
+}
 .fm-row {
   height: 1.95em;
   cursor: default;

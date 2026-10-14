@@ -50,6 +50,7 @@
         openVSCode: '从 VS Code 打开',
         copyPath: '复制路径',
         copiedPath: '已复制路径：{path}',
+        copiedCsv: '已复制 {count} 行到剪贴板',
         cdHistory: '最近访问',
         copyTransfer: '复制传输命令',
         copiedCommand: '已复制：{command}',
@@ -96,6 +97,7 @@
         openVSCode: 'Open from VS Code',
         copyPath: 'Copy path',
         copiedPath: 'Copied path: {path}',
+        copiedCsv: 'Copied {count} rows as CSV',
         cdHistory: 'Recent',
         copyTransfer: 'Copy transfer command',
         copiedCommand: 'Copied: {command}',
@@ -285,7 +287,7 @@
 
     const listPane = el('div', { class: 'fm-list-pane' });
     const listHead = el('div', { class: 'fm-list-head' });
-    const listEl = el('div', { class: 'fm-list' });
+    const listEl = el('div', { class: 'fm-list', tabindex: '0' });
     listPane.append(listHead, listEl);
 
     const treeDivider = el('div', { class: 'fm-divider-v' });
@@ -653,6 +655,8 @@
           else selectOnly(path);
           setStatusPath(path);
           renderList();
+          // 让列表获得焦点，便于 Cmd/Ctrl+C 复制选中行（见 wrap 的 keydown）。
+          listEl.focus();
           // 点文件时把左侧目录树滚动定位到它所在的目录节点。
           scrollTreeToSelected();
         });
@@ -667,6 +671,7 @@
           if (!state.selection.has(path)) selectOnly(path);
           setStatusPath(path);
           renderList();
+          listEl.focus();
           scrollTreeToSelected();
           const paths = selectionPaths();
           openContextMenu(event.clientX, event.clientY, [
@@ -758,6 +763,30 @@
       const result = await window.ships.sftp.copyPath(list);
       if (result && result.ok) setStatus(i18n.t('filesUi.copiedPath', { path: list.join('\n') }));
       else setStatus(i18n.t('filesUi.copyFailed'), true);
+    }
+
+    /* 单选 / 多选后按 Cmd/Ctrl+C：把选中行按表格列导出为 CSV 写入剪贴板。 */
+    function csvField(value) {
+      const s = String(value == null ? '' : value);
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }
+    function copySelectionCsv() {
+      const ordered = sortedEntries().filter((entry) => state.selection.has(joinPath(state.cwd, entry.name)));
+      if (!ordered.length) return;
+      const rows = [
+        [i18n.t('filesUi.name'), i18n.t('filesUi.size'), i18n.t('filesUi.perm'), i18n.t('filesUi.time')],
+        ...ordered.map((entry) => [
+          entry.name,
+          formatSize(entry.size),
+          formatMode(entry.mode, entry.type),
+          formatTime(entry.mtime),
+        ]),
+      ];
+      const csv = rows.map((row) => row.map(csvField).join(',')).join('\n');
+      window.ships.sftp.copyText(csv).then((result) => {
+        if (result && result.ok) setStatus(i18n.t('filesUi.copiedCsv', { count: ordered.length }));
+        else setStatus(i18n.t('filesUi.copyFailed'), true);
+      });
     }
 
     /* 右键「复制传输命令」：按会话连接信息生成 scp 命令（可多个源）并复制到剪贴板。 */
@@ -963,6 +992,16 @@
         pathInput.value = state.cwd;
         pathInput.blur();
       }
+    });
+
+    // Cmd / Ctrl + C：把选中的文件行导出为 CSV（输入框内的复制不拦截）。
+    wrap.addEventListener('keydown', (event) => {
+      if (!(event.metaKey || event.ctrlKey) || String(event.key).toLowerCase() !== 'c') return;
+      const tag = (event.target && event.target.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (!state.selection.size) return;
+      event.preventDefault();
+      copySelectionCsv();
     });
 
     listEl.addEventListener('dragover', (event) => {

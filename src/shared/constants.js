@@ -72,6 +72,7 @@ const IPC = {
   SFTP_TRANSFER_COMMAND: 'sftp:transfer-command',
   SFTP_PROGRESS: 'sftp:progress',
   SFTP_COPY_PATH: 'sftp:copy-path',
+  SFTP_COPY_TEXT: 'sftp:copy-text',
 
   CD_HISTORY_LIST: 'cd-history:list',
   CD_HISTORY_ADD: 'cd-history:add',
