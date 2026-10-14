@@ -75,21 +75,23 @@ function registerSftpIpc(ipcMain) {
     );
   });
 
-  // 生成 scp 传输命令并复制到系统剪贴板（文件 / 目录右键菜单）。
+  // 生成 scp 传输命令并复制到系统剪贴板（文件 / 目录右键菜单，支持多选）。
   ipcMain.handle(IPC.SFTP_TRANSFER_COMMAND, (event, payload) => {
     if (!isAllowedSender(event)) return { ok: false };
-    const result = sftp.transferCommand(payload && payload.id, payload && payload.path, Boolean(payload && payload.recursive));
+    const raw = (payload && payload.paths) || (payload && payload.path);
+    const result = sftp.transferCommand(payload && payload.id, raw, Boolean(payload && payload.recursive));
     if (result && result.ok) clipboard.writeText(result.command);
     return result;
   });
 
-  // 右键「复制路径」：把远端绝对路径写入系统剪贴板。
+  // 右键「复制路径」：把选中的远端绝对路径写入系统剪贴板（多条按换行）。
   ipcMain.handle(IPC.SFTP_COPY_PATH, (event, payload) => {
     if (!isAllowedSender(event)) return { ok: false };
-    const p = payload && payload.path;
-    if (!p) return { ok: false };
-    clipboard.writeText(String(p));
-    return { ok: true, path: String(p) };
+    const raw = (payload && payload.paths) || (payload && payload.path);
+    const list = (Array.isArray(raw) ? raw : [raw]).map((p) => String(p || '')).filter(Boolean);
+    if (!list.length) return { ok: false };
+    clipboard.writeText(list.join('\n'));
+    return { ok: true, paths: list };
   });
 
   // cd 历史（按 ssh 目标 = 用户名@主机 关联）：记录 / 读取最近 cd 到的目录。

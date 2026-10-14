@@ -140,6 +140,12 @@
     return base === '/' ? `/${name}` : `${base.replace(/\/$/, '')}/${name}`;
   }
 
+  function baseName(path) {
+    const s = String(path || '');
+    const i = s.lastIndexOf('/');
+    return i >= 0 ? s.slice(i + 1) : s;
+  }
+
   function formatSize(bytes) {
     const value = Number(bytes);
     if (!Number.isFinite(value)) return '';
@@ -257,7 +263,9 @@
       // 连接就绪前收到的 cd 参数，连上后再跟随
       pendingCd: null,
       entries: [],
-      selected: '',
+      // 文件列表多选：selection = 选中的远端路径集合，anchor = Shift 范围选择的锚点
+      selection: new Set(),
+      anchor: '',
       // 列表排序：列名（name / size / time）+ 方向
       sortKey: 'name',
       sortDir: 'asc',
@@ -490,13 +498,11 @@
       // 目录节点也支持右键「复制传输命令」（目录 → scp -r）。
       row.addEventListener('contextmenu', (event) => {
         event.preventDefault();
-        state.selected = path;
         setStatusPath(path);
-        renderTree();
         openContextMenu(event.clientX, event.clientY, [
           { label: i18n.t('filesUi.upload'), run: () => chooseAndUpload(path) },
-          { label: i18n.t('filesUi.copyPath'), run: () => copyPath(path) },
-          { label: i18n.t('filesUi.copyTransfer'), run: () => copyTransferCommand(path, true) },
+          { label: i18n.t('filesUi.copyPath'), run: () => copyPath([path]) },
+          { label: i18n.t('filesUi.copyTransfer'), run: () => copyTransferCommand([path], true) },
         ]);
       });
       if (state.cwd === path) row.classList.add('selected');
@@ -578,6 +584,34 @@
       return files;
     }
 
+    /* 当前目录下、按显示顺序排列的远端路径（用于多选与范围选择）。 */
+    function rowPaths() {
+      return sortedEntries().map((entry) => joinPath(state.cwd, entry.name));
+    }
+    function selectionPaths() {
+      return rowPaths().filter((p) => state.selection.has(p));
+    }
+    function selectOnly(path) {
+      state.selection = new Set([path]);
+      state.anchor = path;
+    }
+    function toggleSelect(path) {
+      if (state.selection.has(path)) state.selection.delete(path);
+      else state.selection.add(path);
+      state.anchor = path;
+    }
+    function selectRangeTo(path) {
+      const paths = rowPaths();
+      const i = paths.indexOf(state.anchor);
+      const j = paths.indexOf(path);
+      if (i < 0 || j < 0) {
+        selectOnly(path);
+        return;
+      }
+      const [lo, hi] = i <= j ? [i, j] : [j, i];
+      state.selection = new Set(paths.slice(lo, hi + 1));
+    }
+
     function renderList() {
       listEl.innerHTML = '';
       const files = state.entries;
@@ -592,7 +626,7 @@
       for (const entry of sortedEntries()) {
         const path = joinPath(state.cwd, entry.name);
         const row = el('div', { class: 'fm-row' });
-        if (state.selected === path) row.classList.add('selected');
+        if (state.selection.has(path)) row.classList.add('selected');
         const icon = el('span', { class: 'fm-cell-icon' });
         icon.innerHTML = (Icons[iconFor(entry.name)] || Icons.file)(13);
         const name = el('span', { class: 'fm-cell-name' }, '');
@@ -601,8 +635,11 @@
         const time = el('span', { class: 'fm-cell-time' }, formatTime(entry.mtime));
         const perm = el('span', { class: 'fm-cell-perm' }, formatMode(entry.mode, entry.type));
         row.append(icon, name, size, perm, time);
-        row.addEventListener('click', () => {
-          state.selected = path;
+        // 多选：Shift = 从锚点范围选择；Cmd / Ctrl = 增删单条；普通点击 = 只选它。
+        row.addEventListener('click', (event) => {
+          if (event.shiftKey && state.anchor) selectRangeTo(path);
+          else if (event.metaKey || event.ctrlKey) toggleSelect(path);
+          else selectOnly(path);
           setStatusPath(path);
           renderList();
           // 点文件时把左侧目录树滚动定位到它所在的目录节点。
@@ -610,21 +647,23 @@
         });
         // 双击：小体积文本文件用 VS Code 打开；大文件 / 图片 / PDF / Word 等非文本用系统默认程序打开。
         row.addEventListener('dblclick', () => {
-          if (prefersNativeOpen(entry)) openFile(path, entry.name);
-          else openWithVSCode(path, entry.name);
+          if (prefersNativeOpen(entry)) openFiles([path]);
+          else openFilesVSCode([path]);
         });
         row.addEventListener('contextmenu', (event) => {
           event.preventDefault();
-          state.selected = path;
+          // 右键未选中的行：先只选它；已选中的行：保留当前多选。
+          if (!state.selection.has(path)) selectOnly(path);
           setStatusPath(path);
           renderList();
           scrollTreeToSelected();
+          const paths = selectionPaths();
           openContextMenu(event.clientX, event.clientY, [
-            { label: i18n.t('filesUi.open'), run: () => openFile(path, entry.name) },
-            { label: i18n.t('filesUi.openVSCode'), run: () => openWithVSCode(path, entry.name) },
-            { label: i18n.t('filesUi.download'), run: () => downloadFile(path, entry.name) },
-            { label: i18n.t('filesUi.copyPath'), run: () => copyPath(path) },
-            { label: i18n.t('filesUi.copyTransfer'), run: () => copyTransferCommand(path, false) },
+            { label: i18n.t('filesUi.open'), run: () => openFiles(paths) },
+            { label: i18n.t('filesUi.openVSCode'), run: () => openFilesVSCode(paths) },
+            { label: i18n.t('filesUi.download'), run: () => downloadFiles(paths) },
+            { label: i18n.t('filesUi.copyPath'), run: () => copyPath(paths) },
+            { label: i18n.t('filesUi.copyTransfer'), run: () => copyTransferCommand(paths, false) },
           ]);
         });
         listEl.appendChild(row);
@@ -651,7 +690,8 @@
       state.cwd = result.path;
       state.home = result.home || state.home;
       state.entries = result.entries.filter((entry) => entry.type !== 'dir');
-      state.selected = '';
+      state.selection = new Set();
+      state.anchor = '';
       pathInput.value = result.path;
       setStatusPath(result.path);
       renderTree();
@@ -700,23 +740,27 @@
     }
 
     /* ------------------------------- actions ------------------------------ */
-    /* 右键「复制路径」：把远端绝对路径写入系统剪贴板，状态栏回显。 */
-    async function copyPath(path) {
-      if (!state.connected || !path) return;
-      const result = await window.ships.sftp.copyPath(path);
-      if (result && result.ok) setStatus(i18n.t('filesUi.copiedPath', { path }));
+    /* 右键「复制路径」：把选中的远端绝对路径写入系统剪贴板（多条按换行），状态栏回显。 */
+    async function copyPath(paths) {
+      const list = (paths || []).filter(Boolean);
+      if (!state.connected || !list.length) return;
+      const result = await window.ships.sftp.copyPath(list);
+      if (result && result.ok) setStatus(i18n.t('filesUi.copiedPath', { path: list.join('\n') }));
       else setStatus(i18n.t('filesUi.copyFailed'), true);
     }
 
-    /* 右键「复制传输命令」：按会话连接信息生成 scp 命令并复制到剪贴板，状态栏回显。 */
-    async function copyTransferCommand(path, recursive) {
-      if (!state.connected || !path) return;
-      const result = await window.ships.sftp.transferCommand(state.id, path, Boolean(recursive));
+    /* 右键「复制传输命令」：按会话连接信息生成 scp 命令（可多个源）并复制到剪贴板。 */
+    async function copyTransferCommand(paths, recursive) {
+      const list = (paths || []).filter(Boolean);
+      if (!state.connected || !list.length) return;
+      const result = await window.ships.sftp.transferCommand(state.id, list, Boolean(recursive));
       if (result && result.ok) setStatus(i18n.t('filesUi.copiedCommand', { command: result.command }));
       else setStatus(i18n.t('filesUi.copyFailed'), true);
     }
 
-    async function downloadFile(path, name) {
+    /* 下载一个远端文件并更新进度 / 状态。 */
+    async function downloadOne(path) {
+      const name = baseName(path);
       setProgress({ name, transferred: 0, total: 0, direction: 'download' });
       setStatus(i18n.t('filesUi.downloading', { name }), false);
       const result = await window.ships.sftp.download(state.id, path);
@@ -725,24 +769,34 @@
       else setStatus(i18n.t('filesUi.downloadFailed', { error: (result && result.error) || 'error' }), true);
     }
 
-    /* 右键「打开」：先下载到下载目录，完成后由主进程在系统文件管理器中定位该文件。 */
-    async function openFile(path, name) {
-      setProgress({ name, transferred: 0, total: 0, direction: 'download' });
-      setStatus(i18n.t('filesUi.downloading', { name }), false);
-      const result = await window.ships.sftp.open(state.id, path);
-      setProgress(null);
-      if (result && result.ok) setStatus(i18n.t('filesUi.opened', { path: result.path }));
-      else setStatus(i18n.t('filesUi.downloadFailed', { error: (result && result.error) || 'error' }), true);
+    async function downloadFiles(paths) {
+      for (const path of (paths || []).filter(Boolean)) await downloadOne(path);
     }
 
-    /* 右键「用 VS Code 打开」：先下载，完成后由主进程用 VS Code 打开该文件。 */
-    async function openWithVSCode(path, name) {
-      setProgress({ name, transferred: 0, total: 0, direction: 'download' });
-      setStatus(i18n.t('filesUi.downloading', { name }), false);
-      const result = await window.ships.sftp.openVSCode(state.id, path);
-      setProgress(null);
-      if (result && result.ok) setStatus(i18n.t('filesUi.openedVSCode', { path: result.path }));
-      else setStatus(i18n.t('filesUi.downloadFailed', { error: (result && result.error) || 'error' }), true);
+    /* 右键「打开」：逐个下载到下载目录，完成后由主进程在系统文件管理器中定位。 */
+    async function openFiles(paths) {
+      for (const path of (paths || []).filter(Boolean)) {
+        const name = baseName(path);
+        setProgress({ name, transferred: 0, total: 0, direction: 'download' });
+        setStatus(i18n.t('filesUi.downloading', { name }), false);
+        const result = await window.ships.sftp.open(state.id, path);
+        setProgress(null);
+        if (result && result.ok) setStatus(i18n.t('filesUi.opened', { path: result.path }));
+        else setStatus(i18n.t('filesUi.downloadFailed', { error: (result && result.error) || 'error' }), true);
+      }
+    }
+
+    /* 右键「用 VS Code 打开」：逐个下载后用 VS Code 打开。 */
+    async function openFilesVSCode(paths) {
+      for (const path of (paths || []).filter(Boolean)) {
+        const name = baseName(path);
+        setProgress({ name, transferred: 0, total: 0, direction: 'download' });
+        setStatus(i18n.t('filesUi.downloading', { name }), false);
+        const result = await window.ships.sftp.openVSCode(state.id, path);
+        setProgress(null);
+        if (result && result.ok) setStatus(i18n.t('filesUi.openedVSCode', { path: result.path }));
+        else setStatus(i18n.t('filesUi.downloadFailed', { error: (result && result.error) || 'error' }), true);
+      }
     }
 
     /* 上传一组本地路径（拖拽 / 目录右键「上传」共用）；逐个上传并更新进度。 */
@@ -800,7 +854,8 @@
       state.expanded = new Set();
       state.entries = [];
       state.cwd = state.home;
-      state.selected = '';
+      state.selection = new Set();
+      state.anchor = '';
       setStatus(i18n.t('filesUi.connected', { target: state.target }), false);
       setStatusPath(state.home);
       pathInput.value = state.home;
@@ -824,7 +879,8 @@
       state.shellCwd = '';
       state.pendingCd = null;
       state.entries = [];
-      state.selected = '';
+      state.selection = new Set();
+      state.anchor = '';
       state.expanded = new Set();
       state.children = new Map();
       treeEl.innerHTML = '';

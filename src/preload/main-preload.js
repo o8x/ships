@@ -73,8 +73,8 @@ const api = {
     openVSCode: (id, path) => ipcRenderer.invoke(IPC.SFTP_OPEN_VSCODE, { id, path }),
     upload: (id, localPath, remoteDir) => ipcRenderer.invoke(IPC.SFTP_UPLOAD, { id, localPath, remoteDir }),
     close: (id) => ipcRenderer.invoke(IPC.SFTP_CLOSE, { id }),
-    transferCommand: (id, path, recursive) => ipcRenderer.invoke(IPC.SFTP_TRANSFER_COMMAND, { id, path, recursive }),
-    copyPath: (path) => ipcRenderer.invoke(IPC.SFTP_COPY_PATH, { path }),
+    transferCommand: (id, paths, recursive) => ipcRenderer.invoke(IPC.SFTP_TRANSFER_COMMAND, { id, paths, recursive }),
+    copyPath: (paths) => ipcRenderer.invoke(IPC.SFTP_COPY_PATH, { paths }),
     cdHistory: {
       list: (id) => ipcRenderer.invoke(IPC.CD_HISTORY_LIST, { id }),
       add: (id, path) => ipcRenderer.invoke(IPC.CD_HISTORY_ADD, { id, path }),

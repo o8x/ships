@@ -328,13 +328,16 @@ function shellQuote(value) {
   return `'${text.replace(/'/g, `'\\''`)}'`;
 }
 
-/* Build an scp command to transfer a remote file/dir to the local download dir
-   (folder → add -r). Uses the session's resolved connection (port / user / key). */
-function transferCommand(id, remotePath, recursive) {
+/* Build an scp command to transfer one or more remote files/dirs to the local download
+   dir (folder → add -r). Uses the session's resolved connection (port / user / key).
+   `remotePaths` may be a single path or an array. */
+function transferCommand(id, remotePaths, recursive) {
   const entry = get(id);
   if (!entry) return { ok: false, error: 'not-connected' };
-  const path = String(remotePath || '');
-  if (!path) return { ok: false, error: 'no-path' };
+  const list = (Array.isArray(remotePaths) ? remotePaths : [remotePaths])
+    .map((item) => String(item || ''))
+    .filter(Boolean);
+  if (!list.length) return { ok: false, error: 'no-path' };
   const resolved = entry.resolved;
   const parts = ['scp'];
   if (resolved.port && Number(resolved.port) !== 22) parts.push('-P', String(resolved.port));
@@ -343,7 +346,7 @@ function transferCommand(id, remotePath, recursive) {
   }
   if (recursive) parts.push('-r');
   const host = resolved.username ? `${resolved.username}@${resolved.host}` : resolved.host;
-  parts.push(`${host}:${shellQuote(path)}`);
+  for (const remotePath of list) parts.push(`${host}:${shellQuote(remotePath)}`);
   const target = expandHome(settings.get('sftpDownloadDir') || DEFAULT_DOWNLOAD_DIR);
   parts.push(shellQuote(target));
   return { ok: true, command: parts.join(' ') };
