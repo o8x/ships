@@ -13,6 +13,9 @@ const logger = require('./utils/logger');
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
 const PRELOAD_DIR = path.join(__dirname, '..', 'preload');
 
+// 终端窗口「悬浮球」尺寸（失去焦点时缩成的圆形窗口，见 §3.9-12）。
+const BALL_SIZE = Number(TERMINAL_WINDOW.ballSize) || 100;
+
 let mainWindow = null;
 let settingsWindow = null;
 // 置顶终端窗口可以有多个（每次点主面板终端按钮都新开一个，落在当前桌面）。
@@ -244,6 +247,8 @@ function saveTerminalWindowSize(win) {
    旧快照覆盖。 */
 function saveTerminalGeometry(win) {
   if (!isTerminalWindow(win) || win.isMaximized() || win.isFullScreen()) return;
+  // 悬浮球模式下的尺寸 / 位置不入记忆（否则会把球的大小记进 terminal-window.json）。
+  if (win.__ballActive) return;
   // 设置写回自带 suppress 保护（避免程序化 setSize 触发回写循环），
   // 几何记忆不受影响：位置 / 尺寸总是记窗口此刻的真实值（多窗口共用一份记忆，最后动的那扇为准）。
   saveTerminalWindowSize(win);
@@ -329,6 +334,11 @@ function toggleTerminalWindow() {
   if (wins.length > 1) return null;
   const win = wins[0] || null;
   if (!win) return openTerminalWindow();
+  // 悬浮球：按快捷键 = 放大回原窗口。
+  if (win.__ballActive) {
+    exitBallMode(win, true);
+    return win;
+  }
   if (win.isVisible() && win.isFocused()) {
     if (terminalCloseAction() === 'hide') {
       win.hide();
@@ -340,6 +350,77 @@ function toggleTerminalWindow() {
   win.show();
   win.focus();
   return win;
+}
+
+/* --------------------------- 终端窗口「悬浮球」 ---------------------------
+   失去焦点时把窗口缩小成 BALL_SIZE 的圆形无标题栏窗口（CSS 画圆形），点击 / 快捷键再放大回原样。
+   - 窗口以 frame:false + transparent:true 创建，圆形由 CSS 呈现。
+   - 缩小时临时把最小尺寸降到球大小、禁用缩放；放大时恢复。
+   - 期间不改动几何记忆（terminal-window.json）。
+   - 拖动由渲染层指针事件触发，主进程按光标位置移动窗口（这样「点击 vs 拖动」可区分）。 */
+let ballDragTimer = null;
+
+function isBallMode(win) {
+  return Boolean(win && !win.isDestroyed() && win.__ballActive);
+}
+
+function ballBoundsFor(win) {
+  const b = win.getBounds();
+  const area = screen.getDisplayMatching(b).workArea;
+  const x = Math.min(Math.max(Math.round(b.x + b.width / 2 - BALL_SIZE / 2), area.x), area.x + area.width - BALL_SIZE);
+  const y = Math.min(Math.max(Math.round(b.y + b.height / 2 - BALL_SIZE / 2), area.y), area.y + area.height - BALL_SIZE);
+  return { x, y, width: BALL_SIZE, height: BALL_SIZE };
+}
+
+function enterBallMode(win) {
+  if (!isTerminalWindow(win) || win.__ballActive || win.isDestroyed()) return;
+  win.__ballActive = true;
+  win.__ballBounds = win.getBounds();
+  if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
+  win.setMinimumSize(BALL_SIZE, BALL_SIZE);
+  if (typeof win.setResizable === 'function') win.setResizable(false);
+  win.webContents.send(IPC.TERMINAL_BALL, { active: true });
+  win.setBounds(ballBoundsFor(win), true);
+  logger.file(`[terminal] entered ball mode (${win.id})`);
+}
+
+function exitBallMode(win, focus) {
+  if (!isTerminalWindow(win) || !win.__ballActive || win.isDestroyed()) return;
+  const restore = win.__ballBounds;
+  win.__ballActive = false;
+  win.__ballBounds = null;
+  win.webContents.send(IPC.TERMINAL_BALL, { active: false });
+  if (typeof win.setResizable === 'function') win.setResizable(true);
+  win.setMinimumSize(TERMINAL_WINDOW.minWidth, TERMINAL_WINDOW.minHeight);
+  if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
+  else win.setAlwaysOnTop(false);
+  if (restore) win.setBounds(restore, true);
+  if (focus !== false) win.focus();
+  saveTerminalGeometry(win);
+  logger.file(`[terminal] exited ball mode (${win.id})`);
+}
+
+function startBallDrag(win, x, y) {
+  if (!isTerminalWindow(win) || !win.__ballActive) return;
+  const b = win.getBounds();
+  const offX = Number(x) - b.x;
+  const offY = Number(y) - b.y;
+  stopBallDrag();
+  ballDragTimer = setInterval(() => {
+    if (win.isDestroyed() || !win.__ballActive) {
+      stopBallDrag();
+      return;
+    }
+    const pt = screen.getCursorScreenPoint();
+    win.setPosition(Math.round(pt.x - offX), Math.round(pt.y - offY), false);
+  }, 16);
+}
+
+function stopBallDrag() {
+  if (ballDragTimer) {
+    clearInterval(ballDragTimer);
+    ballDragTimer = null;
+  }
 }
 
 /* 终端窗口的置顶开关（头部图钉按钮 / settings.json 的 terminalAlwaysOnTop）。 */
@@ -647,8 +728,10 @@ function openTerminalWindow() {
     minWidth: TERMINAL_WINDOW.minWidth,
     minHeight: TERMINAL_WINDOW.minHeight,
     title: 'Ships Terminal',
-    titleBarStyle: 'hiddenInset',
-    backgroundColor: themeBackgroundColor(),
+    // 无边框 + 透明：让窗口在「悬浮球」模式下能呈现圆形（圆角 / 圆形由 CSS 画，见 §3.9-12）。
+    frame: false,
+    transparent: true,
+    hasShadow: false,
     show: false,
     resizable: true,
     minimizable: true,
@@ -691,13 +774,17 @@ function openTerminalWindow() {
   // Steam-like: pinned on top + may float above a full-screen app, but must NOT join
   // every space — it stays on the desktop it was opened on.
   win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
-  // 系统红绿灯藏起来，改用头栏里自绘的小红绿灯（20px 头栏放不下系统的标准尺寸）。
-  if (typeof win.setWindowButtonVisibility === 'function') {
-    win.setWindowButtonVisibility(false);
-  }
   win.loadFile(path.join(RENDERER_DIR, 'terminal.html'));
   win.on('focus', () => {
+    win.__everFocused = true;
     lastTerminalWindow = win;
+  });
+  // 失去焦点 → 缩成圆形悬浮球（DevTools 打开时不缩，避免调试时窗口乱跳）。
+  win.on('blur', () => {
+    if (isQuitting || win.__ballActive || !win.__everFocused) return;
+    if (win.webContents.isDevToolsOpened && win.webContents.isDevToolsOpened()) return;
+    lastTerminalWindow = win;
+    enterBallMode(win);
   });
   win.on('resize', () => scheduleTerminalGeometrySave(win));
   win.on('move', () => scheduleTerminalGeometrySave(win));
@@ -727,6 +814,7 @@ function openTerminalWindow() {
     require('./services/sftp-service').closeForOwner(ownerId);
     terminalWindows.delete(win);
     if (lastTerminalWindow === win) lastTerminalWindow = null;
+    if (ballDragTimer) stopBallDrag();
   });
   return win;
 }
@@ -997,6 +1085,11 @@ module.exports = {
   closeTerminalWindow,
   destroyTerminalWindow,
   toggleTerminalWindow,
+  enterBallMode,
+  exitBallMode,
+  isBallMode,
+  startBallDrag,
+  stopBallDrag,
   openFileWindow,
   getFileWindow,
   getFileWindowTarget,

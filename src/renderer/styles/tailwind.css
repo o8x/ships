@@ -374,6 +374,56 @@ input[type='color'].swatch::-webkit-color-swatch {
 /* 终端窗口头栏（仅 terminal.html）：默认 24px 高，刚好放下自绘的小红绿灯；
    字号跟着终端字号走（--term-header-font-size 由 scripts/terminal.js 在 applyFontSize 里写入）。
    窗口内容本身没有上留白，所以「头栏高度」就是终端文字上方看到的整条高度。 */
+/* 终端窗口本身是透明无边框（见 window-manager），窗口底色 / 圆角 / 描边由这层 #term-shell 画。 */
+#term-shell {
+  background: var(--color-bg);
+  border-radius: var(--radius-window);
+  border: 1px solid var(--color-border);
+}
+/* 悬浮球：失去焦点时窗口缩成 BALL_SIZE 的圆形，只显示这层圆球。 */
+#term-ball {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  border: 1px solid var(--color-border);
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+[data-ball='on'] #term-ball {
+  display: flex;
+  animation: ships-ball-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+[data-ball='on'] #term-shell {
+  display: none;
+}
+#term-ball:active {
+  cursor: grabbing;
+}
+.term-ball-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-accent);
+}
+.term-ball-icon svg {
+  width: 46px;
+  height: 46px;
+}
+@keyframes ships-ball-in {
+  from {
+    transform: scale(0.55);
+    opacity: 0.35;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
 #term-header {
   position: relative;
   height: max(var(--term-header-height), calc(var(--term-header-font-size) + 6px));

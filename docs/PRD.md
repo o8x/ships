@@ -240,6 +240,13 @@ Ships/
     - **状态机**：**检测到 ssh 目标即自动建立 SFTP 连接**（面板仍保持隐藏，状态栏显示「正在连接」）—— 这样终端里的 **cd 跟随在面板未展开时也生效**；点文件按钮展开面板（已连接则直接显示）；**再次点按钮只隐藏面板、保留连接**；手动切换 / 断开 ssh（目标变化）→ **销毁该 SFTP 连接**（面板随之收起）；连接失败（认证 / 超时 / ProxyJump / 无法启动子系统）只在状态栏提示。窗口销毁时该窗口的连接一并关闭。
     - **下载 / 上传进度**：下载与上传（含拖拽多文件逐个）都在状态栏用**进度条**显示百分比（主进程经 `sftp:progress` 事件回传 `transferred/total`）。下载保存到设置的下载目录（默认 `~/Downloads`，重名自动加 ` (n)`，见 §5.1），成功后状态栏显示本地路径。
 11. **独立文件窗口**（`file-window.html`，见 §8.6）：文件管理可**分离为单独窗口**——内嵌面板**路径行最左的「分离为独立窗口」按钮**或 **SSH 管理的 `folder` 图标**（自动连接该主机）打开；点分离按钮时会**关闭并销毁当前内嵌容器**（连同其 SFTP 连接）再开独立窗口，并把**当前所在目录一并带过去**（`file-window:open` 带 `path`，连上后进入该目录；SSH 管理 `folder` 图标无当前目录则从家目录开始）。窗口与终端同为**悬浮 panel**：`alwaysOnTop`（默认开，由设置 `fileWindowAlwaysOnTop` 决定）、可浮在全屏之上但不跟随桌面切换、`titleBarStyle: hiddenInset` + 自绘小红绿灯（**头栏无置顶 / 图钉按钮**）；窗口底色随主题（避免拖动露白，同 §8.5）。**拖拽窗口高度后文件列表区域自动对齐到文件行的整数倍**（行高随字号，见 §8.6）。头栏含一个 **SSH 下拉**切换连接（列出 `~/.ssh/config`，选中即重连），**无终端**；字体 / 样式 / `Cmd +/-` 缩放与终端配置一致（用 `--file-font-size`，`file-window:zoom`），但**字号最小 13px**——终端字体小于 13px 时不再跟随；头栏与红绿灯同样随字号缩放。**连接与内嵌面板彼此独立**（各自一个 SFTP 会话，可各连不同 ssh），并**不随终端里的 ssh 关闭而关闭**。几何（屏幕 / 位置 / 尺寸）记入 `file-window.json`（单槽，同终端窗口的记忆方式）。
+12. **悬浮球（失去焦点缩成圆形小窗）**：终端窗口**失去焦点**时（`win.on('blur')`，DevTools 打开时除外）缩成一个 **`BALL_SIZE`（默认 100px，`package.json` 的 `ships.terminalWindow.ballSize`）的圆形、无标题栏窗口**，形如悬浮球：
+    - **窗口形态**：终端窗口以 `frame: false` + `transparent: true` + `hasShadow: false` 创建（圆形由 CSS 画）；底座 `#term-shell` 负责底色 / 圆角 / 描边，悬浮球为 `#term-ball`（圆形 + `ships.svg` 图标，`--color-accent`）。
+    - **缩放动画**：用 `win.setBounds(bounds, true)` 触发 macOS 原生缩放动画，并给球加 `ships-ball-in` 入场动画；缩小 / 放大都是**从中心收缩 / 展开**。
+    - **进入**：记下原 bounds，临时把最小尺寸降为球大小并 `setResizable(false)`，`setBounds(球位置)`，向渲染层发 `terminal:ball { active:true }`（`<html data-ball="on">`：隐藏 `#term-shell`、显示球）。期间**不写几何记忆**（`saveTerminalGeometry` 遇球模式直接返回）。
+    - **拖动**：渲染层指针事件（pointer capture）→ 主进程按光标位置持续 `setPosition`（16ms）；「按下到松开位移 ≤ 3px」判定为**点击**。
+    - **放大回来**：点击球、或按**终端全局快捷键**（`toggleTerminalWindow`）→ `terminal:ball-restore` → 恢复原 bounds（动画）、恢复最小尺寸 / 可缩放 / 置顶、`win.focus()`，并重新 `fit` / 整格对齐。**不在窗口 `focus` 时自动放大**（避免拖动即触发）。
+    - 多扇终端各自独立成球；球模式不影响 PTY 尺寸（期间不 `fit`、不 `terminal:resize`）。
 
 ---
 
@@ -315,6 +322,7 @@ Ships/
 | `terminal:kill` | `{ id }` | `{ ok }` | 结束会话 |
 | `terminal:copy-text` | `{ text }` | `{ ok }` | 右键快速编辑「复制」：把文本写入系统剪贴板（`clipboard.writeText`）；空文本返回 `{ ok: false }`；只接受来自终端窗口本身的请求 |
 | `terminal:paste-text` | — | `{ ok, text }` | 右键快速编辑「粘贴」：读取系统剪贴板文本返回给渲染层，由 `term.paste()` 注入 shell；只接受来自终端窗口本身的请求 |
+| `terminal:ball-restore` | — | `{ ok }` | 悬浮球点击：把该终端窗口从圆形小窗放大回原窗口（恢复 bounds / 最小尺寸 / 可缩放 / 置顶并 `focus`，见 §3.9-12）；只接受来自该终端窗口本身的请求 |
 | `sftp:connect` | `{ target }` | `{ ok, id?, home?, target?, error?, code? }` | 新建一条 SFTP 会话（`target` = ssh 目标 token；命中 `~/.ssh/config` 用记录，否则命令行用户 + `~/.ssh/id_ed25519`）；返回会话 `id`（内嵌面板与独立窗口各持一个）；`code` ∈ `proxyjump`/`auth`/`timeout`/`sftp`/`connect`/`no-target`；只接受来自终端窗口或独立文件窗口的请求 |
 | `sftp:list` | `{ id, path? }` | `{ ok, path, parent, home, entries?, code?, error? }` | 列远端目录（`entries[]` = `{ name, type: dir\|file\|link, size, mtime, mode }`，目录在前；`mode` 为 st_mode，用于渲染权限列）；`path` 省略 / `~` 取家目录；会话不存在返回 `code: 'not-connected'` |
 | `sftp:download` | `{ id, path }` | `{ ok, path?, name?, error? }` | 下载远端文件到设置的下载目录（重名自动加 ` (n)`），返回本地绝对路径；过程中经 `sftp:progress` 回传进度 |
@@ -367,6 +375,7 @@ Ships/
 | `window:hide` | 隐藏主面板 |
 | `window:open-settings` | 隐藏主面板并打开设置窗口；可选参数 `section`（如 `network`）指定初始分区，窗口已打开时直接切换 |
 | `window:close-settings` | 关闭设置窗口 |
+| `terminal:ball-drag` | 悬浮球拖动（见 §3.9-12）：`{ phase: 'start', x, y }` 开始（主进程记下光标相对窗口的偏移后按光标移动窗口）／ `{ phase: 'end' }` 结束 |
 
 **事件（主 → 渲染）**
 
@@ -379,6 +388,7 @@ Ships/
 | `terminal:data` | `{ id, type: 'data', data }` | PTY 输出（原样文本，含 ANSI），只发给拥有该会话的窗口 |
 | `terminal:exit` | `{ id, type: 'exit', code, signal }` 或 `{ id, type: 'error', message }` | 会话结束 / 启动失败 |
 | `terminal:session` | `{ id, type: 'session', ssh, target }` | 会话进程树里检测到的当前 SSH 目标：`ssh` 为显示用标签（命中配置别名时解析成 `user@hostname`）、`target` 为命令行里的原始目标 token（供文件面板连接用），未连接时均为 `null`；仅在值变化时推送（主进程每秒扫描一次进程树，见 §3.9-4、§3.9-10；**不在头栏显示**） |
+| `terminal:ball` | `{ active }` | 悬浮球状态（见 §3.9-12）：进入球模式 `active:true`（渲染层 `data-ball="on"` 显示圆球、隐藏终端），放大回来 `active:false`。只发给对应终端窗口 |
 | `terminal:recalibrate` | — | 拖动结束后请终端窗口重新测量并按整行对齐高度（拖动期间主进程不改窗口尺寸，见 §3.9-4） |
 | `terminal:drag-active` | — | 主进程检测到终端窗口开始被拖动（`will-resize`）：渲染层据此在拖动期间不发对齐请求 |
 | `terminal:zoom` / `file-window:zoom` | `'in' \| 'out' \| 'reset'` | 焦点在终端窗口 / 独立文件窗口时 `Cmd +/-/0` 的字号缩放（见 §5.3） |
@@ -569,7 +579,7 @@ flowchart TD
 
 ### 8.5 置顶终端窗口
 
-- 尺寸与位置：默认 **1024 × 768**（`ships.terminalWindow.width/height`，可在 **设置 → 终端 → 窗口大小** 调整，存 `settings.json` 的 `terminalWindowWidth` / `terminalWindowHeight`），可缩放、最小 `minWidth × minHeight` = 480×320，`titleBarStyle: hiddenInset`；改设置立即生效，手动拖动窗口写回设置。**窗口 `backgroundColor` 跟随当前主题**（浅 `#ffffff` / 深 `#1c1c1e`，与 `--color-bg` 一致；随 `theme` / 系统外观变化 `setBackgroundColor` 更新）—— 拖动 / 缩放时页面来不及重绘也不会露出系统默认白底。**屏幕 / 位置 / 尺寸会自动记忆**（`terminal-window.json`）：同屏重开沿用记忆（越界夹回工作区），换屏 / 拔屏 / 无记录则用默认尺寸在当前屏幕居中，详见 §3.9。
+- 尺寸与位置：默认 **1024 × 768**（`ships.terminalWindow.width/height`，可在 **设置 → 终端 → 窗口大小** 调整，存 `settings.json` 的 `terminalWindowWidth` / `terminalWindowHeight`），可缩放、最小 `minWidth × minHeight` = 480×320；改设置立即生效，手动拖动窗口写回设置。**窗口为无边框 + 透明**（`frame:false` + `transparent:true` + `hasShadow:false`）：窗口底色 / 圆角 / 描边由渲染层 `#term-shell`（`--color-bg` / `--radius-window`）绘制，便于「悬浮球」模式呈现圆形（见 §3.9-12）。**屏幕 / 位置 / 尺寸会自动记忆**（`terminal-window.json`）：同屏重开沿用记忆（越界夹回工作区），换屏 / 拔屏 / 无记录则用默认尺寸在当前屏幕居中，详见 §3.9。悬浮球尺寸 `BALL_SIZE` 默认 **100px**（`package.json` 的 `ships.terminalWindow.ballSize`）。
 - 层级：`alwaysOnTop` + `setAlwaysOnTop(true, 'screen-saver')`（由终端窗口自己的图钉开关控制，与主面板无关）；`setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true })` —— 带全屏辅助（可浮在全屏应用之上）但**不加入所有桌面**（切换桌面时窗口留在原桌面，详见 §3.9）。
 - 头部：**22px** 自绘头栏 `#term-header`（左侧**自绘小红绿灯** ×3、**左右 padding 各 10px** —— **红绿灯尺寸随头栏字号缩放**（字号×0.75 圆点 / ×0.5 符号，12px→9px/6px），系统红绿灯已隐藏，点击 = `window:control` 关闭 / 最小化 / 缩放；**不显示任何标题文字**；右侧图标区：**SSH 主机下拉**（宽度按内容自适应、最小 100px / 最大 200px，**高固定 14px、字号固定 11px**，条目 `用户名@主机地址`，选中即在当前终端执行 `ssh …`，见 §3.9-2）+ 四枚 18×18px 图标按钮（符号 12px）：**文件**（`folder`，无 ssh 目标时禁用、连接中图标旋转、面板展开时强调色，见 §3.9-10）、**iTerm 交接**、**行号**（`eye`/`eye-off`）、**窗口分裂**（`split`，点击新开一扇终端窗口，同主面板终端按钮）；**无置顶按钮**）；**头栏字号 = 终端字号 + 1**（`--term-header-font-size`，默认终端 12px → 头栏 13px：高 `max(22px, 字号+6px)`，终端 24px → 头栏 25px / 高 30px），头部为拖拽区、红绿灯与图标区为 `no-drag`，头栏不挂 `data-tip`。
 - 主体：xterm.js 终端铺满剩余区域（外层 `#term-host` 负责 6.5 / 13px 留白，xterm 挂在无内边距的 `#term-fit` 上，保证 `FitAddon` 按真实可用区算行数 —— 最后一行完整可见、页面不可滚动，见 §3.9），滚动缓冲 **10000 行**、**不显示滚动条**（滚轮 / 触控板滚动缓冲区，防跳变见 §3.9）。

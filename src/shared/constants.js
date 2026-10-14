@@ -61,6 +61,9 @@ const IPC = {
   TERMINAL_SESSION: 'terminal:session',
   TERMINAL_COPY_TEXT: 'terminal:copy-text',
   TERMINAL_PASTE_TEXT: 'terminal:paste-text',
+  TERMINAL_BALL: 'terminal:ball',
+  TERMINAL_BALL_DRAG: 'terminal:ball-drag',
+  TERMINAL_BALL_RESTORE: 'terminal:ball-restore',
 
   SFTP_CONNECT: 'sftp:connect',
   SFTP_LIST: 'sftp:list',
@@ -130,6 +133,7 @@ const TERMINAL_WINDOW = Object.assign(
     minHeight: 320,
     alwaysOnTop: true,
     scrollback: 10000,
+    ballSize: 100,
   },
   ships.terminalWindow || {}
 );

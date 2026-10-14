@@ -60,7 +60,17 @@ function emitTo(sender) {
    (windows never move across desktops — we never pull an existing one over). */
 function runInTerminal(command) {
   if (!command) return false;
-  const win = wm.getFocusedTerminalWindow() || wm.openTerminalWindow();
+  let win = wm.getFocusedTerminalWindow();
+  if (!win) {
+    // 只有一扇终端且处于「悬浮球」时，直接放大它并注入命令，而不是再开一扇。
+    const existing = wm.getTerminalWindow();
+    if (existing && wm.isBallMode(existing)) {
+      wm.exitBallMode(existing, true);
+      win = existing;
+    } else {
+      win = wm.openTerminalWindow();
+    }
+  }
   overlayLastCommand = command;
   if (!win || win.isDestroyed()) return false;
   const ownerId = win.webContents.id;

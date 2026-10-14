@@ -53,6 +53,9 @@
   const lightMinimize = document.getElementById('light-minimize');
   const lightZoom = document.getElementById('light-zoom');
   const sizeEl = document.getElementById('term-size');
+  const shellEl = document.getElementById('term-shell');
+  const ballEl = document.getElementById('term-ball');
+  const ballIconEl = document.getElementById('term-ball-icon');
 
   let term = null;
   let fit = null;
@@ -77,6 +80,8 @@
   let sshTarget = '';
   // 底部文件面板（SFTP）控制器
   let filesApi = null;
+  // 悬浮球模式（失去焦点缩成圆形小窗；期间不 fit、不把尺寸同步给 PTY）
+  let ballMode = false;
 
   function themeColors() {
     // macOS-like overlay scrollbar (only a safety net: the scrollbar is hidden below)
@@ -213,7 +218,7 @@
   }
 
   function fitIfNeeded(force) {
-    if (!fit || !term || !host) return;
+    if (!fit || !term || !host || ballMode) return;
     const rect = host.getBoundingClientRect();
     const key = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
     if (!force && key === lastHostKey) return;
@@ -358,6 +363,7 @@
      「终端区 = 行高×行数 / 列宽×列数 + chrome」对齐，同时打印度量日志。
      不再依赖 will-resize / recalibrate（不同平台/版本不一定触发）。 */
   function onWindowResize() {
+    if (ballMode) return;
     dragSuspected = true;
     clearTimeout(metricsTimer);
     metricsTimer = setTimeout(() => {
@@ -600,6 +606,56 @@
     // 新开一扇终端窗口（与主面板底部栏的终端按钮行为一致）。
     splitBtn.addEventListener('click', () => window.ships.openTerminal());
   }
+
+  /* 悬浮球：失去焦点时主进程把窗口缩成圆形（<html data-ball="on">），点球放大回来。
+     拖动由指针事件 → 主进程按光标移动窗口；「按下到松开没怎么移动」= 点击 → 放大。 */
+  if (ballIconEl) ballIconEl.innerHTML = Icons.ships ? Icons.ships(46) : '';
+  if (ballEl) {
+    let dragging = false;
+    let startX = 0;
+    let startY = 0;
+    let moved = false;
+    ballEl.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      dragging = true;
+      moved = false;
+      startX = event.screenX;
+      startY = event.screenY;
+      try {
+        ballEl.setPointerCapture(event.pointerId);
+      } catch (err) {
+        /* ignore */
+      }
+      window.ships.terminal.ballDrag({ phase: 'start', x: event.screenX, y: event.screenY });
+    });
+    ballEl.addEventListener('pointermove', (event) => {
+      if (!dragging) return;
+      if (Math.abs(event.screenX - startX) > 3 || Math.abs(event.screenY - startY) > 3) moved = true;
+    });
+    const endDrag = (event) => {
+      if (!dragging) return;
+      dragging = false;
+      try {
+        ballEl.releasePointerCapture(event.pointerId);
+      } catch (err) {
+        /* ignore */
+      }
+      window.ships.terminal.ballDrag({ phase: 'end' });
+      if (!moved) window.ships.terminal.restoreBall();
+    };
+    ballEl.addEventListener('pointerup', endDrag);
+    ballEl.addEventListener('pointercancel', endDrag);
+  }
+
+  window.ships.terminal.onBall((payload) => {
+    ballMode = Boolean(payload && payload.active);
+    document.documentElement.dataset.ball = ballMode ? 'on' : 'off';
+    if (!ballMode) {
+      // 放大回终端：等缩放动画结束后重新 fit / 对齐（球模式期间跳过了 fit）。
+      setTimeout(() => fitIfNeeded(true), 260);
+    }
+  });
 
   window.addEventListener('beforeunload', () => {
     offZoom();

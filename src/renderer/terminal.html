@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="./styles/tailwind.build.css" />
   </head>
   <body class="term-window bg-transparent">
-    <div class="flex h-full w-full flex-col overflow-hidden" style="background: var(--color-bg)">
+    <div id="term-shell" class="flex h-full w-full flex-col overflow-hidden">
       <!-- 头栏高度 / 字号由 styles/tailwind.css 的 #term-header 规则控制（字号跟随终端字号） -->
       <header
         id="term-header"
@@ -45,6 +45,11 @@
       <section id="file-panel" class="hidden">
         <div id="file-panel-root" class="fm-root"></div>
       </section>
+    </div>
+
+    <!-- 悬浮球：终端窗口失去焦点时显示（由 CSS 呈圆形，图标由 terminal.js 注入） -->
+    <div id="term-ball" class="hidden">
+      <span id="term-ball-icon" class="term-ball-icon"></span>
     </div>
 
     <script src="./scripts/theme.js"></script>

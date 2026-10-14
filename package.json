@@ -49,9 +49,10 @@
       "alwaysOnTop": true,
       "scrollback": 10000,
       "hotkey": "CommandOrControl+Shift+Z",
-      "closeAction": "destroy",
-      "fontSize": 12,
-      "shell": ""
+    "closeAction": "destroy",
+    "fontSize": 12,
+    "shell": "",
+    "ballSize": 100
     },
     "sshBuiltinTerminal": true,
     "sftpDownloadDir": "~/Downloads",

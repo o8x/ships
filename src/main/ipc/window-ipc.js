@@ -12,6 +12,9 @@ const {
   isTerminalWindow,
   openTerminalWindow,
   closeTerminalWindow,
+  startBallDrag,
+  stopBallDrag,
+  exitBallMode,
   getFileWindow,
   openFileWindow,
 } = require('../window-manager');
@@ -41,6 +44,20 @@ function registerWindowIpc(ipcMain) {
   });
 
   ipcMain.on(IPC.WINDOW_HIDE, () => hideMainWindow());
+
+  // 悬浮球：拖动（按光标位置移动窗口）与点击放大回终端窗口。
+  ipcMain.on(IPC.TERMINAL_BALL_DRAG, (event, payload) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    if (payload && payload.phase === 'start') startBallDrag(win, payload.x, payload.y);
+    else stopBallDrag();
+  });
+  ipcMain.handle(IPC.TERMINAL_BALL_RESTORE, (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed()) return { ok: false };
+    exitBallMode(win, true);
+    return { ok: true };
+  });
   ipcMain.on(IPC.WINDOW_OPEN_SETTINGS, (_event, section) => {
     hideMainWindow();
     openSettingsWindow(typeof section === 'string' ? section : '');
