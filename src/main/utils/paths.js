@@ -15,8 +15,13 @@ const TERMINAL_WINDOW_FILE = path.join(DATA_DIR, 'terminal-window.json');
 const FILE_WINDOW_FILE = path.join(DATA_DIR, 'file-window.json');
 const FILE_LAYOUT_FILE = path.join(DATA_DIR, 'file-layout.json');
 const FILE_WINDOW_LAYOUT_FILE = path.join(DATA_DIR, 'file-window-layout.json');
-// 日志按天写入 logs/ 目录下的 ships-YYYY-MM-DD.log（见 logger.js）。
-const LOG_DIR = path.join(DATA_DIR, 'logs');
+// 日志按天写入 LOG_DIR 下的 ships-YYYY-MM-DD.log（见 logger.js）。
+// macOS 放到 ~/Library/Logs/Ships：Console.app 的「日志报告」会收录该目录（与 JetBrains/CLion 一致），
+// 与用户数据目录分离；其它平台退回应用数据目录下的 logs/。
+const LOG_DIR =
+  process.platform === 'darwin'
+    ? path.join(os.homedir(), 'Library', 'Logs', 'Ships')
+    : path.join(DATA_DIR, 'logs');
 const SSH_CONFIG_FILE = process.env.SHIPS_SSH_CONFIG || path.join(os.homedir(), '.ssh', 'config');
 
 function pad2(value) {
