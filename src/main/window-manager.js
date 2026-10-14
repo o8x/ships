@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { BrowserWindow, screen, nativeTheme } = require('electron');
+const { BrowserWindow, screen, nativeTheme, app } = require('electron');
 const { WINDOW, SETTINGS_WINDOW, TERMINAL_WINDOW, FILE_WINDOW, VIBRANCY, IPC } = require('../shared/constants');
 const settings = require('./services/settings-service');
 const { TERMINAL_WINDOW_FILE, FILE_WINDOW_FILE } = require('./utils/paths');
@@ -27,6 +27,14 @@ let pinnedPositioned = false;
 let terminalGeometryTimer = null;
 let suppressTerminalSizeSave = false;
 let fileWindowGeometryTimer = null;
+
+// 应用正在退出：此时「关闭即隐藏」不再生效，让窗口正常关闭。
+// 否则终端窗口在 hide 模式下会用 preventDefault() 拦下 close，导致 app.quit() 被中止
+//（表现：点托盘「退出」有时退不掉）。
+let isQuitting = false;
+app.on('before-quit', () => {
+  isQuitting = true;
+});
 
 /* 每个终端窗口各自的拖动 / 对齐状态：will-resize 每帧触发，连续 350ms 没再收到即松手；
    拖动期间不改尺寸（避免打乱 macOS 拖拽跟踪），挂起的对齐请求松手后交渲染层重测。 */
@@ -703,8 +711,9 @@ function openTerminalWindow() {
   // 关闭按钮 / Cmd-W：按「关闭按钮行为」隐藏或销毁；隐藏时窗口还活着（会话保留），
   // 会话结束（exit）与 iTerm 交接走 destroyTerminalWindow()，不受这里拦截。
   win.on('close', (event) => {
+    // 退出应用时不再拦截，保证 app.quit() 能真正关掉窗口。
     // 单扇时按「关闭按钮行为」隐藏；多扇时一律销毁（不拦）。
-    if (shouldHideOnClose()) {
+    if (!isQuitting && shouldHideOnClose()) {
       event.preventDefault();
       saveTerminalGeometry(win);
       win.hide();
