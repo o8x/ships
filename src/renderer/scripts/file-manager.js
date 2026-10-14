@@ -941,7 +941,12 @@
       if (event.key === 'Enter') {
         event.preventDefault();
         const value = pathInput.value.trim();
-        if (value) navigate(value);
+        if (value) {
+          navigate(value).then((ok) => {
+            if (!ok) return;
+            expandTo(state.cwd).then(() => scrollTreeToSelected());
+          });
+        }
       } else if (event.key === 'Escape') {
         event.stopPropagation();
         pathInput.value = state.cwd;
@@ -1006,13 +1011,15 @@
         historyMenu = null;
       }
     }
-    function goToHistory(dir) {
-      navigate(dir).then((ok) => {
-        if (!ok) return;
-        state.shellCwd = state.cwd;
-        recordCd(dir);
-        if (onCd) onCd(dir);
-      });
+    async function goToHistory(dir) {
+      const ok = await navigate(dir);
+      if (!ok) return;
+      state.shellCwd = state.cwd;
+      recordCd(dir);
+      if (onCd) onCd(dir);
+      // 展开该路径的所有上级，让目标目录节点出现在树里，再滚动定位过去。
+      await expandTo(state.cwd);
+      scrollTreeToSelected();
     }
     function openHistoryMenu() {
       if (!state.connected) return;
