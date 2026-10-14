@@ -437,8 +437,8 @@ input[type='color'].swatch::-webkit-color-swatch {
   opacity: 0.9;
 }
 .term-ball-trash svg {
-  width: calc(var(--term-ball-size, 75px) * 0.5);
-  height: calc(var(--term-ball-size, 75px) * 0.5);
+  width: calc(var(--term-ball-size, 75px) * 0.36);
+  height: calc(var(--term-ball-size, 75px) * 0.36);
 }
 [data-ball-trash='on'] .term-ball-trash {
   display: flex;
