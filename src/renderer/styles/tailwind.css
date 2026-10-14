@@ -425,12 +425,12 @@ input[type='color'].swatch::-webkit-color-swatch {
   width: calc(var(--term-ball-size, 75px) * 0.58);
   height: calc(var(--term-ball-size, 75px) * 0.58);
 }
-/* 悬浮球图标颜色：暗色模式 = 浅色/白色（默认），否则黑色。不跟随全局主题。 */
+/* 悬浮球图标颜色：暗色模式 = 浅色/白色图标（默认）；关闭 = 保留图标原色（不去色）。 */
 [data-ball-icon-dark='on'] .term-ball-icon {
   filter: brightness(0) invert(1);
 }
 [data-ball-icon-dark='off'] .term-ball-icon {
-  filter: brightness(0);
+  filter: none;
 }
 /* 设置 → 终端：悬浮球图标选择器的预览框。 */
 .ball-icon-preview {
