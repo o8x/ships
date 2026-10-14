@@ -23,10 +23,9 @@ function applyThemeSource(theme) {
   nativeTheme.themeSource = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : 'system';
 }
 
-// 日志设置：保留天数与「同步到控制台 App」。
+// 日志设置：日志文件保留天数。
 function applyLogSettings(data) {
   logger.setRetentionDays(data.logRetentionDays);
-  logger.setConsoleApp(data.logToConsoleApp);
 }
 
 function registerSettingsIpc(ipcMain) {
@@ -45,7 +44,7 @@ function registerSettingsIpc(ipcMain) {
     if (!keys || keys.includes('pinWindow')) applyPin(Boolean(data.pinWindow));
     if (!keys || keys.includes('vibrancy')) applyVibrancy(Boolean(data.vibrancy));
     if (!keys || keys.includes('theme')) applyThemeSource(data.theme);
-    if (!keys || keys.includes('logRetentionDays') || keys.includes('logToConsoleApp')) applyLogSettings(data);
+    if (!keys || keys.includes('logRetentionDays')) applyLogSettings(data);
   });
 
   nativeTheme.on('updated', () => {

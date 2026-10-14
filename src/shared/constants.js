@@ -184,8 +184,8 @@ const DEFAULT_SETTINGS = {
   sftpDownloadDir: ships.sftpDownloadDir || '~/Downloads',
   // 独立文件窗口置顶
   fileWindowAlwaysOnTop: FILE_WINDOW.alwaysOnTop !== false,
-  // 日志：是否同时写入系统统一日志（控制台 App，仅 macOS）；日志文件保留天数
-  logToConsoleApp: false,
+  // 日志：日志文件保留天数（macOS 下日志写到 ~/Library/Logs/Ships，Console.app 的
+  //「日志报告」会直接收录，无需再做统一日志同步）。
   logRetentionDays: LOG_RETENTION_DAYS,
 };
 
