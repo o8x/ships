@@ -23,6 +23,12 @@ function applyThemeSource(theme) {
   nativeTheme.themeSource = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : 'system';
 }
 
+// 日志设置：保留天数与「同步到控制台 App」。
+function applyLogSettings(data) {
+  logger.setRetentionDays(data.logRetentionDays);
+  logger.setConsoleApp(data.logToConsoleApp);
+}
+
 function registerSettingsIpc(ipcMain) {
   ipcMain.handle(IPC.SETTINGS_GET, () => settings.getAll());
 
@@ -39,6 +45,7 @@ function registerSettingsIpc(ipcMain) {
     if (!keys || keys.includes('pinWindow')) applyPin(Boolean(data.pinWindow));
     if (!keys || keys.includes('vibrancy')) applyVibrancy(Boolean(data.vibrancy));
     if (!keys || keys.includes('theme')) applyThemeSource(data.theme);
+    if (!keys || keys.includes('logRetentionDays') || keys.includes('logToConsoleApp')) applyLogSettings(data);
   });
 
   nativeTheme.on('updated', () => {
@@ -47,6 +54,7 @@ function registerSettingsIpc(ipcMain) {
 
   applyLaunchAtLogin(settings.get('launchAtLogin'));
   applyThemeSource(settings.get('theme'));
+  applyLogSettings(settings.getAll());
 }
 
 module.exports = { registerSettingsIpc, applyLaunchAtLogin };

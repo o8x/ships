@@ -109,7 +109,7 @@ Ships/
 - 来源校验：主进程处理 SSH 连接 / 探测时**不信任渲染层传入的主机字段**，仅以 `alias` 在 `~/.ssh/config` 中查表后使用配置值（见 `ssh-ipc.js`）。
 - 打开外链仅允许 `http(s)` 协议（`app:open-external`）。
 - 数据落盘：设置与探测结果均为**非机密 JSON**，位于用户数据目录；`~/.ssh/config` 仅由用户本机维护。
-- 日志：详细日志仅在调试模式（`SHIPS_DEBUG=1` 或 `--debug`）输出；启动时始终打印数据文件清单与绝对路径。
+- 日志：详细日志（`debug` 级）仅在调试模式（`SHIPS_DEBUG=1` 或 `--debug`）输出；`info` / `warn` / `error` 始终写入当天日志文件；启动时始终打印数据文件清单与绝对路径。可在 **设置 → 日志** 开启**同步到控制台 App**（macOS：经由常驻 `logger` 子进程写入系统统一日志）并配置**保留天数**（默认 7）。
 - 登录项：仅在值发生变化时调用 `app.setLoginItemSettings`，避免无意义报错。
 
 **来源标识注入 / 常驻与托盘**
@@ -156,7 +156,7 @@ Ships/
 3. 归类到具体系统 / 发行版：Linux 读取 `/etc/os-release` 的 `ID`（如 `ubuntu` / `fedora` / `arch` / `centos` / `debian` / `rhel` / `alpine` …），macOS 为 `macos`，BSD 为 `freebsd` / `openbsd` 等，Windows 为 `windows`；同时给出 `family`（`macos`/`linux`/`windows`/`bsd`/`unknown`）与显示名 `label`。
 4. 结果（`{ os, family, label, at }`）写入 `ssh-detected.json` 并广播 `ssh:detected` 事件；渲染层据此更新左侧彩色系统图标与提示。
 5. 表单内探测期间按钮显示「探测中…」且禁用；**探测成功后**才启用「保存」。
-6. **日志**：探测的每一步（开始、目标、认证方式、执行命令、stdout/stderr、解析结果、连接报错）都会追加写入**当天的日志文件** `logs/ships-YYYY-MM-DD.log`（设置 → 开发者 → 日志文件可打开今天那个）；便于排查本地网络 / 权限问题。
+6. **日志**：探测的每一步（开始、目标、认证方式、执行命令、stdout/stderr、解析结果、连接报错）都会追加写入**当天的日志文件** `logs/ships-YYYY-MM-DD.log`（设置 → 日志 → 日志文件夹可打开所在目录）；便于排查本地网络 / 权限问题。
 7. **macOS 本地网络权限**：Info.plist 含 `NSLocalNetworkUsageDescription`。macOS 15+ 首次访问局域网（如 192.168.x / 10.x）时会弹「本地网络」授权，需允许 Ships，否则连接会被系统拦截（表现即“没有本地 SSH 探测权限”）；可在「系统设置 → 隐私与安全性 → 本地网络」中开启。
 
 ### 3.6 修改设置
@@ -256,6 +256,7 @@ Ships/
 | 哈希计算 | 计算 **MD5 / SHA1 / SHA256**；支持输入字符串或**选择本地文件**（流式计算，适合大文件）；切换类型时清空结果 | 字符串输入防抖 200ms；文件经系统对话框选择 |
 | 营养成分 | 输入商品名与每 100g 的能量(kJ)/蛋白质/脂肪/碳水/钠及商品总重，实时换算：盐、千卡、千焦（含每日推荐 2250kcal / 9410kJ 对比与超出量）、慢跑与步行消耗（公里 / 分钟 / 步数）；底部提供**清空（图标）**与**一个复制按钮（复制输入与结果）** | 输入不做历史记录、不落盘，每次打开为默认值；不做历史列表与商品保存 |
 | 设置 · Ships | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、固定悬浮（置顶常驻、失焦不隐藏）、**Liquid Glass**（主界面启用系统玻璃背景：macOS 26+ 用原生 Liquid Glass，旧系统回退 hud 毛玻璃，见 §8.1）、剪贴板条数、剪贴板轮询间隔、打开数据文件夹、关于、开发者（打开悬浮界面 / 设置界面 / **终端界面** DevTools，`devtools:open` 的 `main` / `settings` / `terminal`） | 见 §5.1 |
+| 设置 · 日志 | **同步到控制台 App**（开关，仅 macOS：日志同时写入系统统一日志，可在「控制台」App 查看）、**日志保留天数**（下拉：1 / 3 / 7 / 14 / 30 / 90，默认 7）、**日志文件夹**（按钮，打开 `logs/` 目录，**只打开文件夹**不打开日志文件） | 对应 `settings.json` 的 `logToConsoleApp` / `logRetentionDays`；默认值来自 `package.json` 的 `ships.logRetentionDays`（7） |
 | 设置 · SSH 管理 | `~/.ssh/config` 主机的增删改（别名/HostName/User/Port/IdentityFile/ProxyJump）；列表左侧显示系统图标；新增时自动预填 **用户 root / 端口 22 / 私钥 `~/.ssh/id_ed25519`**，**私钥支持手动选择文件**（对话框默认 `~/.ssh`，选后转为 `~` 路径），保存时别名默认取主机地址；表单内含「探测系统」，**探测成功后才允许保存**，探测失败**保留表单内容**；支持**导出 config** | 别名与主机地址至少填一项；删除二次确认 |
 | 设置 · 终端 | 配置置顶终端窗口：**默认 shell**（留空 = 系统默认 `$SHELL`，可手填或用「选择文件」挑，写入前校验文件存在）、**字体大小**（8–24px，默认 12）、**窗口大小**（宽 × 高，最小 480 × 320，默认 1024 × 768；改完立即作用到已打开的终端窗口，手动拖动窗口也会写回；这是「换屏 / 无记忆」时的默认尺寸，同屏则优先沿用终端窗口自己的位置与尺寸）、**缓冲区大小**（默认 10000 行）、**打开终端的全局快捷键**（默认 `⌘⇧Z`；点按钮后按新组合键改绑，`Backspace` 清除、`Esc` 取消，至少含 Command / Control / Alt 之一，被占用 / 非法时红字提示且不落盘）、**SSH 使用内置终端连接**（开关：开 = 点「连接」在置顶终端执行 `ssh`，关 = 改用 iTerm）、**关闭按钮行为**（分段控件：隐藏窗口 / 销毁窗口，默认销毁）、**SFTP 下载目录**（文本 + 「选择目录」，默认 `~/Downloads`，见 §3.9-10）、**重置**（二次确认后把以上终端设置恢复默认值，并清掉 `terminal-window.json` 里记住的屏幕 / 位置 / 大小） | 对应 `settings.json` 的 `terminalShell`/`terminalFontSize`/`terminalWindowWidth`/`terminalWindowHeight`/`terminalScrollback`/`terminalHotkey`/`terminalCloseAction`/`sshBuiltinTerminal`/`sftpDownloadDir`；默认值来自 `package.json` 的 `ships.terminalWindow`/`ships.sshBuiltinTerminal`/`ships.sftpDownloadDir`；窗口位置 / 屏幕在 `terminal-window.json`（见 §5.1、§3.9） |
 | 设置 · 网络测试 | 在本地或通过 `~/.ssh/config` 里的主机执行测试命令（TCP / UDP / HTTP(S) / ICMP / ARP / 扫描应用 / 扫描主机）；下方是**可直接输入命令的交互终端**（真实 PTY + 默认登录 shell + xterm.js），「测试」把校验过的命令送进终端执行（选主机时包一层 `ssh`）、「停止」发送 Ctrl-C；详见 §3.8 | 端口默认 80；扫描主机需网段（前缀 16–30）；扫描应用端口可留空；输入不落盘 |
@@ -270,8 +271,8 @@ Ships/
 
 | 文件 | 位置 | 结构 | 生命周期 |
 | --- | --- | --- | --- |
-| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/ships/settings.json`） | `{ locale, theme, accent, launchAtLogin, pinWindow, vibrancy, clipboardLimit, clipboardPollMs, terminalShell, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, terminalHotkey, terminalCloseAction, sshBuiltinTerminal, sftpDownloadDir, fileWindowAlwaysOnTop }` | 持久；重启保留 |
-| `logs/ships-YYYY-MM-DD.log` | 同上目录的 `logs/` 子目录 | 按天追加的文本日志（启动信息、SSH 探测 / SFTP / 终端度量等）；启动时把数据文件清单也写进去 | 持久；**惰性清理**：每天首次写日志时删除保留期之前的日志文件（默认保留 **7 天**，来自 `package.json` 的 `ships.logRetentionDays`） |
+| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/ships/settings.json`） | `{ locale, theme, accent, launchAtLogin, pinWindow, vibrancy, clipboardLimit, clipboardPollMs, terminalShell, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, terminalHotkey, terminalCloseAction, sshBuiltinTerminal, sftpDownloadDir, fileWindowAlwaysOnTop, logToConsoleApp, logRetentionDays }` | 持久；重启保留 |
+| `logs/ships-YYYY-MM-DD.log` | 同上目录的 `logs/` 子目录 | 按天追加的文本日志（启动信息、SSH 探测 / SFTP / 终端 / 文件管理等）；启动时把数据文件清单也写进去 | 持久；**惰性清理**：每天首次写日志时删除保留期之前的日志文件（保留天数取设置 `logRetentionDays`，默认 **7 天**，来自 `package.json` 的 `ships.logRetentionDays`） |
 | `ssh-detected.json` | 同上目录 | `{ [alias]: { os, family, label, at } }` | 持久；缓存探测结果 |
 | `terminal-window.json` | 同上目录 | `{ display: { id, scaleFactor, bounds: { x, y, width, height } }, bounds: { x, y, width, height } }`（置顶终端窗口最近一次的所在屏幕 + 位置 + 尺寸） | 持久；打开 / 拖动 / 缩放 / 关闭时写入（含「实际生效」的几何，恢复时被夹取过也记夹取后的值）；同一块屏幕再次打开即沿用，换屏 / 拔屏 / 无记录则改用默认尺寸居中 |
 | `file-window.json` | 同上目录 | 同 `terminal-window.json` 的结构（独立文件窗口的屏幕 + 位置 + 尺寸） | 持久；记忆方式与终端窗口一致 |
@@ -292,7 +293,7 @@ Ships/
 | --- | --- | --- | --- |
 | `app:info` | — | `{ version, platform, arch, systemLocale, dataDir, dataFiles, terminalScrollback }` | 版本取 `package.json`；`terminalScrollback` 取 `ships.terminalWindow.scrollback` |
 | `app:open-data-folder` | — | `{ ok, error? }` | 打开数据目录 |
-| `app:open-log` | — | `{ ok, error? }` | 打开**当天的日志文件**（`logs/ships-YYYY-MM-DD.log`，不存在则建空文件；失败退回 `logs/` 目录） |
+| `app:open-log` | — | `{ ok, error? }` | 打开**日志文件夹** `logs/`（不存在则创建；**只打开文件夹，不打开日志文件**） |
 | `app:open-external` | `url` | `{ ok, error? }` | 仅允许 `http(s)` |
 | `settings:get` | — | `settings` | |
 | `settings:set` | `patch` | 合并后的 `settings` | 副作用：写盘 + 广播 + 可能修改登录项 |
@@ -531,8 +532,8 @@ flowchart TD
 ### 8.2 设置窗口
 
 - 尺寸：**800 × 600**（`ships.settingsWindow`），普通窗口，可缩放（最小 560×420），`titleBarStyle: hiddenInset`。
-- 布局：**左右分栏** —— 左侧导航（宽 190px，含 Ships 设置、SSH 管理、终端、网络测试），右侧内容区。
-- 顶部 **28px** 为可拖拽区域（`.drag-region`，覆盖系统红绿灯 / 原生标题栏范围）；左侧导航从 32px、右侧标题从 12px 起排（不再额外留 52px 空白），`Escape` 关闭窗口。
+- 布局：**左右分栏** —— 左侧导航（宽 190px，含 Ships 设置、日志、SSH 管理、终端、网络测试），右侧内容区。
+- 顶部 **28px** 为可拖拽区域（`.drag-region`，覆盖系统红绿灯 / 原生标题栏范围）；左侧导航从 **48px**（`padding-top`，为避开系统红绿灯留白）、右侧标题从 12px 起排，`Escape` 关闭窗口。
 
 ### 8.3 图标与资源
 
@@ -668,7 +669,7 @@ flowchart TD
 
 ## 12. 其余要点
 
-- **数据位置**：应用数据在 `app.getPath('userData')`；日志在其 `logs/` 子目录（按天 `ships-YYYY-MM-DD.log`，保留 7 天）；SSH 配置在 `~/.ssh/config`。
+- **数据位置**：应用数据在 `app.getPath('userData')`；日志在其 `logs/` 子目录（按天 `ships-YYYY-MM-DD.log`，保留天数由设置 `logRetentionDays` 决定，默认 7 天）；SSH 配置在 `~/.ssh/config`。
 - **调试开关**：`SHIPS_DEBUG=1` 或 `--debug` 输出详细日志；`SHIPS_SSH_CONFIG` 可覆盖 SSH 配置文件路径（测试用）。
 - **开发辅助**：`scripts/capture.cjs` 可在 Electron 中加载真实界面、执行点击/输入并截图（环境变量 `OUT` / `SETTINGS_OUT` / `TAB` / `INPUT` / `PATCH` 等），不参与打包。
 - **协议与端口提示**：应用不监听端口；SSH 默认端口 22。

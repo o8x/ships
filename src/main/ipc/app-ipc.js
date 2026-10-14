@@ -5,7 +5,7 @@ const { app, shell, BrowserWindow, dialog } = require('electron');
 const os = require('os');
 const { IPC, VERSION, TERMINAL_WINDOW } = require('../../shared/constants');
 const logger = require('../utils/logger');
-const { DATA_DIR, LOG_DIR, todayLogFile, describeDataFiles } = require('../utils/paths');
+const { DATA_DIR, LOG_DIR, describeDataFiles } = require('../utils/paths');
 
 function registerAppIpc(ipcMain) {
   ipcMain.handle(IPC.APP_INFO, () => ({
@@ -25,16 +25,13 @@ function registerAppIpc(ipcMain) {
   });
 
   ipcMain.handle(IPC.OPEN_LOG, async () => {
-    // 日志按天分文件：打开今天那一个（不存在就建个空文件；失败则退回日志目录）。
-    const file = todayLogFile();
+    // 只打开日志文件夹（不再打开具体日志文件）。
     try {
       fs.mkdirSync(LOG_DIR, { recursive: true });
-      if (!fs.existsSync(file)) fs.writeFileSync(file, '', 'utf8');
     } catch (err) {
       /* ignore */
     }
-    if (shell.showItemInFolder) shell.showItemInFolder(file);
-    const err = await shell.openPath(fs.existsSync(file) ? file : LOG_DIR);
+    const err = await shell.openPath(LOG_DIR);
     return err ? { ok: false, error: err } : { ok: true };
   });
 

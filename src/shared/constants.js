@@ -175,6 +175,9 @@ const DEFAULT_SETTINGS = {
   sftpDownloadDir: ships.sftpDownloadDir || '~/Downloads',
   // 独立文件窗口置顶
   fileWindowAlwaysOnTop: FILE_WINDOW.alwaysOnTop !== false,
+  // 日志：是否同时写入系统统一日志（控制台 App，仅 macOS）；日志文件保留天数
+  logToConsoleApp: false,
+  logRetentionDays: LOG_RETENTION_DAYS,
 };
 
 module.exports = {

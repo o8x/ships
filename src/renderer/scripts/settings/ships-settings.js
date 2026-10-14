@@ -40,8 +40,6 @@
         devSettings: '设置界面开发者工具',
         devTerminal: '终端界面开发者工具',
         devFile: '文件管理界面开发者工具',
-        logFile: '日志文件',
-        logHint: 'SSH 探测等详细日志（ships.log）',
       },
     },
     en: {
@@ -78,8 +76,6 @@
         devSettings: 'Settings DevTools',
         devTerminal: 'Terminal DevTools',
         devFile: 'File window DevTools',
-        logFile: 'Log file',
-        logHint: 'Detailed logs e.g. SSH detection (ships.log)',
       },
     },
   });
@@ -236,10 +232,6 @@
     devSection.appendChild(row(i18n.t('settingsPage.devSettings'), '', devButton('settings')));
     devSection.appendChild(row(i18n.t('settingsPage.devTerminal'), '', devButton('terminal')));
     devSection.appendChild(row(i18n.t('settingsPage.devFile'), '', devButton('file')));
-
-    const logBtn = el('button', { class: 'btn shrink-0', type: 'button' }, i18n.t('settingsPage.open'));
-    logBtn.addEventListener('click', () => window.ships.openLog());
-    devSection.appendChild(row(i18n.t('settingsPage.logFile'), i18n.t('settingsPage.logHint'), logBtn));
 
     pane.append(languageSection, appearanceSection, generalSection, aboutSection, devSection);
   }
