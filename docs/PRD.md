@@ -663,7 +663,7 @@ flowchart TD
 **主题**
 
 - 支持浅色 / 深色 / 跟随系统；由 `data-theme` 属性与 CSS 变量驱动；跟随系统时监听 `prefers-color-scheme` 与主进程 `theme:changed`。
-- 语言：`zh` / `en`，由渲染层 i18n 字典（`scripts/i18n.js`）提供；工具可 `extend` 扩展自己的文案。
+- 语言：`zh` / `en`，由渲染层 i18n 字典（`scripts/i18n.js`）提供；工具 / 设置分区用 `i18n.extend` 扩展自己的文案，**同命名空间按深合并**（多个文件扩展 `settingsPage` 等不会互相覆盖），键缺失时回退到 `zh`，再缺失则原样显示键名。
 
 ---
 

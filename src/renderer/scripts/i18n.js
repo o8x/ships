@@ -112,10 +112,25 @@ window.ShipsI18n = (function createI18n() {
     return key.split('.').reduce((acc, part) => (acc == null ? acc : acc[part]), target);
   }
 
+  /* 深合并：多个文件用 i18n.extend 扩展同一命名空间（如 settingsPage）时互不覆盖。 */
+  function mergeDeep(target, source) {
+    const out = Object.assign({}, target);
+    for (const key of Object.keys(source)) {
+      const value = source[key];
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        const base = out[key] && typeof out[key] === 'object' && !Array.isArray(out[key]) ? out[key] : {};
+        out[key] = mergeDeep(base, value);
+      } else {
+        out[key] = value;
+      }
+    }
+    return out;
+  }
+
   return {
     extend(extra) {
       for (const lang of Object.keys(extra)) {
-        dict[lang] = Object.assign({}, dict[lang] || {}, extra[lang]);
+        dict[lang] = mergeDeep(dict[lang] || {}, extra[lang]);
       }
     },
     setLocale(next) {
