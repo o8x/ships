@@ -87,7 +87,7 @@ const api = {
     set: (scope, patch) => ipcRenderer.invoke(IPC.FILES_LAYOUT_SET, { scope, patch }),
   },
   fileWindow: {
-    open: (target) => ipcRenderer.invoke(IPC.FILE_WINDOW_OPEN, { target }),
+    open: (target, path) => ipcRenderer.invoke(IPC.FILE_WINDOW_OPEN, { target, path }),
     info: () => ipcRenderer.invoke(IPC.FILE_WINDOW_INFO),
     close: () => ipcRenderer.invoke(IPC.FILE_WINDOW_CLOSE),
     setAlwaysOnTop: (value) => ipcRenderer.invoke(IPC.FILE_WINDOW_SET_TOP, { value }),

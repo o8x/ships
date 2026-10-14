@@ -267,6 +267,8 @@
       shellCwd: '',
       // 连接就绪前收到的 cd 参数，连上后再跟随
       pendingCd: null,
+      // 打开时希望进入的初始目录（如从内嵌面板分离出来时带过去的当前目录）
+      pendingStart: '',
       entries: [],
       // 文件列表多选：selection = 选中的远端路径集合，anchor = Shift 范围选择的锚点
       selection: new Set(),
@@ -313,7 +315,7 @@
       : null;
     if (popBtn) {
       popBtn.innerHTML = Icons.external(14);
-      popBtn.addEventListener('click', () => onPopOut(state.target));
+      popBtn.addEventListener('click', () => onPopOut(state.target, state.cwd));
     }
     const refreshBtn = el('button', { class: 'icon-btn fm-path-btn', type: 'button', 'data-tip': i18n.t('filesUi.refresh') });
     refreshBtn.innerHTML = Icons.refresh(14);
@@ -724,7 +726,15 @@
           if (state.expanded.has(path)) renderTree();
         });
       }
-      return loadList(path, quiet);
+      // 任何导航（目录树 / 路径输入 / cd 跟随 / 历史）成功后都展开到当前目录并滚动定位，
+      // 保证目录树里一定出现该节点、点文件时能定位到它所在的目录。
+      return loadList(path, quiet).then((ok) => {
+        if (!ok) return ok;
+        return expandTo(state.cwd).then(() => {
+          scrollTreeToSelected();
+          return true;
+        });
+      });
     }
 
     /* 终端里输入 `cd <arg>` 且成功时跟随：把参数解析成远端绝对路径后导航。
@@ -743,9 +753,6 @@
       if (ok) {
         state.shellCwd = state.cwd;
         recordCd(state.cwd);
-        // 展开该路径的所有上级，让目标目录节点出现在树里，再滚动定位过去。
-        await expandTo(state.cwd);
-        scrollTreeToSelected();
       }
     }
 
@@ -901,6 +908,11 @@
       pathInput.value = state.home;
       await expandTo(state.home);
       await loadList(state.home);
+      if (state.pendingStart) {
+        const dir = state.pendingStart;
+        state.pendingStart = '';
+        await navigate(dir);
+      }
       if (state.pendingCd != null) {
         const raw = state.pendingCd;
         state.pendingCd = null;
@@ -918,6 +930,7 @@
       state.cwd = '';
       state.shellCwd = '';
       state.pendingCd = null;
+      state.pendingStart = '';
       state.entries = [];
       state.selection = new Set();
       state.anchor = '';
@@ -981,12 +994,7 @@
       if (event.key === 'Enter') {
         event.preventDefault();
         const value = pathInput.value.trim();
-        if (value) {
-          navigate(value).then((ok) => {
-            if (!ok) return;
-            expandTo(state.cwd).then(() => scrollTreeToSelected());
-          });
-        }
+        if (value) navigate(value);
       } else if (event.key === 'Escape') {
         event.stopPropagation();
         pathInput.value = state.cwd;
@@ -1067,9 +1075,6 @@
       state.shellCwd = state.cwd;
       recordCd(dir);
       if (onCd) onCd(dir);
-      // 展开该路径的所有上级，让目标目录节点出现在树里，再滚动定位过去。
-      await expandTo(state.cwd);
-      scrollTreeToSelected();
     }
     function openHistoryMenu() {
       if (!state.connected) return;
@@ -1124,6 +1129,14 @@
       if (state.target && !state.connected && !state.connecting) connect();
     }
 
+    /* 进入指定远端目录：已连接则直接导航，否则记下、连上后再进入。 */
+    function openPath(dir) {
+      const value = String(dir || '');
+      if (!value) return;
+      if (state.connected) navigate(value);
+      else state.pendingStart = value;
+    }
+
     function destroy() {
       if (offProgress) offProgress();
       closeContextMenu();
@@ -1152,7 +1165,7 @@
       applyLayout();
     }
 
-    return { element: wrap, setTarget, activate, setLayout, followCd, destroy, isConnected: () => state.connected };
+    return { element: wrap, setTarget, activate, setLayout, followCd, openPath, destroy, isConnected: () => state.connected };
   }
 
   window.ShipsFileManager = { create, DEFAULT_LAYOUT, _joinPath: joinPath };

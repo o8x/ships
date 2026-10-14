@@ -109,6 +109,7 @@
     applyFontSize(fontSize);
     setupPicker();
     currentTarget = (info && info.target) || '';
+    const startPath = (info && info.path) || '';
     await refreshPicker();
 
     const layout = await window.ships.filesLayout.get('window');
@@ -120,9 +121,13 @@
       onLayout: (patch) => window.ships.filesLayout.set('window', patch),
     });
     if (currentTarget) manager.setTarget(currentTarget);
+    // 分离过来时带上当前目录：连上后进入该目录。
+    if (startPath) manager.openPath(startPath);
 
-    window.ships.fileWindow.onTarget((target) => {
-      setTarget(target);
+    window.ships.fileWindow.onTarget((payload) => {
+      const next = payload && typeof payload === 'object' ? payload : { target: payload };
+      setTarget(next.target || '');
+      if (next.path) manager.openPath(next.path);
     });
     window.ships.fileWindow.onZoom((direction) => zoomFont(direction));
     window.ships.onSettingsChanged((next) => {

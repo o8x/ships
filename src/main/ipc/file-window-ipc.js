@@ -15,13 +15,13 @@ function isFileSender(event) {
 
 function registerFileWindowIpc(ipcMain) {
   ipcMain.handle(IPC.FILE_WINDOW_OPEN, (_event, payload) => {
-    const win = wm.openFileWindow(payload && payload.target);
+    const win = wm.openFileWindow(payload && payload.target, payload && payload.path);
     return { ok: Boolean(win) };
   });
 
   ipcMain.handle(IPC.FILE_WINDOW_INFO, (event) => {
     if (!isFileSender(event)) return { ok: false };
-    return { ok: true, target: wm.getFileWindowTarget(), settings: settings.getAll() };
+    return { ok: true, target: wm.getFileWindowTarget(), path: wm.getFileWindowPath(), settings: settings.getAll() };
   });
 
   ipcMain.handle(IPC.FILE_WINDOW_CLOSE, (event) => {

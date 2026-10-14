@@ -20,6 +20,7 @@ const terminalWindows = new Set();
 let lastTerminalWindow = null;
 let fileWindow = null;
 let fileWindowTarget = '';
+let fileWindowPath = '';
 let fileWindowOwnerId = null;
 let trayRef = null;
 let blurSuppressed = false;
@@ -803,14 +804,24 @@ function getFileWindowTarget() {
   return fileWindowTarget;
 }
 
-function openFileWindow(target) {
-  if (target != null) fileWindowTarget = String(target || '');
+function getFileWindowPath() {
+  return fileWindowPath;
+}
+
+function openFileWindow(target, pathArg) {
+  if (target != null) {
+    fileWindowTarget = String(target || '');
+    // 切换目标时同步重置「初始目录」：显式传入则用它，否则回到家目录。
+    fileWindowPath = pathArg != null ? String(pathArg || '') : '';
+  }
   if (fileWindow && !fileWindow.isDestroyed()) {
     fileWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
     fileWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
     fileWindow.show();
     fileWindow.focus();
-    if (target != null) fileWindow.webContents.send(IPC.FILE_WINDOW_TARGET, fileWindowTarget);
+    if (target != null) {
+      fileWindow.webContents.send(IPC.FILE_WINDOW_TARGET, { target: fileWindowTarget, path: fileWindowPath });
+    }
     return fileWindow;
   }
 
@@ -989,6 +1000,7 @@ module.exports = {
   openFileWindow,
   getFileWindow,
   getFileWindowTarget,
+  getFileWindowPath,
   isFileWindow,
   snapFileWindowContentSize,
   closeFileWindow,

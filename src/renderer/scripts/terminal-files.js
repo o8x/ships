@@ -74,10 +74,10 @@
         // 主动连接：检测到 ssh 目标即建立 SFTP（面板可保持隐藏），这样终端里的 cd 能随时被跟随。
         active: true,
         onCd,
-        onPopOut: (t) => {
-          // 分离为独立窗口：关闭并销毁当前内嵌容器（含其 SFTP 连接），再开独立窗口。
+        onPopOut: (t, dir) => {
+          // 分离为独立窗口：关闭并销毁当前内嵌容器（含其 SFTP 连接），再开独立窗口（带过去当前目录）。
           hide({ destroy: true });
-          window.ships.fileWindow.open(t);
+          window.ships.fileWindow.open(t, dir);
         },
         onLayout: (patch) => {
           Object.assign(layout, patch);
