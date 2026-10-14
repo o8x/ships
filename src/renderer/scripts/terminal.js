@@ -712,11 +712,14 @@
       // 下一帧再开过渡，确保从缩放态起动画。
       requestAnimationFrame(() => applyBallShellScale(1, 1, duration));
     } else {
-      // settle：动画结束，恢复正常并重新 fit / 对齐。
+      // settle：动画结束，恢复正常、重新 fit / 对齐，并把焦点交回终端输入。
       ballMode = false;
       resetBallShellScale();
       document.documentElement.dataset.ball = 'off';
-      setTimeout(() => fitIfNeeded(true), 40);
+      setTimeout(() => {
+        fitIfNeeded(true);
+        if (term) term.focus();
+      }, 40);
     }
   });
 

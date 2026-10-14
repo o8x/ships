@@ -243,7 +243,7 @@ Ships/
 12. **悬浮球（失去焦点缩成圆形小窗）**：终端窗口**失去焦点后延迟 `terminalBallDelayMs`（默认 0.5s）**缩成一个 **`terminalBallSize`（默认 75px、宽高强制 1:1、40–200px）的圆形、无标题栏窗口**，形如悬浮球：
     - **开关与延迟**：设置 → 终端「自动缩成悬浮球」（`settings.terminalBallEnabled`，默认开）、「缩成悬浮球延迟」（下拉：200ms / 500ms / 1s / 5s / 10s / 15s / 30s / 60s，默认 500ms）、「悬浮球大小」（`settings.terminalBallSize`，默认 75px，1:1）；**延迟内焦点回来则取消缩球**（`blur` 起计时、`focus` 清除）。
     - **窗口形态**：终端窗口以 `frame: false` + `transparent: true` + `hasShadow: false` + **`roundedCorners: false`**（圆角由 CSS 画，避免系统把四角边框裁掉）+ **`acceptFirstMouse: true`** 创建（macOS：让悬浮球浮在其它应用 / 全屏应用之上时**第一次点击**就落到窗口内容，而不必先激活、点两次）；底座 `#term-shell` 负责底色 / 圆角 / 描边，悬浮球为 `#term-ball`（**固定 `--term-ball-size` 的圆形 + `ships.svg` 图标**，`--color-accent`）——球尺寸固定、**锚在窗口右上角**（`top:0; right:0`）。
-    - **玻璃效果**：设置 → Ships 的 **Liquid Glass** 开启时，悬浮球用**原生 Liquid Glass**（进入球模式时给该窗口 `addView`，`cornerRadius = 半径` 呈圆形，球体 CSS 透明让玻璃透出）；旧系统回退为 **`backdrop-filter` 毛玻璃**（`frost`）；关闭时为纯色球。`glass` 随 `terminal:ball` 事件下发。
+    - **玻璃效果**：设置 → Ships 的 **Liquid Glass** 开启时，悬浮球用 **CSS 玻璃观感**（半透明 + `backdrop-filter` 模糊 + 高光描边）；关闭时为纯色球。**注意**：不用原生 `electron-liquid-glass`——它的视图**无法移除、会持续铺满整个窗口**，会让「终端收缩」透出整块玻璃（像整个白窗口）；`glass` 随 `terminal:ball` 事件下发（`glass`/`off`）。
     - **空间归属**：球固定在它所在的桌面 / 空间，**切换桌面时不跟随**（进入球模式重新声明 `setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true })`）。
     - **位置稳定**：球 = 原窗口**右上角**的 `size×size` 方块；若用户没拖动过球，放大时**原样恢复**原 bounds（多次「终端 ↔ 球」往返位置不变）；拖动过则以球位置为右上角展开回原尺寸（夹回工作区）。
     - **缩放动画（渲染层 CSS transform）**：窗口尺寸只在**动画首 / 尾各改一次**（`setBounds`，非逐帧）：收缩时窗口保持原尺寸，渲染层把 `#term-shell` 以 `transform-origin: top right` 从 `scale(1)` 过渡到 `scale(size/宽, size/高)`；放大时窗口先一次性还原，再把 shell 从球 scale 过渡到 `1`。由 GPU 合成，**右上角严格不动、不左右弹跳**（原生窗口动画做不到精确锚点）。`BALL_ANIM_MS = 420ms`，`scaleX/scaleY` 由主进程随事件下发。
@@ -396,7 +396,7 @@ Ships/
 | `terminal:data` | `{ id, type: 'data', data }` | PTY 输出（原样文本，含 ANSI），只发给拥有该会话的窗口 |
 | `terminal:exit` | `{ id, type: 'exit', code, signal }` 或 `{ id, type: 'error', message }` | 会话结束 / 启动失败 |
 | `terminal:session` | `{ id, type: 'session', ssh, target }` | 会话进程树里检测到的当前 SSH 目标：`ssh` 为显示用标签（命中配置别名时解析成 `user@hostname`）、`target` 为命令行里的原始目标 token（供文件面板连接用），未连接时均为 `null`；仅在值变化时推送（主进程每秒扫描一次进程树，见 §3.9-4、§3.9-10；**不在头栏显示**） |
-| `terminal:ball` | `{ active, size, phase, duration, scaleX, scaleY, glass }` | 悬浮球状态（见 §3.9-12）：`phase` ∈ `enter`（终端按缩放缩小）/ `settle`（切球或切终端）/ `grow`（终端从球 scale 放大）；`size` 球边长、`scaleX/scaleY` 起止缩放、`duration` 过渡时长、`glass` ∈ `liquid`/`frost`/`off`。只发给对应终端窗口 |
+| `terminal:ball` | `{ active, size, phase, duration, scaleX, scaleY, glass }` | 悬浮球状态（见 §3.9-12）：`phase` ∈ `enter`（终端按缩放缩小）/ `settle`（切球或切终端）/ `grow`（终端从球 scale 放大）；`size` 球边长、`scaleX/scaleY` 起止缩放、`duration` 过渡时长、`glass` ∈ `glass`/`off`。只发给对应终端窗口 |
 | `terminal:ball-pin` | `{ value: boolean }` | `{ ok, value }` | 头栏「固定」按钮：设置该终端窗口是否**失焦不缩球**（`win.__ballPin`，仅当前窗口、不持久）；只接受来自该终端窗口本身的请求 |
 | `terminal:recalibrate` | — | 拖动结束后请终端窗口重新测量并按整行对齐高度（拖动期间主进程不改窗口尺寸，见 §3.9-4） |
 | `terminal:drag-active` | — | 主进程检测到终端窗口开始被拖动（`will-resize`）：渲染层据此在拖动期间不发对齐请求 |

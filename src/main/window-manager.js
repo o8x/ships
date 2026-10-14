@@ -432,25 +432,11 @@ function ballBoundsFor(orig, size) {
   return clampToWorkArea({ x: orig.x + orig.width - size, y: orig.y, width: size, height: size });
 }
 
-/* 悬浮球是否用玻璃效果：'liquid'（原生 Liquid Glass）/ 'frost'（vibrancy 回退的毛玻璃）/ 'off'。 */
+/* 悬浮球玻璃：Liquid Glass 开启时用 CSS 玻璃观感（'glass'），否则纯色（'off'）。
+   注意：原生 `electron-liquid-glass` 的视图**无法移除**、会一直铺满整个窗口，导致「终端收缩」
+   时透出整块玻璃（看起来像整个白窗口）。所以悬浮球不用原生玻璃，改用渲染层 CSS 近似。 */
 function ballGlassKind() {
-  const mode = glassMode();
-  if (mode === 'liquid') return 'liquid';
-  if (mode === 'vibrancy') return 'frost';
-  return 'off';
-}
-
-/* 为悬浮球窗口挂上原生 Liquid Glass（圆形，cornerRadius = 半径），只挂一次。 */
-function ensureBallGlass(win, size) {
-  if (win.__ballGlassAdded) return;
-  const lg = getLiquidGlass();
-  if (!lg || !liquidGlassAvailable()) return;
-  try {
-    lg.addView(win.getNativeWindowHandle(), { cornerRadius: Math.round(size / 2) });
-    win.__ballGlassAdded = true;
-  } catch (err) {
-    logger.warn('ball liquid glass addView failed:', err.message);
-  }
+  return settings.get('vibrancy') ? 'glass' : 'off';
 }
 
 function enterBallMode(win) {
@@ -469,16 +455,15 @@ function enterBallMode(win) {
   const scaleY = size / win.__ballOrig.height;
   const glass = ballGlassKind();
   win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'enter', duration: BALL_ANIM_MS, scaleX, scaleY, glass });
-  // 动画结束后：窗口一次性收到球大小，切到球（此刻终端已被缩到小球大小，衔接无缝）。
+  // 提前切到球（终端缩到接近球大小时就隐藏，避免尾段那一下卡顿）。
   clearBallSettleTimer(win);
   win.__ballSettleTimer = setTimeout(() => {
     win.__ballSettleTimer = null;
     if (win.isDestroyed() || !win.__ballActive) return;
     win.setBounds(win.__ballBounds, false);
     if (typeof win.setResizable === 'function') win.setResizable(false);
-    if (glass === 'liquid') ensureBallGlass(win, size);
     win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'settle', glass });
-  }, BALL_ANIM_MS);
+  }, Math.round(BALL_ANIM_MS * 0.6));
   logger.file(`[terminal] entered ball mode (${win.id}) size=${size}`);
 }
 

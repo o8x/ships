@@ -405,16 +405,13 @@ input[type='color'].swatch::-webkit-color-swatch {
 [data-ball='on'] #term-shell {
   display: none;
 }
-/* 悬浮球的玻璃效果：'liquid' = 原生 Liquid Glass（挂在窗口内容之后，球体透明让它透出）；
-   'frost' = vibrancy 回退的毛玻璃（backdrop-filter 模糊背景）。 */
-[data-ball='on'][data-ball-glass='liquid'] #term-ball {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--color-border) 60%, transparent);
-}
-[data-ball='on'][data-ball-glass='frost'] #term-ball {
-  background: color-mix(in srgb, var(--color-surface) 55%, transparent);
-  -webkit-backdrop-filter: blur(18px) saturate(1.6);
-  backdrop-filter: blur(18px) saturate(1.6);
+/* 悬浮球的玻璃效果：Liquid Glass 开启时用 CSS 玻璃观感（半透明 + 模糊 + 高光描边）。 */
+[data-ball='on'][data-ball-glass='glass'] #term-ball {
+  background: color-mix(in srgb, var(--color-surface) 42%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: blur(16px) saturate(1.6);
+  border-color: color-mix(in srgb, #fff 45%, var(--color-border));
+  box-shadow: inset 0 1px 1px color-mix(in srgb, #fff 55%, transparent);
 }
 #term-ball:active {
   cursor: grabbing;
