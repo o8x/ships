@@ -15,6 +15,8 @@
         linesOn: '隐藏行号',
         linesOff: '显示行号',
         newWindow: '新建窗口',
+        pinBallOn: '取消固定（失焦会缩成悬浮球）',
+        pinBallOff: '固定：本窗口失焦不缩成悬浮球',
         failed: '无法启动终端会话：{error}',
         noTerminal: 'xterm 未能加载，无法显示终端',
       },
@@ -26,6 +28,8 @@
         linesOn: 'Hide line numbers',
         linesOff: 'Show line numbers',
         newWindow: 'New window',
+        pinBallOn: 'Unpin (shrink to a ball when unfocused)',
+        pinBallOff: 'Pin: keep this window open when it loses focus',
         failed: 'Cannot start the terminal session: {error}',
         noTerminal: 'xterm failed to load',
       },
@@ -56,6 +60,7 @@
   const shellEl = document.getElementById('term-shell');
   const ballEl = document.getElementById('term-ball');
   const ballIconEl = document.getElementById('term-ball-icon');
+  const pinBtn = document.getElementById('term-pin');
 
   let term = null;
   let fit = null;
@@ -82,6 +87,8 @@
   let filesApi = null;
   // 悬浮球模式（失去焦点缩成圆形小窗；期间不 fit、不把尺寸同步给 PTY）
   let ballMode = false;
+  // 「固定」：开启后本窗口失焦不缩成悬浮球（仅当前窗口，默认关，不持久）
+  let ballPinned = false;
 
   function themeColors() {
     // macOS-like overlay scrollbar (only a safety net: the scrollbar is hidden below)
@@ -396,6 +403,11 @@
     itermBtn.innerHTML = Icons.terminal(15);
     splitBtn.innerHTML = Icons.split(15);
     splitBtn.setAttribute('data-tip', i18n.t('terminalWin.newWindow'));
+    if (pinBtn) {
+      pinBtn.innerHTML = (ballPinned ? Icons.pin : Icons.pinOff)(15);
+      pinBtn.style.color = ballPinned ? 'var(--color-accent)' : '';
+      pinBtn.setAttribute('data-tip', i18n.t(ballPinned ? 'terminalWin.pinBallOn' : 'terminalWin.pinBallOff'));
+    }
     // 自绘小红绿灯的符号（尺寸交给 CSS，见 #term-lights svg）
     lightClose.innerHTML = Icons.trafficClose(6);
     lightMinimize.innerHTML = Icons.trafficMinimize(6);
@@ -607,9 +619,33 @@
     // 新开一扇终端窗口（与主面板底部栏的终端按钮行为一致）。
     splitBtn.addEventListener('click', () => window.ships.openTerminal());
   }
+  if (pinBtn) {
+    // 固定：开启后本窗口失焦不缩成悬浮球（仅当前窗口）。
+    pinBtn.addEventListener('click', () => {
+      ballPinned = !ballPinned;
+      renderHeader();
+      window.ships.terminal.setBallPin(ballPinned);
+    });
+  }
 
-  /* 悬浮球：失去焦点时主进程把窗口缩成圆形（<html data-ball="on">），点球放大回来。
-     拖动由指针事件 → 主进程按光标移动窗口；「按下到松开没怎么移动」= 点击 → 放大。 */
+  /* 悬浮球：失去焦点后主进程把窗口缩成圆形（用 CSS transform 把终端缩到右上角球大小），
+     点球放大回来。拖动由指针事件 → 主进程按光标移动窗口；「按下到松开没怎么移动」= 点击。 */
+  function applyBallShellScale(scaleX, scaleY, durationMs) {
+    if (!shellEl) return;
+    shellEl.style.transformOrigin = 'top right';
+    if (durationMs) {
+      shellEl.style.transition = `transform ${durationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+    } else {
+      shellEl.style.transition = 'none';
+    }
+    shellEl.style.transform = `scale(${scaleX}, ${scaleY})`;
+  }
+  function resetBallShellScale() {
+    if (!shellEl) return;
+    shellEl.style.transition = 'none';
+    shellEl.style.transform = 'none';
+  }
+
   if (ballIconEl) ballIconEl.innerHTML = Icons.ships ? Icons.ships(46) : '';
   if (ballEl) {
     let dragging = false;
@@ -652,22 +688,34 @@
   window.ships.terminal.onBall((payload) => {
     const active = Boolean(payload && payload.active);
     const phase = (payload && payload.phase) || 'settle';
-    if (payload && payload.size) {
-      document.documentElement.style.setProperty('--term-ball-size', `${payload.size}px`);
-    }
-    if (active) {
-      // enter：球显示、终端保留（收缩动画看得见）；settle：只留球。
+    const size = payload && payload.size;
+    const duration = (payload && payload.duration) || 0;
+    const scaleX = (payload && payload.scaleX) || 1;
+    const scaleY = (payload && payload.scaleY) || 1;
+    if (size) document.documentElement.style.setProperty('--term-ball-size', `${size}px`);
+    if (active && phase === 'enter') {
+      // 收缩：终端保持可见，用 CSS transform 缩到右上角球大小（窗口尺寸不动 → 不跳）。
       ballMode = true;
-      document.documentElement.dataset.ball = phase === 'settle' ? 'on' : 'enter';
-    } else if (phase === 'settle') {
-      // 放大结束：切回终端并重新 fit / 对齐。
+      document.documentElement.dataset.ball = 'off';
+      applyBallShellScale(scaleX, scaleY, duration);
+    } else if (active) {
+      // settle：窗口已变成球大小 → 隐藏终端、显示球。
+      ballMode = true;
+      resetBallShellScale();
+      document.documentElement.dataset.ball = 'on';
+    } else if (phase === 'grow') {
+      // 放大：窗口已还原，终端先按球大小显示，再 CSS 放大到 1。
+      ballMode = true;
+      document.documentElement.dataset.ball = 'off';
+      applyBallShellScale(scaleX, scaleY, 0);
+      // 下一帧再开过渡，确保从缩放态起动画。
+      requestAnimationFrame(() => applyBallShellScale(1, 1, duration));
+    } else {
+      // settle：动画结束，恢复正常并重新 fit / 对齐。
       ballMode = false;
+      resetBallShellScale();
       document.documentElement.dataset.ball = 'off';
       setTimeout(() => fitIfNeeded(true), 40);
-    } else {
-      // grow：放大期间只显示球（窗口从球长大）。
-      ballMode = true;
-      document.documentElement.dataset.ball = 'grow';
     }
   });
 

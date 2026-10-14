@@ -334,7 +334,10 @@
     );
 
     const ballDelaySelect = window.ShipsUI.createSelect({
-      options: [0.5, 1, 2, 3, 5, 10].map((value) => ({ value: value * 1000, label: `${value} ${i18n.t('terminalSettings.seconds')}` })),
+      options: [200, 500, 1000, 5000, 10000, 15000, 30000, 60000].map((ms) => ({
+        value: ms,
+        label: ms < 1000 ? `${ms} ms` : `${ms / 1000} ${i18n.t('terminalSettings.seconds')}`,
+      })),
       value: Number(ctx.settings.terminalBallDelayMs) || 500,
       align: 'right',
       className: 'w-[120px] shrink-0',

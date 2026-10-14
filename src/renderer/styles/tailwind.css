@@ -380,11 +380,11 @@ input[type='color'].swatch::-webkit-color-swatch {
   border-radius: var(--radius-window);
   border: 1px solid var(--color-border);
 }
-/* 悬浮球：固定尺寸的圆形，锚在窗口**左上角**（缩小 / 放大都是纯尺寸动画，x/y 不变，不会左右弹跳）。 */
+/* 悬浮球：固定尺寸的圆形，锚在窗口**右上角**（缩放动画用 shell 的 CSS transform，右上角严格不动）。 */
 #term-ball {
   position: fixed;
   top: 0;
-  left: 0;
+  right: 0;
   width: var(--term-ball-size, 75px);
   height: var(--term-ball-size, 75px);
   display: none;
@@ -397,14 +397,12 @@ input[type='color'].swatch::-webkit-color-swatch {
   user-select: none;
   -webkit-user-select: none;
 }
-/* 悬浮球只在收缩**完成**后出现（`on`）/ 放大期间保留（`grow`）；收缩中（`enter`）只见终端缩进角落。 */
-[data-ball='on'] #term-ball,
-[data-ball='grow'] #term-ball {
+/* 只留球（终端隐藏）。 */
+[data-ball='on'] #term-ball {
   display: flex;
   animation: ships-ball-in 0.18s ease both;
 }
-[data-ball='on'] #term-shell,
-[data-ball='grow'] #term-shell {
+[data-ball='on'] #term-shell {
   display: none;
 }
 #term-ball:active {
@@ -516,6 +514,15 @@ body.show-lines #term-host {
   padding-left: 10px;
   --traffic-size: calc(var(--term-header-font-size) * 0.75);
   --traffic-glyph-size: calc(var(--term-header-font-size) * 0.5);
+}
+/* 红绿灯右侧的「固定」按钮（开启后本窗口不缩成悬浮球）。 */
+#term-pin {
+  width: calc(var(--term-header-font-size) + 6px);
+  height: calc(var(--term-header-font-size) + 6px);
+}
+#term-pin svg {
+  width: var(--term-header-font-size);
+  height: var(--term-header-font-size);
 }
 .traffic-light {
   display: inline-flex;

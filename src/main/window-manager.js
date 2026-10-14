@@ -385,8 +385,8 @@ function toggleTerminalWindow() {
    - 期间不改动几何记忆（terminal-window.json）。
    - 拖动由渲染层指针事件触发，主进程按光标位置移动窗口（这样「点击 vs 拖动」可区分）。 */
 let ballDragTimer = null;
-// 原生窗口动画时长系统固定（约 0.25s）；此值只用于阶段切换（enter→settle / grow→finish）的定时。
-const BALL_ANIM_MS = 260;
+// 球的缩放动画时长（渲染层 CSS transform 过渡，可控且流畅）。
+const BALL_ANIM_MS = 420;
 
 function terminalBallEnabled() {
   return settings.get('terminalBallEnabled') !== false;
@@ -406,6 +406,18 @@ function clearBallTimer(win) {
     win.__ballTimer = null;
   }
 }
+function clearBallSettleTimer(win) {
+  if (win && win.__ballSettleTimer) {
+    clearTimeout(win.__ballSettleTimer);
+    win.__ballSettleTimer = null;
+  }
+}
+function clearBoundsTimer(win) {
+  if (win && win.__boundsTimer) {
+    clearTimeout(win.__boundsTimer);
+    win.__boundsTimer = null;
+  }
+}
 
 function clampToWorkArea(bounds) {
   const area = screen.getDisplayMatching(bounds).workArea;
@@ -414,34 +426,10 @@ function clampToWorkArea(bounds) {
   return { x: Math.round(x), y: Math.round(y), width: bounds.width, height: bounds.height };
 }
 
-/* 球 = 窗口**左上角**的 size×size 方块：这样缩小 / 放大都只是「改宽高、x/y 不变」的纯尺寸动画，
-   原生窗口动画不会让窗口左右平移（否则右上角锚定会让它在展开时先向左弹一下）。 */
+/* 球 = 窗口**右上角**的 size×size 方块。缩放动画由**渲染层 CSS transform**完成（`transform-origin: top right`），
+   窗口尺寸只在动画首 / 尾各改一次，因此右上角严格不变、不会左右弹跳（原生窗口动画做不到精确锚点）。 */
 function ballBoundsFor(orig, size) {
-  return clampToWorkArea({ x: orig.x, y: orig.y, width: size, height: size });
-}
-
-/* 用 macOS 原生窗口动画（`setBounds(bounds, true)`，由合成器逐帧渲染，不卡）完成
-   球 ↔ 原尺寸的缩放；`durationMs` 只用于**阶段切换的定时**（原生动画时长系统固定，约 0.25s）。 */
-function animateWindowBounds(win, target, durationMs, done) {
-  if (win.__boundsTimer) {
-    clearTimeout(win.__boundsTimer);
-    win.__boundsTimer = null;
-  }
-  const bounds = {
-    x: Math.round(target.x),
-    y: Math.round(target.y),
-    width: Math.round(target.width),
-    height: Math.round(target.height),
-  };
-  try {
-    win.setBounds(bounds, true);
-  } catch (err) {
-    win.setBounds(bounds);
-  }
-  win.__boundsTimer = setTimeout(() => {
-    win.__boundsTimer = null;
-    if (!win.isDestroyed() && typeof done === 'function') done();
-  }, Math.max(120, durationMs || 0));
+  return clampToWorkArea({ x: orig.x + orig.width - size, y: orig.y, width: size, height: size });
 }
 
 function enterBallMode(win) {
@@ -453,43 +441,46 @@ function enterBallMode(win) {
   win.__ballBounds = ballBoundsFor(win.__ballOrig, size);
   if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
   win.setMinimumSize(size, size);
-  // 收缩开始：保留终端（看得见它缩进右上角）。
-  win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'enter' });
-  animateWindowBounds(win, win.__ballBounds, BALL_ANIM_MS, null);
-  // 提前一点隐藏终端、显示球（在缩到很小之前就压住，避免动画最后一下的卡顿）。
-  if (win.__ballSettleTimer) clearTimeout(win.__ballSettleTimer);
+  // 窗口保持原尺寸，渲染层用 CSS 把终端从 1 缩到球大小（transform，GPU、不跳）。
+  const scaleX = size / win.__ballOrig.width;
+  const scaleY = size / win.__ballOrig.height;
+  win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'enter', duration: BALL_ANIM_MS, scaleX, scaleY });
+  // 动画结束后：窗口一次性收到球大小，切到球（此刻终端已被缩到小球大小，衔接无缝）。
+  clearBallSettleTimer(win);
   win.__ballSettleTimer = setTimeout(() => {
     win.__ballSettleTimer = null;
     if (win.isDestroyed() || !win.__ballActive) return;
+    win.setBounds(win.__ballBounds, false);
     if (typeof win.setResizable === 'function') win.setResizable(false);
     win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'settle' });
-  }, Math.round(BALL_ANIM_MS * 0.3));
+  }, BALL_ANIM_MS);
   logger.file(`[terminal] entered ball mode (${win.id}) size=${size}`);
 }
 
 function exitBallMode(win, focus) {
   if (!isTerminalWindow(win) || !win.__ballActive || win.__exitingBall || win.isDestroyed()) return;
   win.__exitingBall = true;
-  if (win.__ballSettleTimer) {
-    clearTimeout(win.__ballSettleTimer);
-    win.__ballSettleTimer = null;
-  }
+  clearBallSettleTimer(win);
   const orig = win.__ballOrig || win.getBounds();
   const size = ballSize();
-  // 没拖动过球 → 原样恢复；拖动过 → 以球的位置为「右上角」展开回原尺寸（夹回工作区）。
+  // 没拖动过球 → 原样恢复；拖动过 → 以球的位置为右上角展开回原尺寸（夹回工作区）。
   const current = win.getBounds();
   const restore = win.__ballMoved
-    ? clampToWorkArea({ x: current.x, y: current.y, width: orig.width, height: orig.height })
+    ? clampToWorkArea({ x: current.x + size - orig.width, y: current.y, width: orig.width, height: orig.height })
     : orig;
-  // 放大期间只显示球（窗口从球长大），结束后再切回终端。
-  win.webContents.send(IPC.TERMINAL_BALL, { active: false, size, phase: 'grow' });
-  const finish = () => {
+  // 窗口一次性还原到原尺寸（此刻只显示球，右上角不变，看不到跳变），渲染层再用 CSS 把终端从球大小放大。
+  win.setBounds(restore, false);
+  const scaleX = size / restore.width;
+  const scaleY = size / restore.height;
+  win.webContents.send(IPC.TERMINAL_BALL, { active: false, size, phase: 'grow', duration: BALL_ANIM_MS, scaleX, scaleY });
+  clearBoundsTimer(win);
+  win.__boundsTimer = setTimeout(() => {
+    win.__boundsTimer = null;
     if (win.isDestroyed()) return;
     win.__ballActive = false;
     win.__ballBounds = null;
     win.__ballOrig = null;
     win.__exitingBall = false;
-    // 动画结束后才改可缩放 / 最小尺寸 / 置顶 / 聚焦（中途改会与动画抢状态 → 弹跳）。
     if (typeof win.setResizable === 'function') win.setResizable(true);
     win.setMinimumSize(TERMINAL_WINDOW.minWidth, TERMINAL_WINDOW.minHeight);
     if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
@@ -498,8 +489,7 @@ function exitBallMode(win, focus) {
     saveTerminalGeometry(win);
     if (focus !== false) win.focus();
     logger.file(`[terminal] exited ball mode (${win.id})`);
-  };
-  animateWindowBounds(win, restore, BALL_ANIM_MS, finish);
+  }, BALL_ANIM_MS);
 }
 
 function startBallDrag(win, x, y) {
@@ -889,7 +879,7 @@ function openTerminalWindow() {
   // 失去焦点 → 延迟后缩成圆形悬浮球（延时内焦点回来则取消；DevTools 打开 / iTerm 交接时不动）。
   win.on('blur', () => {
     if (isQuitting || win.__ballActive || win.__exitingBall || !win.__everFocused) return;
-    if (win.__suppressBall || !win.isVisible()) return;
+    if (win.__suppressBall || win.__ballPin || !win.isVisible()) return;
     if (!terminalBallEnabled()) return;
     if (win.webContents.isDevToolsOpened && win.webContents.isDevToolsOpened()) return;
     lastTerminalWindow = win;

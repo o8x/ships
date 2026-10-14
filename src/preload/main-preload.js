@@ -67,6 +67,7 @@ const api = {
     onBall: (cb) => on(IPC.TERMINAL_BALL, cb),
     ballDrag: (payload) => ipcRenderer.send(IPC.TERMINAL_BALL_DRAG, payload),
     restoreBall: () => ipcRenderer.invoke(IPC.TERMINAL_BALL_RESTORE),
+    setBallPin: (value) => ipcRenderer.invoke(IPC.TERMINAL_BALL_PIN, { value }),
   },
   sftp: {
     connect: (target) => ipcRenderer.invoke(IPC.SFTP_CONNECT, { target }),

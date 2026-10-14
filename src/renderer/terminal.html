@@ -19,11 +19,14 @@
         class="flex shrink-0 items-center justify-between gap-2 px-3"
         style="border-bottom: 1px solid var(--color-border); -webkit-app-region: drag"
       >
-        <!-- 自绘小红绿灯（系统红绿灯由主进程 setWindowButtonVisibility(false) 隐藏） -->
-        <div id="term-lights" class="flex shrink-0 items-center" style="-webkit-app-region: no-drag">
-          <button id="light-close" class="traffic-light traffic-close" type="button"></button>
-          <button id="light-minimize" class="traffic-light traffic-minimize" type="button"></button>
-          <button id="light-zoom" class="traffic-light traffic-zoom" type="button"></button>
+        <!-- 自绘小红绿灯（系统红绿灯由主进程隐藏）+「固定」按钮（开启后本窗口不缩成悬浮球） -->
+        <div class="flex shrink-0 items-center gap-1.5">
+          <div id="term-lights" class="flex shrink-0 items-center" style="-webkit-app-region: no-drag">
+            <button id="light-close" class="traffic-light traffic-close" type="button"></button>
+            <button id="light-minimize" class="traffic-light traffic-minimize" type="button"></button>
+            <button id="light-zoom" class="traffic-light traffic-zoom" type="button"></button>
+          </div>
+          <button id="term-pin" class="icon-btn term-pin-btn" type="button" style="-webkit-app-region: no-drag"></button>
         </div>
         <div id="term-actions" class="flex shrink-0 items-center" style="-webkit-app-region: no-drag">
           <button id="btn-files" class="icon-btn" type="button"></button>

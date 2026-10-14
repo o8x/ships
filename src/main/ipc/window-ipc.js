@@ -15,6 +15,7 @@ const {
   startBallDrag,
   stopBallDrag,
   exitBallMode,
+  enterBallMode,
   getFileWindow,
   openFileWindow,
 } = require('../window-manager');
@@ -32,6 +33,11 @@ function registerWindowIpc(ipcMain) {
       return { ok: true, action };
     }
     if (action === 'minimize') {
+      // 终端窗口的「最小化」= 缩成悬浮球（而不是真正最小化）。
+      if (isTerminalWindow(win)) {
+        enterBallMode(win);
+        return { ok: true, action };
+      }
       win.minimize();
       return { ok: true, action };
     }
@@ -57,6 +63,14 @@ function registerWindowIpc(ipcMain) {
     if (!win || win.isDestroyed()) return { ok: false };
     exitBallMode(win, true);
     return { ok: true };
+  });
+
+  // 「固定」按钮（仅当前终端窗口，默认关）：开启后该窗口失焦不再缩成悬浮球。
+  ipcMain.handle(IPC.TERMINAL_BALL_PIN, (event, payload) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed() || !isTerminalWindow(win)) return { ok: false };
+    win.__ballPin = Boolean(payload && payload.value);
+    return { ok: true, value: win.__ballPin };
   });
   ipcMain.on(IPC.WINDOW_OPEN_SETTINGS, (_event, section) => {
     hideMainWindow();
