@@ -391,10 +391,11 @@ input[type='color'].swatch::-webkit-color-swatch {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
   border: 1px solid color-mix(in srgb, #fff 40%, var(--color-border));
   -webkit-backdrop-filter: blur(30px) saturate(1.5);
   backdrop-filter: blur(30px) saturate(1.5);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 30%, transparent);
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
@@ -409,7 +410,7 @@ input[type='color'].swatch::-webkit-color-swatch {
 }
 /* Liquid Glass 开关不改变球底（始终半透明磨砂）。 */
 [data-ball='on'][data-ball-glass='glass'] #term-ball {
-  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
 }
 #term-ball:active {
   cursor: grabbing;
