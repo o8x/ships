@@ -337,9 +337,9 @@ function destroyTerminalWindow(target) {
   // 即将销毁：不要因失焦（如 iTerm 交接、会话结束）触发缩球。
   win.__suppressBall = true;
   clearBallTimer(win);
-  if (win.__boundsAnim) {
-    clearInterval(win.__boundsAnim);
-    win.__boundsAnim = null;
+  if (win.__boundsTimer) {
+    clearTimeout(win.__boundsTimer);
+    win.__boundsTimer = null;
   }
   saveTerminalGeometry(win);
   win.destroy();
@@ -381,7 +381,8 @@ function toggleTerminalWindow() {
    - 期间不改动几何记忆（terminal-window.json）。
    - 拖动由渲染层指针事件触发，主进程按光标位置移动窗口（这样「点击 vs 拖动」可区分）。 */
 let ballDragTimer = null;
-const BALL_ANIM_MS = 1000;
+// 原生窗口动画时长系统固定（约 0.25s）；此值只用于阶段切换（enter→settle / grow→finish）的定时。
+const BALL_ANIM_MS = 260;
 
 function terminalBallEnabled() {
   return settings.get('terminalBallEnabled') !== false;
@@ -414,41 +415,28 @@ function ballBoundsFor(orig, size) {
   return clampToWorkArea({ x: orig.x + orig.width - size, y: orig.y, width: size, height: size });
 }
 
-/* 逐帧把窗口 bounds 插值到 target（ease-in-out cubic），**锚定右上角**：
-   每帧只插值宽/高，x = right − w、y = top，保证右上角纹丝不动（否则 x 与 width 分别取整
-   会相差 ±1px，球就会抖）。完成后回调 done。 */
+/* 用 macOS 原生窗口动画（`setBounds(bounds, true)`，由合成器逐帧渲染，不卡）完成
+   球 ↔ 原尺寸的缩放；`durationMs` 只用于**阶段切换的定时**（原生动画时长系统固定，约 0.25s）。 */
 function animateWindowBounds(win, target, durationMs, done) {
-  if (win.__boundsAnim) {
-    clearInterval(win.__boundsAnim);
-    win.__boundsAnim = null;
+  if (win.__boundsTimer) {
+    clearTimeout(win.__boundsTimer);
+    win.__boundsTimer = null;
   }
-  const from = win.getBounds();
-  const right = Math.round(target.x + target.width);
-  const top = Math.round(target.y);
-  if (!durationMs || durationMs <= 0) {
-    win.setBounds({ x: right - target.width, y: top, width: target.width, height: target.height });
-    if (typeof done === 'function') done();
-    return;
+  const bounds = {
+    x: Math.round(target.x),
+    y: Math.round(target.y),
+    width: Math.round(target.width),
+    height: Math.round(target.height),
+  };
+  try {
+    win.setBounds(bounds, true);
+  } catch (err) {
+    win.setBounds(bounds);
   }
-  const start = Date.now();
-  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-  win.__boundsAnim = setInterval(() => {
-    if (win.isDestroyed()) {
-      clearInterval(win.__boundsAnim);
-      win.__boundsAnim = null;
-      return;
-    }
-    const t = Math.min(1, (Date.now() - start) / durationMs);
-    const k = ease(t);
-    const width = Math.round(from.width + (target.width - from.width) * k);
-    const height = Math.round(from.height + (target.height - from.height) * k);
-    win.setBounds({ x: right - width, y: top, width, height });
-    if (t >= 1) {
-      clearInterval(win.__boundsAnim);
-      win.__boundsAnim = null;
-      if (typeof done === 'function') done();
-    }
-  }, 16);
+  win.__boundsTimer = setTimeout(() => {
+    win.__boundsTimer = null;
+    if (!win.isDestroyed() && typeof done === 'function') done();
+  }, Math.max(120, durationMs || 0));
 }
 
 function enterBallMode(win) {

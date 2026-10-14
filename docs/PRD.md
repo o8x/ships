@@ -244,7 +244,7 @@ Ships/
     - **开关与延迟**：设置 → 终端「自动缩成悬浮球」（`settings.terminalBallEnabled`，默认开）、「缩成悬浮球延迟」（`settings.terminalBallDelayMs`，默认 500ms）、「悬浮球大小」（`settings.terminalBallSize`，默认 75px，1:1）；**延迟内焦点回来则取消缩球**（`blur` 起计时、`focus` 清除）。
     - **窗口形态**：终端窗口以 `frame: false` + `transparent: true` + `hasShadow: false` + **`acceptFirstMouse: true`** 创建（macOS：让悬浮球浮在其它应用 / 全屏应用之上时**第一次点击**就落到窗口内容，而不必先激活、点两次）；底座 `#term-shell` 负责底色 / 圆角 / 描边，悬浮球为 `#term-ball`（**固定 `--term-ball-size` 的圆形 + `ships.svg` 图标**，`--color-accent`）——球尺寸固定、**锚在窗口右上角**（`top:0; right:0`），动画期间右上角不动（不会变椭圆、不会先变大）。
     - **位置稳定**：球 = 原窗口**右上角**的 `size×size` 方块；若用户没拖动过球，放大时**原样恢复**原 bounds（多次「终端 ↔ 球」往返位置不变）；拖动过则以球位置为右上角展开回原尺寸（夹回工作区）。
-    - **缩放动画**：主进程用 **JS 逐帧插值**（16ms、ease-in-out cubic、`BALL_ANIM_MS = 1000ms`）`setBounds` 把窗口在**球 ↔ 原尺寸**间平滑过渡；每帧**只插值宽 / 高、`x = 右上角 − 宽` 推导**，保证右上角严格不动（否则宽与 x 分别取整会差 ±1px，球会抖）；`setMinimumSize` 只在放大动画**结束后**恢复，避免最小尺寸把窗口瞬间「弹」大导致抖动。
+    - **缩放动画**：用 **macOS 原生窗口动画 `win.setBounds(bounds, true)`**（由系统合成器逐帧渲染，**不卡不抖**）把窗口在**球 ↔ 原尺寸**间平滑过渡；原生动画时长由系统固定（约 0.25s），`BALL_ANIM_MS = 260ms` 仅用于**阶段切换定时**（enter→settle / grow→finish）。`setMinimumSize` 只在放大动画**结束后**恢复，避免最小尺寸把窗口瞬间「弹」大。
     - **阶段（`terminal:ball` 的 `phase`）**：`enter` = 只保留终端（收缩动画看得见，终端一路缩进右上角，**此阶段不显示球**）；`on` = 收缩完成后**只留球**（终端隐藏，球淡入「压住」窗口）；`grow` = 放大过程中只显示球（窗口从球长大）；`off`（`settle`）= 切回终端并重新 `fit` / 对齐。进入 / 放大都由主进程在动画结束时切换到下一阶段，期间**不写几何记忆**（`saveTerminalGeometry` 遇球模式直接返回）。
     - **动画期间禁用整格对齐**：球模式下主进程的 `applyTerminalSnap` / `requestTerminalSnap` / `markTerminalResizing` 与渲染层的 `ResizeObserver` / `fitIfNeeded` 全部跳过 —— 否则「窗口宽高对齐到整行 / 整列」会与缩放动画抢尺寸，导致缩 / 放过程抖动。
     - **拖动**：渲染层指针事件（pointer capture）→ 主进程按光标位置持续 `setPosition`（16ms）；「按下到松开位移 ≤ 3px」判定为**点击**（聚焦后按住不放视为拖动，松开即展开）。
