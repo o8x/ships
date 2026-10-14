@@ -512,6 +512,7 @@
   const offData = window.ships.terminal.onData((message) => {
     if (!message || message.id !== sessionId || message.type !== 'data') return;
     write(message.data);
+    pulseBall();
   });
   const offSession = window.ships.terminal.onSession((message) => {
     if (!message || message.id !== sessionId) return;
@@ -663,6 +664,24 @@
   function applyBallDark(dark) {
     document.documentElement.dataset.ballDark = dark ? 'on' : 'off';
   }
+  // 终端持续有输出时，悬浮球图标做轻微弹簧跳动；1s 内无输出则停止。
+  let ballPulseTimer = null;
+  function pulseBall() {
+    if (!ballMode || !ballEl) return;
+    ballEl.classList.add('term-ball-bounce');
+    clearTimeout(ballPulseTimer);
+    ballPulseTimer = setTimeout(() => {
+      ballPulseTimer = null;
+      if (ballEl) ballEl.classList.remove('term-ball-bounce');
+    }, 1000);
+  }
+  function stopBallPulse() {
+    if (ballPulseTimer) {
+      clearTimeout(ballPulseTimer);
+      ballPulseTimer = null;
+    }
+    if (ballEl) ballEl.classList.remove('term-ball-bounce');
+  }
   if (ballTrashEl) ballTrashEl.innerHTML = Icons.trash(24);
   if (ballEl) {
     let dragging = false;
@@ -750,6 +769,7 @@
     } else {
       // settle：动画结束，恢复正常、重新 fit / 对齐，并把焦点交回终端输入。
       ballMode = false;
+      stopBallPulse();
       resetBallShellScale();
       document.documentElement.dataset.ball = 'off';
       setTimeout(() => {

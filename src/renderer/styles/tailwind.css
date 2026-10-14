@@ -432,6 +432,24 @@ input[type='color'].swatch::-webkit-color-swatch {
 [data-ball-dark='off'] #term-ball {
   background: color-mix(in srgb, #ffffff 92%, transparent);
 }
+/* 终端持续有输出时，悬浮球图标轻微弹簧跳动（无输出 1s 后由 JS 移除该类）。 */
+@keyframes ships-ball-bounce {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  35% {
+    transform: translateY(-7%) scale(1.07, 0.93);
+  }
+  70% {
+    transform: translateY(0) scale(0.97, 1.03);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+.term-ball-bounce .term-ball-icon {
+  animation: ships-ball-bounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+}
 /* 设置 → 终端：悬浮球图标选择器的预览框。 */
 .ball-icon-preview {
   display: inline-flex;
