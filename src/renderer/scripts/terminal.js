@@ -659,9 +659,9 @@
     ballIconEl.innerHTML = svg;
   }
   applyBallIcon(ballIconName);
-  // 悬浮球图标颜色：暗色模式 = 浅色/白色图标（默认），否则黑色；不跟随全局主题。
-  function applyBallIconTheme(dark) {
-    document.documentElement.dataset.ballIconDark = dark ? 'on' : 'off';
+  // 悬浮球底色：暗色模式（默认）/ 白天模式；不跟随全局主题。图标始终保留原色。
+  function applyBallDark(dark) {
+    document.documentElement.dataset.ballDark = dark ? 'on' : 'off';
   }
   if (ballTrashEl) ballTrashEl.innerHTML = Icons.trash(24);
   if (ballEl) {
@@ -774,7 +774,7 @@
     i18n.setLocale((settings && settings.locale) || 'zh');
     window.ShipsTheme.set(settings || {});
     applyBallIcon(settings && settings.terminalBallIcon);
-    applyBallIconTheme((settings && settings.terminalBallDarkIcon) !== false);
+    applyBallDark((settings && settings.terminalBallDark) !== false);
     renderHeader();
     sshPicker = setupSshPicker();
     refreshSshPicker();
@@ -790,7 +790,7 @@
       i18n.setLocale((next && next.locale) || 'zh');
       window.ShipsTheme.set(next || {});
       applyBallIcon(next && next.terminalBallIcon);
-      applyBallIconTheme((next && next.terminalBallDarkIcon) !== false);
+      applyBallDark((next && next.terminalBallDark) !== false);
       renderHeader();
       refreshSshPicker();
       if (term) term.options.theme = themeColors();

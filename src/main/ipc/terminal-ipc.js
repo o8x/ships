@@ -28,7 +28,7 @@ const TERMINAL_SETTING_KEYS = [
   'terminalBallDelayMs',
   'terminalBallSize',
   'terminalBallIcon',
-  'terminalBallDarkIcon',
+  'terminalBallDark',
 ];
 
 function terminalDefaults() {

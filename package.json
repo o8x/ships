@@ -56,7 +56,7 @@
       "ballEnabled": true,
       "ballDelayMs": 200,
       "ballIcon": "ball.svg",
-      "ballDarkIcon": true
+      "ballDark": true
     },
     "sshBuiltinTerminal": true,
     "sftpDownloadDir": "~/Downloads",

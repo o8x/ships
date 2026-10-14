@@ -408,9 +408,9 @@ input[type='color'].swatch::-webkit-color-swatch {
 [data-ball='on'] #term-shell {
   display: none;
 }
-/* Liquid Glass 开关不改变球底（始终半透明磨砂）。 */
+/* Liquid Glass 开关不影响球的底色（底色由暗色/白天设置决定）。 */
 [data-ball='on'][data-ball-glass='glass'] #term-ball {
-  background: color-mix(in srgb, var(--color-surface) 97%, transparent);
+  border-color: color-mix(in srgb, #808080 55%, transparent);
 }
 #term-ball:active {
   cursor: grabbing;
@@ -425,12 +425,12 @@ input[type='color'].swatch::-webkit-color-swatch {
   width: calc(var(--term-ball-size, 75px) * 0.58);
   height: calc(var(--term-ball-size, 75px) * 0.58);
 }
-/* 悬浮球图标颜色：暗色模式 = 浅色/白色图标（默认）；关闭 = 保留图标原色（不去色）。 */
-[data-ball-icon-dark='on'] .term-ball-icon {
-  filter: brightness(0) invert(1);
+/* 悬浮球底色：暗色（默认）/ 白天；不跟随全局主题。图标始终保留原色（不去色）。 */
+[data-ball-dark='on'] #term-ball {
+  background: color-mix(in srgb, #2a2a2c 92%, transparent);
 }
-[data-ball-icon-dark='off'] .term-ball-icon {
-  filter: none;
+[data-ball-dark='off'] #term-ball {
+  background: color-mix(in srgb, #ffffff 92%, transparent);
 }
 /* 设置 → 终端：悬浮球图标选择器的预览框。 */
 .ball-icon-preview {

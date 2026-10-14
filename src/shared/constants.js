@@ -138,7 +138,7 @@ const TERMINAL_WINDOW = Object.assign(
     ballEnabled: true,
     ballDelayMs: 200,
     ballIcon: 'ball.svg',
-    ballDarkIcon: true,
+    ballDark: true,
   },
   ships.terminalWindow || {}
 );
@@ -196,8 +196,8 @@ const DEFAULT_SETTINGS = {
   terminalBallSize: Number.isFinite(TERMINAL_WINDOW.ballSize) ? TERMINAL_WINDOW.ballSize : 75,
   // 悬浮球图标（assets/icons/ball/ 下的文件名）
   terminalBallIcon: TERMINAL_WINDOW.ballIcon || 'ball.svg',
-  // 悬浮球图标是否为暗色模式（浅色/白色图标）；默认开，不跟随全局主题
-  terminalBallDarkIcon: TERMINAL_WINDOW.ballDarkIcon !== false,
+  // 悬浮球底色是否为暗色（浅色/暗色底）；默认开，不跟随全局主题。图标始终保留原色。
+  terminalBallDark: TERMINAL_WINDOW.ballDark !== false,
   // 内置终端文件面板：下载保存目录（默认 ~/Downloads）
   sftpDownloadDir: ships.sftpDownloadDir || '~/Downloads',
   // 独立文件窗口置顶

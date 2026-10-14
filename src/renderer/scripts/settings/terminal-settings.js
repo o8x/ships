@@ -44,8 +44,8 @@
         ballSizeHint: '圆形悬浮球的边长（宽高强制 1:1，40–200px）',
         ballIcon: '悬浮球图标',
         ballIconHint: '从 assets/icons/ball 中选择悬浮球显示的图标，实时生效',
-        ballDarkIcon: '悬浮球图标使用暗色',
-        ballDarkIconHint: '开启后图标为浅色/白色（默认）；关闭保留图标原色（不去色）；不跟随全局主题',
+        ballDark: '悬浮球暗色模式',
+        ballDarkHint: '开启用暗色底（默认）、关闭用浅色底；不跟随全局主题；图标始终保留原色',
         seconds: '秒',
         reset: '重置',
         resetHint: '恢复终端相关设置为默认值，并清除记住的窗口屏幕 / 位置 / 大小',
@@ -94,8 +94,8 @@
         ballSizeHint: 'Edge length of the round ball (forced 1:1, 40–200px)',
         ballIcon: 'Ball icon',
         ballIconHint: 'Pick the floating ball icon from assets/icons/ball (applies live)',
-        ballDarkIcon: 'Dark ball icon',
-        ballDarkIconHint: 'On = light/white icon (default); Off = keep original colors; independent of the app theme',
+        ballDark: 'Dark ball',
+        ballDarkHint: 'On = dark background (default), Off = light background; independent of the app theme; the icon keeps its colors',
         seconds: 's',
         reset: 'Reset',
         resetHint: 'Restore the terminal settings to their defaults and forget the remembered screen / position / size',
@@ -398,15 +398,15 @@
       row(i18n.t('terminalSettings.ballIcon'), i18n.t('terminalSettings.ballIconHint'), ballIconSelect.el)
     );
 
-    /* 悬浮球图标颜色：暗色模式（浅色图标）/ 黑色；不跟随全局主题 */
-    const ballDarkSwitch = switchControl(ctx.settings.terminalBallDarkIcon !== false, (value) =>
-      ctx.patch({ terminalBallDarkIcon: value })
+    /* 悬浮球底色：暗色（默认）/ 白天；不跟随全局主题。图标始终保留原色。 */
+    const ballDarkSwitch = switchControl(ctx.settings.terminalBallDark !== false, (value) =>
+      ctx.patch({ terminalBallDark: value })
     );
     syncers.push((next) => {
-      ballDarkSwitch.classList.toggle('on', next.terminalBallDarkIcon !== false);
+      ballDarkSwitch.classList.toggle('on', next.terminalBallDark !== false);
     });
     wrap.appendChild(
-      row(i18n.t('terminalSettings.ballDarkIcon'), i18n.t('terminalSettings.ballDarkIconHint'), ballDarkSwitch)
+      row(i18n.t('terminalSettings.ballDark'), i18n.t('terminalSettings.ballDarkHint'), ballDarkSwitch)
     );
 
     /* 全局快捷键：在任意界面按下即可拉起置顶终端窗口 */
