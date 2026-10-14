@@ -391,7 +391,7 @@ input[type='color'].swatch::-webkit-color-swatch {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 65%, transparent);
   border: 1px solid var(--color-border);
   cursor: grab;
   user-select: none;
@@ -407,9 +407,9 @@ input[type='color'].swatch::-webkit-color-swatch {
 }
 /* 悬浮球的玻璃效果：Liquid Glass 开启时用 CSS 玻璃观感（半透明 + 模糊 + 高光描边）。 */
 [data-ball='on'][data-ball-glass='glass'] #term-ball {
-  background: color-mix(in srgb, var(--color-surface) 42%, transparent);
-  -webkit-backdrop-filter: blur(16px) saturate(1.6);
-  backdrop-filter: blur(16px) saturate(1.6);
+  background: color-mix(in srgb, var(--color-surface) 26%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
   border-color: color-mix(in srgb, #fff 45%, var(--color-border));
   box-shadow: inset 0 1px 1px color-mix(in srgb, #fff 55%, transparent);
 }
@@ -440,6 +440,15 @@ input[type='color'].swatch::-webkit-color-swatch {
 .ball-icon-preview svg {
   width: 18px;
   height: 18px;
+}
+/* 下拉里带图标的选项 / 触发器（悬浮球图标选择）。 */
+.select-option-icon svg,
+.select-trigger .select-option-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.select-option .select-option-icon {
+  flex: 0 0 auto;
 }
 /* 球上右键 → 悬浮垃圾桶图标（半透明）；再点一下球即销毁终端。 */
 .term-ball-trash {

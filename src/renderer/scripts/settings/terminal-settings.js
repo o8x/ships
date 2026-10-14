@@ -373,32 +373,24 @@
       row(i18n.t('terminalSettings.ballSize'), i18n.t('terminalSettings.ballSizeHint'), ballSizeField.input)
     );
 
-    /* 悬浮球图标：assets/icons/ball/ 下可选，带预览，实时生效 */
+    /* 悬浮球图标：assets/icons/ball/ 下可选，下拉里直接显示图标，实时生效 */
     const ballIconData = window.shipsBallIcons || { names: [], icons: {} };
-    const ballIconPreview = el('span', { class: 'ball-icon-preview' });
-    const applyBallIconPreview = (name) => {
-      const svg = ballIconData.icons[name] || ballIconData.icons['ball.svg'] || '';
-      ballIconPreview.innerHTML = svg;
-    };
     const ballIconSelect = window.ShipsUI.createSelect({
-      options: ballIconData.names.map((name) => ({ value: name, label: name.replace(/\.svg$/, '') })),
+      options: ballIconData.names.map((name) => ({
+        value: name,
+        label: '',
+        icon: ballIconData.icons[name] || '',
+      })),
       value: ctx.settings.terminalBallIcon || 'ball.svg',
       align: 'right',
-      className: 'w-[140px] shrink-0',
-      onChange: (value) => {
-        applyBallIconPreview(value);
-        ctx.patch({ terminalBallIcon: value });
-      },
+      className: 'w-[90px] shrink-0',
+      onChange: (value) => ctx.patch({ terminalBallIcon: value }),
     });
-    applyBallIconPreview(ctx.settings.terminalBallIcon || 'ball.svg');
     syncers.push((next) => {
       ballIconSelect.setValue(next.terminalBallIcon || 'ball.svg');
-      applyBallIconPreview(next.terminalBallIcon || 'ball.svg');
     });
-    const ballIconControl = el('div', { class: 'flex shrink-0 items-center gap-2' });
-    ballIconControl.append(ballIconPreview, ballIconSelect.el);
     wrap.appendChild(
-      row(i18n.t('terminalSettings.ballIcon'), i18n.t('terminalSettings.ballIconHint'), ballIconControl)
+      row(i18n.t('terminalSettings.ballIcon'), i18n.t('terminalSettings.ballIconHint'), ballIconSelect.el)
     );
 
     /* 全局快捷键：在任意界面按下即可拉起置顶终端窗口 */

@@ -277,7 +277,15 @@ window.ShipsUI = (function createUI() {
 
     function syncLabel() {
       const item = currentItem();
-      label.textContent = item ? item.label : '';
+      label.textContent = '';
+      if (item) {
+        if (item.icon) {
+          const iconWrap = el('span', { class: 'select-option-icon inline-flex' });
+          iconWrap.innerHTML = item.icon;
+          label.appendChild(iconWrap);
+        }
+        if (item.label) label.appendChild(el('span', { class: 'truncate' }, item.label));
+      }
       if (menu) {
         Array.from(menu.children).forEach((node) =>
           node.classList.toggle('active', String(node.dataset.value) === String(current))
@@ -305,7 +313,12 @@ window.ShipsUI = (function createUI() {
       menu = el('div', { class: 'select-menu' });
       for (const item of items) {
         const opt = el('button', { type: 'button', class: 'select-option', dataset: { value: item.value } });
-        opt.append(el('span', { class: 'select-option-label truncate' }, item.label));
+        if (item.icon) {
+          const iconWrap = el('span', { class: 'select-option-icon inline-flex' });
+          iconWrap.innerHTML = item.icon;
+          opt.appendChild(iconWrap);
+        }
+        if (item.label) opt.appendChild(el('span', { class: 'select-option-label truncate' }, item.label));
         if (String(item.value) === String(current)) opt.appendChild(el('span', { class: 'inline-flex' }, Icons.check(14)));
         opt.addEventListener('click', () => {
           current = item.value;
