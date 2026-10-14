@@ -60,6 +60,7 @@
   const shellEl = document.getElementById('term-shell');
   const ballEl = document.getElementById('term-ball');
   const ballIconEl = document.getElementById('term-ball-icon');
+  const ballTrashEl = document.getElementById('term-ball-trash');
   const pinBtn = document.getElementById('term-pin');
 
   let term = null;
@@ -600,7 +601,9 @@
 
   itermBtn.addEventListener('click', () => window.ships.terminal.openIterm());
   lightClose.addEventListener('click', () => window.ships.windowControl('close'));
-  lightMinimize.addEventListener('click', () => window.ships.windowControl('minimize'));
+  // 终端窗口禁用「最小化」（关闭按钮在「隐藏」配置下已改为缩成悬浮球）。
+  lightMinimize.classList.add('traffic-disabled');
+  lightMinimize.setAttribute('aria-disabled', 'true');
   lightZoom.addEventListener('click', () => window.ships.windowControl('zoom'));
   window.addEventListener('focus', syncWindowFocus);
   window.addEventListener('blur', syncWindowFocus);
@@ -647,11 +650,22 @@
   }
 
   if (ballIconEl) ballIconEl.innerHTML = Icons.ships ? Icons.ships(46) : '';
+  if (ballTrashEl) ballTrashEl.innerHTML = Icons.trash(24);
   if (ballEl) {
     let dragging = false;
     let startX = 0;
     let startY = 0;
     let moved = false;
+    let trashArmed = false;
+    const setTrash = (on) => {
+      trashArmed = on;
+      document.documentElement.dataset.ballTrash = on ? 'on' : 'off';
+    };
+    // 球上右键 → 悬浮垃圾桶图标；再点一下球 → 销毁终端。
+    ballEl.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      setTrash(!trashArmed);
+    });
     ballEl.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) return;
       event.preventDefault();
@@ -668,7 +682,10 @@
     });
     ballEl.addEventListener('pointermove', (event) => {
       if (!dragging) return;
-      if (Math.abs(event.screenX - startX) > 3 || Math.abs(event.screenY - startY) > 3) moved = true;
+      if (Math.abs(event.screenX - startX) > 3 || Math.abs(event.screenY - startY) > 3) {
+        moved = true;
+        if (trashArmed) setTrash(false);
+      }
     });
     const endDrag = (event) => {
       if (!dragging) return;
@@ -679,7 +696,13 @@
         /* ignore */
       }
       window.ships.terminal.ballDrag({ phase: 'end' });
-      if (!moved) window.ships.terminal.restoreBall();
+      if (moved) return;
+      if (trashArmed) {
+        setTrash(false);
+        window.ships.terminal.destroy();
+      } else {
+        window.ships.terminal.restoreBall();
+      }
     };
     ballEl.addEventListener('pointerup', endDrag);
     ballEl.addEventListener('pointercancel', endDrag);

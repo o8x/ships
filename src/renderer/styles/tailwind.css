@@ -426,6 +426,29 @@ input[type='color'].swatch::-webkit-color-swatch {
   width: calc(var(--term-ball-size, 75px) * 0.58);
   height: calc(var(--term-ball-size, 75px) * 0.58);
 }
+/* 球上右键 → 悬浮垃圾桶图标（半透明）；再点一下球即销毁终端。 */
+.term-ball-trash {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-danger);
+  opacity: 0.9;
+}
+.term-ball-trash svg {
+  width: calc(var(--term-ball-size, 75px) * 0.5);
+  height: calc(var(--term-ball-size, 75px) * 0.5);
+}
+[data-ball-trash='on'] .term-ball-trash {
+  display: flex;
+}
+[data-ball-trash='on'] .term-ball-icon {
+  display: none;
+}
+[data-ball-trash='on'] #term-ball {
+  background: color-mix(in srgb, var(--color-danger) 26%, transparent);
+}
 @keyframes ships-ball-in {
   from {
     opacity: 0;
@@ -552,6 +575,11 @@ body.show-lines #term-host {
 }
 .traffic-zoom {
   background: var(--traffic-zoom);
+}
+/* 禁用的小红绿灯（如终端窗口禁用最小化）。 */
+.traffic-disabled {
+  opacity: 0.35;
+  pointer-events: none;
 }
 .traffic-light svg {
   width: var(--traffic-glyph-size);

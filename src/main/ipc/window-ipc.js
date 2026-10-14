@@ -11,7 +11,8 @@ const {
   getTerminalWindow,
   isTerminalWindow,
   openTerminalWindow,
-  closeTerminalWindow,
+  terminalCloseAction,
+  destroyTerminalWindow,
   startBallDrag,
   stopBallDrag,
   exitBallMode,
@@ -27,17 +28,18 @@ function registerWindowIpc(ipcMain) {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win || win.isDestroyed()) return { ok: false, action };
     if (action === 'close') {
-      // 终端窗口：按「关闭按钮行为」隐藏或销毁；其它窗口照旧关闭
-      if (isTerminalWindow(win)) closeTerminalWindow(win);
-      else win.close();
+      // 终端窗口：关闭按钮行为 = 隐藏时改为「缩成悬浮球」；否则销毁。其它窗口照旧关闭。
+      if (isTerminalWindow(win)) {
+        if (terminalCloseAction() === 'hide') enterBallMode(win);
+        else destroyTerminalWindow(win);
+        return { ok: true, action };
+      }
+      win.close();
       return { ok: true, action };
     }
     if (action === 'minimize') {
-      // 终端窗口的「最小化」= 缩成悬浮球（而不是真正最小化）。
-      if (isTerminalWindow(win)) {
-        enterBallMode(win);
-        return { ok: true, action };
-      }
+      // 终端窗口禁用最小化。
+      if (isTerminalWindow(win)) return { ok: false, action };
       win.minimize();
       return { ok: true, action };
     }

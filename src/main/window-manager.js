@@ -915,12 +915,11 @@ function openTerminalWindow() {
   // 会话结束（exit）与 iTerm 交接走 destroyTerminalWindow()，不受这里拦截。
   win.on('close', (event) => {
     // 退出应用时不再拦截，保证 app.quit() 能真正关掉窗口。
-    // 单扇时按「关闭按钮行为」隐藏；多扇时一律销毁（不拦）。
-    if (!isQuitting && shouldHideOnClose()) {
+    // 关闭按钮行为 = 隐藏时：改为缩成悬浮球；否则销毁（不拦）。
+    if (!isQuitting && terminalCloseAction() === 'hide') {
       event.preventDefault();
       clearBallTimer(win);
-      saveTerminalGeometry(win);
-      win.hide();
+      enterBallMode(win);
       return;
     }
     saveTerminalGeometry(win);
