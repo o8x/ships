@@ -337,6 +337,10 @@ function destroyTerminalWindow(target) {
   // 即将销毁：不要因失焦（如 iTerm 交接、会话结束）触发缩球。
   win.__suppressBall = true;
   clearBallTimer(win);
+  if (win.__ballSettleTimer) {
+    clearTimeout(win.__ballSettleTimer);
+    win.__ballSettleTimer = null;
+  }
   if (win.__boundsTimer) {
     clearTimeout(win.__boundsTimer);
     win.__boundsTimer = null;
@@ -448,18 +452,27 @@ function enterBallMode(win) {
   win.__ballBounds = ballBoundsFor(win.__ballOrig, size);
   if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
   win.setMinimumSize(size, size);
-  if (typeof win.setResizable === 'function') win.setResizable(false);
-  // 收缩期间：显示球但**保留终端**（能看到终端一路缩进右上角），结束后再隐藏终端只留球。
+  // 收缩开始：保留终端（看得见它缩进右上角）。
   win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'enter' });
-  animateWindowBounds(win, win.__ballBounds, BALL_ANIM_MS, () => {
-    if (!win.isDestroyed()) win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'settle' });
-  });
+  animateWindowBounds(win, win.__ballBounds, BALL_ANIM_MS, null);
+  // 提前一点隐藏终端、显示球（在缩到很小之前就压住，避免动画最后一下的卡顿）。
+  if (win.__ballSettleTimer) clearTimeout(win.__ballSettleTimer);
+  win.__ballSettleTimer = setTimeout(() => {
+    win.__ballSettleTimer = null;
+    if (win.isDestroyed() || !win.__ballActive) return;
+    if (typeof win.setResizable === 'function') win.setResizable(false);
+    win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'settle' });
+  }, Math.round(BALL_ANIM_MS * 0.55));
   logger.file(`[terminal] entered ball mode (${win.id}) size=${size}`);
 }
 
 function exitBallMode(win, focus) {
   if (!isTerminalWindow(win) || !win.__ballActive || win.__exitingBall || win.isDestroyed()) return;
   win.__exitingBall = true;
+  if (win.__ballSettleTimer) {
+    clearTimeout(win.__ballSettleTimer);
+    win.__ballSettleTimer = null;
+  }
   const orig = win.__ballOrig || win.getBounds();
   const size = ballSize();
   // 没拖动过球 → 原样恢复；拖动过 → 以球的位置为「右上角」展开回原尺寸（夹回工作区）。
@@ -467,11 +480,7 @@ function exitBallMode(win, focus) {
   const restore = win.__ballMoved
     ? clampToWorkArea({ x: current.x + size - orig.width, y: current.y, width: orig.width, height: orig.height })
     : orig;
-  if (typeof win.setResizable === 'function') win.setResizable(true);
-  if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
-  else win.setAlwaysOnTop(false);
-  if (focus !== false) win.focus();
-  // 放大期间只显示球（窗口从球长大），结束后再显示终端。
+  // 放大期间只显示球（窗口从球长大），结束后再切回终端。
   win.webContents.send(IPC.TERMINAL_BALL, { active: false, size, phase: 'grow' });
   const finish = () => {
     if (win.isDestroyed()) return;
@@ -479,10 +488,14 @@ function exitBallMode(win, focus) {
     win.__ballBounds = null;
     win.__ballOrig = null;
     win.__exitingBall = false;
-    // 放大动画结束后再恢复最小尺寸并切回终端（避免最小尺寸把窗口「弹」大导致抖动）。
+    // 动画结束后才改可缩放 / 最小尺寸 / 置顶 / 聚焦（中途改会与动画抢状态 → 弹跳）。
+    if (typeof win.setResizable === 'function') win.setResizable(true);
     win.setMinimumSize(TERMINAL_WINDOW.minWidth, TERMINAL_WINDOW.minHeight);
+    if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
+    else win.setAlwaysOnTop(false);
     win.webContents.send(IPC.TERMINAL_BALL, { active: false, size, phase: 'settle' });
     saveTerminalGeometry(win);
+    if (focus !== false) win.focus();
     logger.file(`[terminal] exited ball mode (${win.id})`);
   };
   animateWindowBounds(win, restore, BALL_ANIM_MS, finish);
