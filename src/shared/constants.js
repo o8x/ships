@@ -17,6 +17,7 @@ const IPC = {
   OPEN_CONSOLE: 'app:open-console',
   CLEAR_DATA: 'app:clear-data',
   OPEN_EXTERNAL: 'app:open-external',
+  UPDATER_CHECK: 'app:check-updates',
 
   WINDOW_HIDE: 'window:hide',
   WINDOW_OPEN_SETTINGS: 'window:open-settings',

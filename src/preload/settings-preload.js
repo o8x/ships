@@ -21,6 +21,7 @@ const api = {
   openLog: () => ipcRenderer.invoke(IPC.OPEN_LOG),
   openConsole: () => ipcRenderer.invoke(IPC.OPEN_CONSOLE),
   clearData: () => ipcRenderer.invoke(IPC.CLEAR_DATA),
+  checkUpdates: () => ipcRenderer.invoke(IPC.UPDATER_CHECK),
   openExternal: (url) => ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url),
   closeSettings: () => ipcRenderer.send(IPC.WINDOW_CLOSE_SETTINGS),
   openDevTools: (target) => ipcRenderer.invoke(IPC.DEVTOOLS_OPEN, target),

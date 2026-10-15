@@ -39,6 +39,8 @@
         open: '打开',
         about: '关于',
         version: '版本',
+        checkUpdates: '检查更新',
+        check: '检查',
         developerMode: '开发者模式',
         developerModeHint: '开启后显示下方的开发者工具，并在主界面版本号旁标记',
         developer: '开发者',
@@ -81,6 +83,8 @@
         open: 'Open',
         about: 'About',
         version: 'Version',
+        checkUpdates: 'Check for updates',
+        check: 'Check',
         developerMode: 'Developer mode',
         developerModeHint: 'Show the developer tools below, and mark it next to the version in the main panel',
         developer: 'Developer',
@@ -272,6 +276,30 @@
     aboutSection.appendChild(
       row(i18n.t('settingsPage.version'), '', el('span', { class: 'font-mono text-[12px] text-fg-muted' }, `v${(info && info.version) || ''}`))
     );
+
+    /* 检查更新：手动触发自动更新检查（服务端弹窗提示结果）。 */
+    const updateRow = el('div', {
+      class: 'flex items-center justify-between gap-4 rounded-card border border-border bg-surface px-4 py-3',
+    });
+    const updateLeft = el('div', { class: 'min-w-0' });
+    updateLeft.appendChild(el('div', { class: 'text-[13px] font-medium text-fg' }, i18n.t('settingsPage.checkUpdates')));
+    const updateNote = el('div', { class: 'mt-0.5 break-all text-[11px] text-fg-muted' });
+    updateLeft.appendChild(updateNote);
+    const checkBtn = el('button', { class: 'btn shrink-0', type: 'button' }, i18n.t('settingsPage.check'));
+    checkBtn.addEventListener('click', async () => {
+      updateNote.textContent = '';
+      checkBtn.disabled = true;
+      try {
+        const res = await window.ships.checkUpdates();
+        if (res && res.ok === false) updateNote.textContent = res.message || res.error || '';
+      } catch (err) {
+        updateNote.textContent = String((err && err.message) || err);
+      } finally {
+        checkBtn.disabled = false;
+      }
+    });
+    updateRow.append(updateLeft, checkBtn);
+    aboutSection.appendChild(updateRow);
 
     /* 开发者模式开关：开启后才显示下方的开发者工具区，值持久化到 settings.json。 */
     const devModeSwitch = switchControl(settings.developerMode === true, (value) =>

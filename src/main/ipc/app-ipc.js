@@ -5,6 +5,7 @@ const { app, shell, BrowserWindow, dialog } = require('electron');
 const os = require('os');
 const { IPC, VERSION, TERMINAL_WINDOW } = require('../../shared/constants');
 const logger = require('../utils/logger');
+const updater = require('../services/updater-service');
 const {
   DATA_DIR,
   LOG_DIR,
@@ -86,6 +87,12 @@ function registerAppIpc(ipcMain) {
     }
     await shell.openExternal(url);
     return { ok: true };
+  });
+
+  // 设置界面「检查更新」（手动）：由 updater-service 弹窗提示结果。
+  ipcMain.handle(IPC.UPDATER_CHECK, (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    return updater.checkForUpdatesInteractive(win);
   });
 
   // Directory picker (settings → terminal → SFTP download directory).

@@ -19,6 +19,7 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "electron-liquid-glass": "^1.1.1",
+    "electron-updater": "^6.8.9",
     "ssh2": "^1.17.0"
   },
   "devDependencies": {
@@ -60,7 +61,7 @@
     },
     "sshBuiltinTerminal": true,
     "sftpDownloadDir": "~/Downloads",
-  "cdHistoryMax": 10,
+    "cdHistoryMax": 10,
     "logRetentionDays": 7,
     "fileWindow": {
       "width": 900,
@@ -84,17 +85,24 @@
     "directories": {
       "output": "release"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "o8x",
+        "repo": "ships"
+      }
+    ],
     "files": [
       "src/**/*",
       "assets/**/*",
       "package.json"
     ],
     "asar": true,
-  "asarUnpack": [
-    "**/*.node",
-    "src/main/scripts/*",
-    "node_modules/electron-liquid-glass/**"
-  ],
+    "asarUnpack": [
+      "**/*.node",
+      "src/main/scripts/*",
+      "node_modules/electron-liquid-glass/**"
+    ],
     "npmRebuild": false,
     "compression": "maximum",
     "electronLanguages": [
@@ -107,6 +115,12 @@
       "target": [
         {
           "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
           "arch": [
             "arm64"
           ]

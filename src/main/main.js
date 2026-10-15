@@ -47,6 +47,9 @@ function onReady() {
   installApplicationMenu();
   wm.createMainWindow();
 
+  // 自动更新：打包后静默检查一次，发现新版本再提示下载 / 安装。
+  require('./services/updater-service').initUpdater();
+
   const tray = createTray({
     onLeftClick: () => wm.toggleMainWindow(),
     onOpenSettings: () => wm.openSettingsWindow(),
