@@ -7,7 +7,7 @@
 | 技术栈 | Electron 44（主进程）+ Tailwind CSS 3（界面样式）+ 原生 JavaScript（渲染层，无打包器）+ ssh2（SSH 探测）+ electron-liquid-glass（macOS 26+ 原生 Liquid Glass，可选）+ electron-updater（自动更新）+ @xterm/xterm 与 @xterm/addon-fit（设置页内嵌终端）+ python3（PTY 桥接脚本）+ 本地 geoip.json（IP 归属地） |
 | 支持平台 | macOS（arm64 / x64；当前主要面向 arm64） |
 | 当前版本 | 3.19.1 |
-| 发布方式 | 本地/CI 通过 `electron-builder` 打包 macOS arm64 **DMG + ZIP**（`pnpm dist:mac`）；打 `v*` tag 时发布到 GitHub Releases，内置 `electron-updater` 自动更新（见 §7）；暂未签名 / 公证 |
+| 发布方式 | 本地/CI 通过 `electron-builder` 打包 macOS arm64 **DMG + ZIP**（`pnpm dist:mac`）；打 `v*` tag 时发布到 GitHub Releases；更新用 `electron-updater` 做版本检测，**macOS 下载 DMG 手动安装**（挂载 DMG 后拖入 Applications）、Windows 走 `electron-updater` 自动安装（见 §7）；暂未签名 / 公证 |
 
 **核心设计**：应用常驻系统托盘、不占用 Dock；点击托盘图标在图标正下方弹出 400×500 的圆角面板，面板内以顶部 TAB 切换工具、底部显示版本与设置入口；所有输入实时反馈，无需点击“计算”按钮。
 
@@ -537,14 +537,20 @@ flowchart TD
   C -- 否（静默） --> Z[结束]
   C -- 出错（手动） --> E[弹窗：暂时无法检查]
   D -- 稍后 --> Z
-  D -- 下载 --> W["打开下载窗口（不可关闭）：进度条 + 取消 + 禁用的重启按钮"]
-  W --> F[downloadUpdate 差量下载]
-  F -- download-progress --> W
-  F -- 取消 --> X[中止下载 / 关闭窗口：退出本次更新]
-  F --> G[update-downloaded]
-  G --> H["下载窗口：重启按钮可用 + 显示 60 秒倒计时"]
-  H -- 点重启 / 倒计时到 0 --> I[quitAndInstall]
-  H -- 取消 --> X2[关闭窗口：不立即重启]
+  D -- 下载 --> W["下载窗口（不可关闭）：进度条 + 取消 + 安装按钮"]
+  W --> F{平台?}
+  F -- "macOS" --> F1["下载 .dmg（GitHub Release，net 流式、可取消）"]
+  F -- "Windows" --> F2["electron-updater downloadUpdate"]
+  F1 -- 进度 --> W
+  F2 -- download-progress --> W
+  F1 -- 取消 --> X[中止下载 + 删除半成品：退出本次更新]
+  F2 -- 取消 --> X
+  F1 --> G[下载完成]
+  F2 --> G
+  G --> H["安装按钮可用 + 60 秒倒计时"]
+  H -- "点安装 / 倒计时到 0" --> I{平台?}
+  I -- "macOS" --> I1["挂载 DMG 并打开 Finder + 退出本程序（用户手动安装）"]
+  I -- "Windows" --> I2[quitAndInstall]
 ```
 
 ---
@@ -578,14 +584,16 @@ flowchart TD
   - 加固依赖 `asarmor`、`@electron/fuses` 位于 `devDependencies`。
   - **公证**：`afterSign` 钩子 `scripts/notarize.cjs`，当设置 `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` 时自动公证（`SKIP_NOTARIZE=1` 可跳过）。
   - 产物命名：`Ships-v<version>-<arch>.dmg` 与 `Ships-v<version>-<arch>.zip`（各含 `.blockmap`；`.blockmap` 是**差量更新索引**，供 `electron-updater` 只下载变化块）。
-- **自动更新（`electron-updater` + GitHub Releases，`src/main/services/updater-service.js`）**：
-  - **仅打包后**的 macOS / Windows 生效（`app.isPackaged`）；开发模式不检查。
-  - 启动后**静默检查一次**（延迟 5s，不打扰）；`autoDownload=false`、`autoInstallOnAppQuit=true`。
-  - **提示后下载**：`update-available` → 弹窗「发现新版本 vX（当前 vY），现在下载吗？」→ 确认才 `downloadUpdate()`。
-  - **下载窗口**：确认下载后弹出一个**小型、不可关闭（`closable: false` + `frame: false`，无关闭按钮、Cmd-W 无效，仅退出应用时放行）、可最小化、置顶居中的前台窗口** `update.html`（尺寸 `ships.updateWindow` = 380 × 160，见 §8.7）。窗口只有：顶部**自绘红绿灯**（仅「最小化」可用）、**实时进度条**（`download-progress` → `update:progress`）、**取消**、**「重启更新」按钮**（下载期间禁用）。下载完成后「重启更新」可用，并显示 **60 秒倒计时**（常量 `UPDATE_COUNTDOWN_SECONDS`）自动 `quitAndInstall()`；点「重启更新」立即安装。**取消 = 退出本次更新**：下载阶段 `CancellationToken.cancel()` 中止下载并关闭窗口，已完成则仅停止倒计时、不立即重启。**`autoInstallOnAppQuit` 必须为 `true`**：macOS 的 `MacUpdater` 只有在该标志为真时才会在下载完成时让 Squirrel 预取更新（否则 `quitAndInstall()` 会静默失败、点按钮无反应）；`MacUpdater` 不注册 JS 的 quit 安装钩子，因此为真也不会「取消后退出应用时自动安装」，安装仅由下载窗口的「重启更新」/ 倒计时触发。**兜底重启**：调用 `quitAndInstall()` 后若 6 秒内应用仍未退出（未签名构建下 Squirrel 会静默失败），则 `app.relaunch()` + `app.quit()` 强制重启，保证按钮有可见效果；真正的安装仍需稳定签名。
+- **更新流程（`src/main/services/updater-service.js`）**：
+  - **版本检测**：用 `electron-updater`（读 GitHub Releases 的 `latest-mac.yml`）——**仅检测版本，不需要签名**。**仅打包后**的 macOS / Windows 生效（`app.isPackaged`）；开发模式不检查。启动后**静默检查一次**（延迟 5s，不打扰）。
+  - **提示后下载**：`update-available` → 弹窗「发现新版本 vX（当前 vY），现在下载吗？」→ 确认才下载。
+  - **下载方式按平台分两种模式**（`dl.mode`）：
+    - **macOS（`mode=dmg`）**：从 GitHub Release 下载 **`.dmg`**（先经 GitHub API `releases/tags/vX.Y.Z` 选出与当前架构匹配的 `.dmg`，失败再按 `Ships-vX.Y.Z-{arch}.dmg` 命名规则拼 URL），用 Electron `net` 流式下载到 `app.getPath('downloads')`，可取消（abort + 删除半成品）。**不依赖 Squirrel / 签名**，因此 ad-hoc 构建也能更新。
+    - **Windows（`mode=auto`）**：仍用 `electron-updater` 的 `downloadUpdate()` 自动下载并 `quitAndInstall()`（`autoInstallOnAppQuit=true`；6 秒未退出则 `app.relaunch()` + `app.quit()` 兜底）。
+  - **下载窗口**：确认下载后弹出一个**小型、不可关闭（`closable: false` + `frame: false`，无关闭按钮、Cmd-W 无效，仅退出应用时放行）、可最小化、置顶居中的前台窗口** `update.html`（尺寸 `ships.updateWindow` = 380 × 160，见 §8.7）。窗口只有：顶部**自绘红绿灯**（仅「最小化」可用）、**实时进度条**（`update:progress`）、**取消**、**安装按钮**（下载期间禁用）。下载完成后按钮可用并显示 **60 秒倒计时**（常量 `UPDATE_COUNTDOWN_SECONDS`）；**macOS 按钮为「退出并安装」**（`shell`/`open` 挂载 DMG 并打开 Finder，随后退出本程序，由用户手动拖入 Applications；倒计时文案「N 秒后自动退出并挂载安装包」），**Windows 按钮为「重启更新」**（`quitAndInstall()`）。**取消 = 退出本次更新**（下载阶段中止下载并删除半成品；点击安装 / 倒计时到 0 后取消按钮禁用）。
   - **下载失败**：仅在日志记录详细错误，并关闭下载窗口、给一句友好提示。
   - **手动检查**：设置 → Ships → 关于「检查更新」（`app:check-updates`）触发，会提示「已是最新 / 暂时无法检查」；**每次点击都必须有反馈**（有新版本同样会重新弹窗，反复点击不会静默无响应）；检查进行中再次点击返回 `{ ok: true, checking: true }`，界面就地提示「正在检查…」。**出错时不报技术错误**：手动检查给一句友好提示（详情写日志），启动时的静默检查出错则完全不提示。
-  - **差量下载**：依赖发布时随产物上传的 `*.zip.blockmap` 与 `latest-mac.yml`；旧版本通过更新器安装过才可差量，否则整包。
+  - **说明**：macOS 的 Squirrel 自动安装需要稳定 **Developer ID 签名**，本项目默认 ad-hoc 签名，故改用 DMG 手动安装；发布时仍同时产出 `*.zip` / `latest-mac.yml`（`electron-updater` 版本检测依赖 `latest-mac.yml` / `*.blockmap`）。
   - **签名要求**：macOS 自动更新需**稳定 Developer ID 签名**（ad-hoc 兜底不满足，会导致更新校验失败）。
 - **图标生成**：`node scripts/gen-icons.mjs` 在 `assets/imgs/` 生成 `trayTemplate*.png`、`app.png`，在 macOS 上经 `iconutil` 额外生成 `icon.icns`。
 - **CI**（`.github/workflows/build-mac.yml`）：在 `macos-14` 上以 **pnpm 10 / Node 22** 安装并执行 `pnpm dist:mac`；签名/公证由 secrets 提供（`CSC_LINK` / `CSC_KEY_PASSWORD` / `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID`，缺省则未签名构建）；上传 `*.dmg` / `*.dmg.blockmap` / `*.zip` / `*.zip.blockmap` / `latest-mac.yml` 为 artifact；打 `v*` tag 时把这些文件一并发布到 GitHub Release（供自动更新读取）。
@@ -659,8 +667,8 @@ flowchart TD
 
 - 尺寸 **380 × 160**（`package.json` 的 `ships.updateWindow` → `constants.js` 的 `UPDATE_WINDOW`）；无边框（`frame: false`）、不可缩放、**不可关闭**（`closable: false`，无关闭按钮、Cmd-W 无效，仅应用退出 / `quitAndInstall` 时放行）、置顶（`alwaysOnTop`）并**居中**显示。**可最小化**（`minimizable: true`）。
 - 顶部**自绘红绿灯**（`#update-lights`，9px 圆点，与终端窗口同一套 `.traffic-light` 样式 / 失焦变灰）：**只保留「最小化」可用**，关闭 / 缩放用 `.traffic-disabled` 置灰且不可点；最小化经 `window:control` 生效。
-- 结构（`update.html`）：红绿灯 → 标题（下载中「正在下载更新 vX」/ 完成「下载完成 vX」）→ **进度条** `update-progress`（宽 = `percent`）→ 状态行（`已下载 / 总量 · 速度`，完成时显示「N 秒后自动重启更新」）→ 底部按钮「取消」与「**重启更新**」（「重启更新」下载期间禁用；**一旦触发重启——点「重启更新」或倒计时到 0——「取消」与「重启更新」一并禁用**；两者紧贴状态行、无多余留白）。整窗为拖拽区、红绿灯与按钮为 `no-drag`。
-- 行为见 §6.6 / §7：进度实时回填；下载完成后重启按钮可用并显示 60 秒倒计时（到点自动重启安装）；取消 = 退出本次更新。**「重启更新」调用 `quitAndInstall()`；若 6 秒内应用仍未退出（如未签名构建下 Squirrel 静默失败），兜底 `app.relaunch()` + `app.quit()` 强制重启**（真正的安装仍需稳定签名，见 §7）。
+- 结构（`update.html`）：红绿灯 → 标题（下载中「正在下载更新 vX」/ 完成「下载完成 vX」）→ **进度条** `update-progress`（宽 = `percent`）→ 状态行（`已下载 / 总量 · 速度`；完成时 macOS 显示「N 秒后自动退出并挂载安装包」、Windows 显示「N 秒后自动重启更新」）→ 底部按钮「取消」与**安装按钮**（macOS =「**退出并安装**」/ Windows =「**重启更新**」，文案随状态里的 `mode` 切换；下载期间禁用；**一旦触发安装——点按钮或倒计时到 0——「取消」与安装按钮一并禁用**；两者紧贴状态行、无多余留白）。整窗为拖拽区、红绿灯与按钮为 `no-drag`。
+- 行为见 §6.6 / §7：进度实时回填；下载完成后安装按钮可用并显示 60 秒倒计时。**macOS**：点安装 / 倒计时到 0 → `open` 挂载 DMG（并打开 Finder）后退出本程序，用户手动拖入 Applications。**Windows**：调用 `quitAndInstall()`，6 秒未退出则 `app.relaunch()` + `app.quit()` 兜底。
 
 ---
 

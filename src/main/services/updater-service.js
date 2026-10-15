@@ -1,15 +1,22 @@
 'use strict';
 
-const { app, dialog } = require('electron');
+const fs = require('fs');
+const path = require('path');
+const { spawn } = require('child_process');
+const { app, dialog, net } = require('electron');
 const settings = require('./settings-service');
 const logger = require('../utils/logger');
 const wm = require('../window-manager');
 const { IPC, UPDATE_COUNTDOWN_SECONDS } = require('../../shared/constants');
+const pkg = require('../../../package.json');
 
-/* 自动更新（electron-updater + GitHub Releases）：
-   - 启动后静默检查一次；发现新版本才「提示后下载」。
-   - 用户确认下载后弹出一个**小型的、不可关闭的前台下载窗口**（进度条 + 取消 + 重启更新按钮）；
-     下载完成后「重启更新」变为可用，并显示 60 秒倒计时自动重启安装。
+/* 自动更新：
+   - 用 electron-updater + GitHub Releases **只做版本检测**（读 latest-mac.yml，不需要签名）。
+   - 发现新版本 → 提示后下载 → 小型不可关闭的前台下载窗口（进度条 + 取消 + 安装按钮）。
+   - **macOS**：下载 `.dmg`（`模式 = dmg`），完成后按钮为「退出并安装」：退出本程序并挂载 DMG，
+     由用户手动拖入 Applications 安装 —— 未签名 / ad-hoc 构建下也能更新（Squirrel 自动安装
+     需要稳定的 Developer ID 签名）。
+   - **Windows**：仍用 electron-updater 自动下载并 `quitAndInstall()`（模式 = auto）。
    - 取消 = 退出本次更新（下载阶段会中止下载）。
    - 设置 → Ships → 关于 可手动「检查更新」（提示已是最新 / 暂时无法检查，不报技术错误）。
    仅打包后的 macOS / Windows 生效；开发模式不检查。 */
@@ -49,10 +56,12 @@ let manualCheck = false;
 let promptedVersion = '';
 
 // 下载窗口状态（可查询、可广播）。
-let downloadToken = null;
+let downloadToken = null; // Windows（electron-updater）下载的取消令牌
+let dmgRequest = null; // macOS DMG 下载的 net 请求（可 abort）
 let countdownTimer = null;
 let countdownRemaining = 0;
 const dl = {
+  mode: 'auto', // 'dmg'（macOS：下载 DMG 手动安装）| 'auto'（Windows：electron-updater 自动安装）
   phase: 'idle', // 'idle' | 'downloading' | 'downloaded'
   version: '',
   percent: 0,
@@ -60,10 +69,13 @@ const dl = {
   total: 0,
   bytesPerSecond: 0,
   countdown: 0,
+  dmgPath: '',
+  dmgName: '',
 };
 
 function snapshot() {
   return {
+    mode: dl.mode,
     phase: dl.phase,
     version: dl.version,
     percent: dl.percent,
@@ -71,6 +83,7 @@ function snapshot() {
     total: dl.total,
     bytesPerSecond: dl.bytesPerSecond,
     countdown: dl.countdown,
+    dmgName: dl.dmgName,
   };
 }
 
@@ -95,10 +108,21 @@ function showBox(options) {
   return win ? dialog.showMessageBox(win, options) : dialog.showMessageBox(options);
 }
 
+/* ----------------------------- 下载窗口 ----------------------------- */
+
+function reportProgress(transferred, total, bytesPerSecond) {
+  if (dl.phase !== 'downloading') return;
+  dl.transferred = Math.max(0, Number(transferred) || 0);
+  dl.total = Math.max(0, Number(total) || 0);
+  dl.percent = dl.total > 0 ? Math.max(0, Math.min(100, (dl.transferred / dl.total) * 100)) : dl.percent;
+  if (Number.isFinite(bytesPerSecond) && bytesPerSecond >= 0) dl.bytesPerSecond = bytesPerSecond;
+  wm.sendToUpdateWindow(IPC.UPDATE_PROGRESS, snapshot());
+  logger.file(`[updater] downloading ${Math.round(dl.percent)}%`);
+}
+
 /* 确认下载：用户点「下载」后打开下载窗口并开始下载。 */
 async function promptDownload(info) {
   if (dl.phase !== 'idle') {
-    // 已在下载 / 已下载完成：直接把下载窗口拉到前台。
     wm.openUpdateWindow();
     return;
   }
@@ -115,8 +139,9 @@ async function promptDownload(info) {
 }
 
 function startDownload(info) {
-  const updater = loadUpdater();
-  if (!updater) return;
+  dl.dmgPath = '';
+  dl.dmgName = '';
+  dl.dmgRequest = null;
   dl.phase = 'downloading';
   dl.version = (info && info.version) || dl.version;
   dl.percent = 0;
@@ -124,64 +149,194 @@ function startDownload(info) {
   dl.total = 0;
   dl.bytesPerSecond = 0;
   dl.countdown = 0;
-  downloadToken = new updaterModule.CancellationToken();
   wm.openUpdateWindow();
-  logger.info(`[updater] download start: ${dl.version}`);
+  logger.info(`[updater] download start: ${dl.version} (mode=${dl.mode})`);
+  if (dl.mode === 'dmg') {
+    startDmgDownload().catch(() => {});
+  } else {
+    startAutoDownload();
+  }
+}
+
+function startAutoDownload() {
+  const updater = loadUpdater();
+  if (!updater) return;
+  downloadToken = new updaterModule.CancellationToken();
   const promise = autoUpdater.downloadUpdate(downloadToken);
   if (promise && typeof promise.catch === 'function') promise.catch(() => {});
 }
+
+/* ------------------------- macOS：下载 DMG ------------------------- */
+
+function publishConfig() {
+  const publish = (pkg.build && pkg.build.publish) || [];
+  const gh = publish.find((entry) => entry && entry.provider === 'github') || {};
+  return {
+    owner: gh.owner || '',
+    repo: gh.repo || '',
+    productName: (pkg.build && pkg.build.productName) || pkg.name || 'app',
+  };
+}
+
+/* GitHub Releases API：挑出与当前架构匹配的 dmg（找不到则回退到按命名规则拼出的 URL）。 */
+async function resolveDmgUrl(version) {
+  const { owner, repo, productName } = publishConfig();
+  const arch = process.arch; // 'arm64' | 'x64'
+  const fallbackName = `${productName}-v${version}-${arch}.dmg`;
+  const fallbackUrl =
+    owner && repo
+      ? `https://github.com/${owner}/${repo}/releases/download/v${version}/${fallbackName}`
+      : '';
+  if (owner && repo) {
+    try {
+      const data = await httpGetJson(`https://api.github.com/repos/${owner}/${repo}/releases/tags/v${version}`);
+      const assets = Array.isArray(data && data.assets) ? data.assets : [];
+      const dmgs = assets.filter((a) => a && typeof a.name === 'string' && a.name.toLowerCase().endsWith('.dmg'));
+      const match = dmgs.find((a) => a.name.includes(`-${arch}.dmg`)) || dmgs[0];
+      if (match && match.browser_download_url) return { url: match.browser_download_url, name: match.name };
+    } catch (err) {
+      logger.warn('[updater] resolve dmg via API failed:', (err && err.message) || err);
+    }
+  }
+  if (fallbackUrl) return { url: fallbackUrl, name: fallbackName };
+  return null;
+}
+
+function httpGetJson(url) {
+  return new Promise((resolve, reject) => {
+    const request = net.request({
+      url,
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Ships-Updater' },
+    });
+    let body = '';
+    request.on('response', (response) => {
+      if (response.statusCode !== 200) {
+        reject(new Error(`HTTP ${response.statusCode}`));
+        return;
+      }
+      response.on('data', (chunk) => {
+        body += chunk.toString('utf8');
+      });
+      response.on('end', () => {
+        try {
+          resolve(JSON.parse(body));
+        } catch (err) {
+          reject(err);
+        }
+      });
+      response.on('error', reject);
+    });
+    request.on('error', reject);
+    request.end();
+  });
+}
+
+async function startDmgDownload() {
+  let target = null;
+  try {
+    target = await resolveDmgUrl(dl.version);
+  } catch (err) {
+    target = null;
+  }
+  if (dl.phase !== 'downloading') return; // 解析期间被取消
+  if (!target) {
+    failDownload();
+    return;
+  }
+  const destPath = path.join(app.getPath('downloads'), target.name);
+  dl.dmgPath = destPath;
+  dl.dmgName = target.name;
+  try {
+    await downloadDmg(target.url, destPath);
+  } catch (err) {
+    if (dl.phase !== 'downloading') return; // 已取消
+    logger.warn('[updater] dmg download failed:', (err && err.message) || err);
+    failDownload();
+    return;
+  }
+  if (dl.phase !== 'downloading') return;
+  onDownloaded({ version: dl.version });
+}
+
+function downloadDmg(url, destPath) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const file = fs.createWriteStream(destPath);
+    const request = net.request({ url });
+    dmgRequest = request;
+    let total = 0;
+    let transferred = 0;
+    let lastTime = Date.now();
+    let lastBytes = 0;
+    let bytesPerSecond = 0;
+
+    const cleanup = (err) => {
+      if (settled) return;
+      settled = true;
+      dmgRequest = null;
+      try {
+        file.destroy();
+      } catch (e) {
+        /* ignore */
+      }
+      try {
+        request.abort();
+      } catch (e) {
+        /* ignore */
+      }
+      reject(err);
+    };
+
+    request.on('response', (response) => {
+      if (response.statusCode !== 200) {
+        cleanup(new Error(`HTTP ${response.statusCode}`));
+        return;
+      }
+      total = Number(response.headers['content-length']) || 0;
+      response.on('data', (chunk) => {
+        transferred += chunk.length;
+        file.write(chunk);
+        const now = Date.now();
+        if (now - lastTime >= 500) {
+          bytesPerSecond = Math.round(((transferred - lastBytes) * 1000) / (now - lastTime));
+          lastTime = now;
+          lastBytes = transferred;
+        }
+        reportProgress(transferred, total, bytesPerSecond);
+      });
+      response.on('end', () => {
+        file.end(() => {
+          if (settled) return;
+          settled = true;
+          dmgRequest = null;
+          resolve();
+        });
+      });
+      response.on('error', cleanup);
+    });
+    request.on('error', cleanup);
+    request.end();
+  });
+}
+
+function abortDmgDownload() {
+  if (dmgRequest) {
+    try {
+      dmgRequest.abort();
+    } catch (err) {
+      /* ignore */
+    }
+    dmgRequest = null;
+  }
+}
+
+/* ------------------------------ 倒计时 / 安装 ------------------------------ */
 
 function stopCountdown() {
   if (countdownTimer) {
     clearInterval(countdownTimer);
     countdownTimer = null;
   }
-}
-
-function installNow() {
-  stopCountdown();
-  const updater = loadUpdater();
-  if (!updater) return;
-  logger.info('[updater] quit and install');
-  // 放行下载窗口的 close 拦截，避免拖住退出。
-  const win = wm.getUpdateWindow();
-  if (win) win.__forceClose = true;
-
-  // 兜底重启：某些环境（例如未签名 / ad-hoc 构建）Squirrel 会静默失败、应用完全不退出，
-  // 表现为点了「重启更新」毫无反应。若数秒后应用仍未退出，则强制重启（真正的安装仍需
-  // 稳定 Developer ID 签名，见 PRD §7）。
-  let fallback = setTimeout(() => {
-    fallback = null;
-    logger.warn('[updater] quitAndInstall had no effect; forcing relaunch');
-    try {
-      app.relaunch();
-    } catch (err) {
-      /* ignore */
-    }
-    app.quit();
-  }, 6000);
-  const clearFallback = () => {
-    if (fallback) {
-      clearTimeout(fallback);
-      fallback = null;
-    }
-  };
-  if (typeof app.once === 'function') app.once('before-quit', clearFallback);
-
-  setImmediate(() => {
-    try {
-      autoUpdater.quitAndInstall();
-    } catch (err) {
-      logger.warn('[updater] quitAndInstall failed:', (err && err.message) || err);
-      clearFallback();
-      try {
-        app.relaunch();
-      } catch (e) {
-        /* ignore */
-      }
-      app.quit();
-    }
-  });
 }
 
 function startCountdown() {
@@ -199,34 +354,116 @@ function startCountdown() {
   }, 1000);
 }
 
+/* 「退出并安装」/ 倒计时到 0：macOS 挂载 DMG 让用户手动安装；Windows 走 quitAndInstall。 */
+function installNow() {
+  stopCountdown();
+  const win = wm.getUpdateWindow();
+  if (win) win.__forceClose = true;
+  if (dl.mode === 'dmg') installDmg();
+  else installAuto();
+}
+
+function installDmg() {
+  const dmgPath = dl.dmgPath;
+  logger.info(`[updater] quit and mount dmg: ${dmgPath}`);
+  if (dmgPath && fs.existsSync(dmgPath)) {
+    // detached：即使本进程随后退出，挂载 DMG / 打开 Finder 仍会完成。
+    try {
+      spawn('/usr/bin/open', [dmgPath], { detached: true, stdio: 'ignore' }).unref();
+    } catch (err) {
+      logger.warn('[updater] open dmg failed:', (err && err.message) || err);
+    }
+  }
+  app.quit();
+}
+
+function installAuto() {
+  const updater = loadUpdater();
+  if (!updater) return;
+  logger.info('[updater] quit and install');
+  // 兜底重启：未签名环境下 Squirrel 可能静默失败、应用不退出。
+  let fallback = setTimeout(() => {
+    fallback = null;
+    logger.warn('[updater] quitAndInstall had no effect; forcing relaunch');
+    try {
+      app.relaunch();
+    } catch (err) {
+      /* ignore */
+    }
+    app.quit();
+  }, 6000);
+  const clearFallback = () => {
+    if (fallback) {
+      clearTimeout(fallback);
+      fallback = null;
+    }
+  };
+  if (typeof app.once === 'function') app.once('before-quit', clearFallback);
+  setImmediate(() => {
+    try {
+      autoUpdater.quitAndInstall();
+    } catch (err) {
+      logger.warn('[updater] quitAndInstall failed:', (err && err.message) || err);
+      clearFallback();
+      try {
+        app.relaunch();
+      } catch (e) {
+        /* ignore */
+      }
+      app.quit();
+    }
+  });
+}
+
 function resetDownloadState() {
   stopCountdown();
   downloadToken = null;
+  dmgRequest = null;
   dl.phase = 'idle';
   dl.percent = 0;
   dl.transferred = 0;
   dl.total = 0;
   dl.bytesPerSecond = 0;
   dl.countdown = 0;
+  dl.dmgPath = '';
+  dl.dmgName = '';
 }
 
-/* 取消（下载窗口的「取消」按钮）：下载阶段中止下载；已完成则仅停止倒计时、不立即重启。 */
+/* 取消（下载窗口的「取消」按钮）：下载阶段中止下载；已完成则仅停止倒计时、不立即安装。 */
 function cancelUpdate() {
   if (dl.phase === 'idle') {
     wm.closeUpdateWindow();
     return;
   }
   const wasDownloading = dl.phase === 'downloading';
-  if (wasDownloading && downloadToken) {
-    try {
-      downloadToken.cancel();
-    } catch (err) {
-      /* ignore */
+  if (wasDownloading) {
+    if (dl.mode === 'dmg') {
+      abortDmgDownload();
+      if (dl.dmgPath) {
+        try {
+          fs.rmSync(dl.dmgPath, { force: true });
+        } catch (err) {
+          /* ignore */
+        }
+      }
+    } else if (downloadToken) {
+      try {
+        downloadToken.cancel();
+      } catch (err) {
+        /* ignore */
+      }
     }
   }
   logger.file(`[updater] download cancelled (downloading=${wasDownloading})`);
   resetDownloadState();
   wm.closeUpdateWindow();
+}
+
+function failDownload() {
+  resetDownloadState();
+  wm.closeUpdateWindow();
+  const c = copy();
+  showBox({ type: 'info', buttons: ['OK'], defaultId: 0, title: c.checkTitle, message: c.notCheckable }).catch(() => {});
 }
 
 function onDownloaded(info) {
@@ -248,12 +485,9 @@ function initUpdater() {
   if (!supported()) return;
   const updater = loadUpdater();
   if (!updater) return;
+  dl.mode = process.platform === 'darwin' ? 'dmg' : 'auto';
   updater.autoDownload = false;
-  /* 必须为 true：macOS 上 MacUpdater 只有在 download 完成时该标志为 true 才会让 Squirrel
-     预取更新（否则 squirrelDownloadedUpdate 一直为 false，quitAndInstall() 会走「等 Squirrel
-     再取一次」的分支，通常静默失败 —— 表现就是点「重启更新」毫无反应）。
-     注意：MacUpdater 不注册 JS 的 quit 安装钩子，所以这里为 true 不会导致「取消后退出应用时
-     自动安装」；安装只在下载窗口的「重启更新」/ 倒计时调用 quitAndInstall() 时发生。 */
+  // Windows 自动安装需要该标志；macOS 不走 Squirrel 安装，无影响。
   updater.autoInstallOnAppQuit = true;
 
   updater.on('update-available', (info) => {
@@ -275,15 +509,13 @@ function initUpdater() {
     );
   });
   updater.on('download-progress', (p) => {
-    if (dl.phase !== 'downloading') return;
-    dl.percent = Math.max(0, Math.min(100, Number(p && p.percent) || 0));
-    dl.transferred = Number(p && p.transferred) || 0;
-    dl.total = Number(p && p.total) || 0;
-    dl.bytesPerSecond = Number(p && p.bytesPerSecond) || 0;
-    wm.sendToUpdateWindow(IPC.UPDATE_PROGRESS, snapshot());
-    logger.file(`[updater] downloading ${Math.round(dl.percent)}%`);
+    // 仅 Windows（auto）用 electron-updater 下载时触发；macOS DMG 由 downloadDmg 汇报进度。
+    if (dl.mode !== 'auto' || dl.phase !== 'downloading') return;
+    reportProgress(Number(p && p.transferred) || 0, Number(p && p.total) || 0, Number(p && p.bytesPerSecond) || 0);
+    dl.percent = Math.max(0, Math.min(100, Number(p && p.percent) || dl.percent));
   });
   updater.on('update-downloaded', (info) => {
+    if (dl.mode !== 'auto') return;
     onDownloaded(info);
   });
   updater.on('update-cancelled', () => {
@@ -293,13 +525,7 @@ function initUpdater() {
     // 详细错误只写日志；面向用户不报技术错误。
     logger.warn('[updater] error:', (err && err.message) || err);
     if (dl.phase === 'downloading') {
-      // 下载失败：结束下载窗口并给一句友好提示。
-      resetDownloadState();
-      wm.closeUpdateWindow();
-      const c = copy();
-      showBox({ type: 'info', buttons: ['OK'], defaultId: 0, title: c.checkTitle, message: c.notCheckable }).catch(
-        () => {}
-      );
+      failDownload();
       return;
     }
     if (manualCheck) {
