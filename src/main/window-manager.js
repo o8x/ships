@@ -316,13 +316,14 @@ function shouldHideOnClose() {
   return terminalCloseAction() === 'hide' && !hasMultipleTerminals();
 }
 
-/* 关闭按钮 / Cmd-W：单扇按「关闭按钮行为」隐藏或销毁；多扇一律销毁。 */
+/* 关闭按钮 / Cmd-W：单扇按「关闭按钮行为」收缩成悬浮球或销毁；多扇一律销毁。 */
 function closeTerminalWindow(target) {
   const win = isTerminalWindow(target) ? target : getTerminalWindow();
   if (!win) return null;
   clearBallTimer(win);
   if (shouldHideOnClose()) {
-    win.hide();
+    // 「隐藏」行为 = 收缩到悬浮球（球关闭时才真正隐藏窗口）。
+    shrinkTerminalToBall(win);
     return win;
   }
   destroyTerminalWindow(win);
@@ -351,7 +352,8 @@ function destroyTerminalWindow(target) {
 
 /* 全局快捷键（Steam 式开关）：
    - 同时存在多扇终端窗口 → 失效（不响应）。
-   - 只有一扇 → 在前台时按「关闭按钮行为」隐藏或销毁（多次按同样遵循），否则拉回前台。
+   - 只有一扇 → 「悬浮球 ↔ 终端」互相切换：球态放大回窗口；窗口态收缩成球；都不在前台则拉回。
+   - 悬浮球关闭时回退为「关闭按钮行为」（隐藏 / 销毁）。
    - 一扇都没有 → 新开一扇（窗口永不跨桌面移动）。 */
 function toggleTerminalWindow() {
   const wins = terminalWindowsList();
@@ -364,6 +366,11 @@ function toggleTerminalWindow() {
     return win;
   }
   if (win.isVisible() && win.isFocused()) {
+    // 窗口态：收缩成悬浮球（悬浮球关闭时回退为隐藏 / 销毁）。
+    if (terminalBallEnabled()) {
+      enterBallMode(win);
+      return win;
+    }
     if (terminalCloseAction() === 'hide') {
       win.hide();
       return win;
@@ -398,6 +405,14 @@ function terminalBallDelayMs() {
 
 function isBallMode(win) {
   return Boolean(win && !win.isDestroyed() && win.__ballActive);
+}
+
+/* 把终端窗口「收起来」：悬浮球开启时收缩成悬浮球，否则真正隐藏窗口。
+   所有「隐藏终端」的路径（关闭按钮 / 快捷键 / Cmd-W）都走这里，统一成收缩到悬浮球。 */
+function shrinkTerminalToBall(win) {
+  if (!isTerminalWindow(win) || win.isDestroyed()) return;
+  if (terminalBallEnabled()) enterBallMode(win);
+  else win.hide();
 }
 
 function clearBallTimer(win) {
@@ -910,11 +925,11 @@ function openTerminalWindow() {
   // 会话结束（exit）与 iTerm 交接走 destroyTerminalWindow()，不受这里拦截。
   win.on('close', (event) => {
     // 退出应用时不再拦截，保证 app.quit() 能真正关掉窗口。
-    // 关闭按钮行为 = 隐藏时：改为缩成悬浮球；否则销毁（不拦）。
+    // 关闭按钮行为 = 隐藏时：改为缩成悬浮球（球关闭时才真正隐藏）；否则销毁（不拦）。
     if (!isQuitting && terminalCloseAction() === 'hide') {
       event.preventDefault();
       clearBallTimer(win);
-      enterBallMode(win);
+      shrinkTerminalToBall(win);
       return;
     }
     saveTerminalGeometry(win);
@@ -1198,6 +1213,7 @@ module.exports = {
   enterBallMode,
   exitBallMode,
   isBallMode,
+  shrinkTerminalToBall,
   startBallDrag,
   stopBallDrag,
   openFileWindow,

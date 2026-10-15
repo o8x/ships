@@ -16,7 +16,7 @@ const {
   startBallDrag,
   stopBallDrag,
   exitBallMode,
-  enterBallMode,
+  shrinkTerminalToBall,
   getFileWindow,
   openFileWindow,
 } = require('../window-manager');
@@ -28,9 +28,9 @@ function registerWindowIpc(ipcMain) {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win || win.isDestroyed()) return { ok: false, action };
     if (action === 'close') {
-      // 终端窗口：关闭按钮行为 = 隐藏时改为「缩成悬浮球」；否则销毁。其它窗口照旧关闭。
+      // 终端窗口：关闭按钮行为 = 隐藏时收缩成「悬浮球」；否则销毁。其它窗口照旧关闭。
       if (isTerminalWindow(win)) {
-        if (terminalCloseAction() === 'hide') enterBallMode(win);
+        if (terminalCloseAction() === 'hide') shrinkTerminalToBall(win);
         else destroyTerminalWindow(win);
         return { ok: true, action };
       }
