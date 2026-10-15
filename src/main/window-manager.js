@@ -10,6 +10,7 @@ const {
   TERMINAL_WINDOW,
   FILE_WINDOW,
   UPDATE_WINDOW,
+  CENTER_SNAP,
   VIBRANCY,
   IPC,
 } = require('../shared/constants');
@@ -691,6 +692,40 @@ function forgetMainWindowGeometry() {
   }
 }
 
+/* 拖动窗口时，窗口纵向中心与屏幕（工作区）纵向中心对齐就轻微「卡」一下（磁性吸附，带滞回）：
+   进入阈值内吸附到正中、拖动超过释放阈值才脱开。用于终端窗口与窗口模式的主窗口，
+   仅改 y 坐标（不动尺寸），作为对齐屏幕纵向中线的简单提示。 */
+const vCenterSnapped = new WeakMap();
+
+function maybeSnapVerticalCenter(win) {
+  if (!win || win.isDestroyed() || win.isMinimized() || win.isFullScreen()) return;
+  if (win.__ballActive) return; // 终端悬浮球模式：不参与
+  const bounds = win.getBounds();
+  let area;
+  try {
+    area = screen.getDisplayMatching(bounds).workArea;
+  } catch (err) {
+    return;
+  }
+  const centeredY = Math.round(area.y + (area.height - bounds.height) / 2);
+  const diff = bounds.y + bounds.height / 2 - (area.y + area.height / 2);
+  const abs = Math.abs(diff);
+  const snapped = vCenterSnapped.get(win) === true;
+
+  if (snapped) {
+    if (abs > CENTER_SNAP.vRelease) {
+      vCenterSnapped.set(win, false);
+      return;
+    }
+    if (bounds.y !== centeredY) win.setPosition(bounds.x, centeredY, false);
+    return;
+  }
+  if (abs <= CENTER_SNAP.vThreshold && bounds.y !== centeredY) {
+    vCenterSnapped.set(win, true);
+    win.setPosition(bounds.x, centeredY, false);
+  }
+}
+
 function createMainWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
   return isFloatMode() ? createFloatWindow() : createWindowWindow();
@@ -815,7 +850,10 @@ function createWindowWindow() {
     }
   });
   mainWindow.on('resize', scheduleMainWindowGeometrySave);
-  mainWindow.on('move', scheduleMainWindowGeometrySave);
+  mainWindow.on('move', () => {
+    maybeSnapVerticalCenter(mainWindow);
+    scheduleMainWindowGeometrySave();
+  });
   // 关闭按钮 = 隐藏（应用常驻托盘）；退出应用时才真正关闭。
   mainWindow.on('close', (event) => {
     if (isQuitting) return;
@@ -1107,7 +1145,10 @@ function openTerminalWindow() {
     }, terminalBallDelayMs());
   });
   win.on('resize', () => scheduleTerminalGeometrySave(win));
-  win.on('move', () => scheduleTerminalGeometrySave(win));
+  win.on('move', () => {
+    maybeSnapVerticalCenter(win);
+    scheduleTerminalGeometrySave(win);
+  });
   // 只用来标记「正在拖动」：不拦截、不改尺寸，松手后再执行挂起的对齐请求
   win.on('will-resize', () => markTerminalResizing(win));
   // 实际生效的几何（恢复时可能被夹取过）也记下来，保证记忆与窗口一致。

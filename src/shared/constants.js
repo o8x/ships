@@ -188,6 +188,13 @@ const UPDATE_WINDOW = Object.assign(
 // 更新下载完成后自动重启安装的倒计时（秒）。
 const UPDATE_COUNTDOWN_SECONDS = 60;
 
+// 拖动窗口时，窗口纵向中心与屏幕（工作区）纵向中心对齐的「磁性吸附」（px，滞回）：
+// 进入吸附的阈值 / 脱离吸附的释放阈值。用于终端窗口与窗口模式的主窗口（简单提示）。
+const CENTER_SNAP = {
+  vThreshold: 10,
+  vRelease: 26,
+};
+
 // 日志保留天数（按天写文件，惰性删除更早的日志）。
 const LOG_RETENTION_DAYS = Number.isFinite(ships.logRetentionDays) ? ships.logRetentionDays : 7;
 
@@ -256,6 +263,7 @@ module.exports = {
   FILE_WINDOW,
   UPDATE_WINDOW,
   UPDATE_COUNTDOWN_SECONDS,
+  CENTER_SNAP,
   LOG_RETENTION_DAYS,
   CD_HISTORY_MAX,
   VIBRANCY,
