@@ -420,10 +420,7 @@ input[type='color'].swatch::-webkit-color-swatch {
   align-items: center;
   justify-content: center;
   color: var(--color-accent);
-  /* 有输出时弹跳：动画常驻、默认暂停（见下方 ships-ball-bounce）。 */
-  animation: ships-ball-bounce var(--term-ball-bounce-duration, 1.15s)
-    cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
-  animation-play-state: paused;
+  /* 输出时的「正弦平滑弹跳」见 styles/ball-animations.css（独立文件，便于调整）。 */
 }
 .term-ball-icon svg {
   width: calc(var(--term-ball-size, 75px) * 0.58);
@@ -436,28 +433,6 @@ input[type='color'].swatch::-webkit-color-swatch {
 }
 [data-ball-dark='auto'][data-theme='light'] #term-ball {
   background: color-mix(in srgb, #ffffff 92%, transparent);
-}
-/* 终端持续有输出时，悬浮球内的**图标**做轻微「弹簧跳动」（球本身不动，无输出 1s 后由 JS 移除该类）。
-   动画常驻但默认暂停：有输出时切 .term-ball-bounce 恢复播放，避免切类重建动画导致从 0% 重播。 */
-@keyframes ships-ball-bounce {
-  0% {
-    transform: translateY(0) scale(1, 1);
-  }
-  30% {
-    transform: translateY(-18%) scale(0.94, 1.08);
-  }
-  55% {
-    transform: translateY(0) scale(1.05, 0.93);
-  }
-  78% {
-    transform: translateY(-6%) scale(0.97, 1.03);
-  }
-  100% {
-    transform: translateY(0) scale(1, 1);
-  }
-}
-.term-ball-bounce .term-ball-icon {
-  animation-play-state: running;
 }
 /* 设置 → 终端：悬浮球图标选择器的预览框。 */
 .ball-icon-preview {
