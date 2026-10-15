@@ -687,13 +687,13 @@
   function ballElapsedMs() {
     return ballBounceOn ? Math.max(0, performance.now() - ballBounceStartedAt) : 0;
   }
-  // 拆成上行 h/m（非 0 才显示）与下行 s（秒不到两位不补前导 0：5s 而非 05s）。
+  // 拆成上行 h/m（非 0 才显示，均不补前导 0）与下行 s（同样不补前导 0：5s 而非 05s）。
   function formatBallClock(ms) {
     const total = Math.floor(ms / 1000);
     const h = Math.floor(total / 3600);
     const m = Math.floor((total % 3600) / 60);
     const s = total % 60;
-    const hm = `${h > 0 ? `${String(h).padStart(2, '0')}h` : ''}${m > 0 ? `${String(m).padStart(2, '0')}m` : ''}`;
+    const hm = `${h > 0 ? `${h}h` : ''}${m > 0 ? `${m}m` : ''}`;
     return { hm, s: `${s}s` };
   }
   function setBallTimerVisible(on) {
