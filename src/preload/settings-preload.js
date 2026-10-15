@@ -47,6 +47,7 @@ const api = {
     read: () => ipcRenderer.invoke(IPC.SSH_CONFIG_READ),
     upsert: (host) => ipcRenderer.invoke(IPC.SSH_CONFIG_UPSERT, host),
     remove: (alias) => ipcRenderer.invoke(IPC.SSH_CONFIG_REMOVE, alias),
+    renameGroup: (payload) => ipcRenderer.invoke(IPC.SSH_CONFIG_RENAME_GROUP, payload),
     export: () => ipcRenderer.invoke(IPC.SSH_CONFIG_EXPORT),
   },
 };

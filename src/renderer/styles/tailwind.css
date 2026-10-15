@@ -109,10 +109,19 @@
   .accordion-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 2px;
     width: 100%;
-    padding: 7px 12px;
+    padding: 4px 6px 4px 8px;
+  }
+  .accordion-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 4px 6px;
     border: none;
+    border-radius: var(--radius-control-sm);
     background: transparent;
     color: var(--color-fg);
     font-size: 12px;
@@ -120,7 +129,7 @@
     text-align: left;
     cursor: pointer;
   }
-  .accordion-header:hover {
+  .accordion-toggle:hover {
     background: var(--color-surface-2);
   }
   .accordion-chevron {

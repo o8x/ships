@@ -38,6 +38,8 @@
         ungrouped: '未分组',
         newGroup: '新建分组…',
         groupPlaceholder: '输入新分组名称',
+        renameGroup: '重命名分组',
+        groupExists: '同名分组已存在',
       },
     },
     en: {
@@ -71,6 +73,8 @@
         ungrouped: 'Ungrouped',
         newGroup: 'New group…',
         groupPlaceholder: 'New group name',
+        renameGroup: 'Rename group',
+        groupExists: 'A group with this name already exists',
       },
     },
   });
@@ -89,6 +93,10 @@
       messageTimer: null,
       // 折叠的分组（默认空 = 全部分组展开）。key 为分组名，未分组用 ''。
       collapsed: new Set(),
+      // 正在重命名的分组（null = 无）；renameValue 保存输入草稿，renameError 显示校验错误。
+      renamingGroup: null,
+      renameValue: '',
+      renameError: '',
     };
     const root = el('div', {});
     pane.appendChild(root);
@@ -204,21 +212,107 @@
     function buildGroupSection(group, hosts) {
       const collapsed = state.collapsed.has(group);
       const item = el('div', { class: collapsed ? 'accordion-item collapsed' : 'accordion-item' });
-      const head = el('button', { class: 'accordion-header', type: 'button' });
-      const chevron = el('span', { class: 'accordion-chevron inline-flex' });
-      chevron.innerHTML = Icons.chevronDown(14);
-      const name = el('span', { class: 'accordion-name truncate' });
-      name.textContent = group || i18n.t('sshSettings.ungrouped');
-      head.append(chevron, name, el('span', { class: 'accordion-count' }, String(hosts.length)));
-      head.addEventListener('click', () => {
-        if (state.collapsed.has(group)) state.collapsed.delete(group);
-        else state.collapsed.add(group);
-        render();
-      });
+      const head = el('div', { class: 'accordion-header' });
+
+      if (group && state.renamingGroup === group) {
+        // 就地重命名：输入框 + 确认 / 取消（未分组不可重命名）。
+        const input = el('input', { class: 'field min-w-0 flex-1 px-2 py-1 text-[12px]', type: 'text', spellcheck: 'false' });
+        input.value = state.renameValue != null ? state.renameValue : group;
+        input.addEventListener('input', () => {
+          state.renameValue = input.value;
+        });
+        input.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') commitRename(group, input.value);
+          else if (event.key === 'Escape') {
+            state.renamingGroup = null;
+            state.renameError = '';
+            render();
+          }
+        });
+        const ok = el('button', { class: 'icon-btn h-7 w-7 shrink-0', type: 'button' });
+        ok.innerHTML = Icons.check(15);
+        ok.style.color = 'var(--color-success)';
+        ok.addEventListener('click', () => commitRename(group, input.value));
+        const cancel = el('button', { class: 'icon-btn h-7 w-7 shrink-0', type: 'button' });
+        cancel.innerHTML = Icons.x(15);
+        cancel.addEventListener('click', () => {
+          state.renamingGroup = null;
+          state.renameError = '';
+          render();
+        });
+        head.append(input, ok, cancel);
+        item.appendChild(head);
+        if (state.renameError) {
+          item.appendChild(el('div', { class: 'px-3 pb-1 text-[11px] text-danger' }, state.renameError));
+        }
+        setTimeout(() => {
+          if (input.isConnected) {
+            input.focus();
+            input.select();
+          }
+        }, 0);
+      } else {
+        const toggle = el('button', { class: 'accordion-toggle', type: 'button' });
+        const chevron = el('span', { class: 'accordion-chevron inline-flex' });
+        chevron.innerHTML = Icons.chevronDown(14);
+        const name = el('span', { class: 'accordion-name truncate' });
+        name.textContent = group || i18n.t('sshSettings.ungrouped');
+        toggle.append(chevron, name, el('span', { class: 'accordion-count' }, String(hosts.length)));
+        toggle.addEventListener('click', () => {
+          if (state.collapsed.has(group)) state.collapsed.delete(group);
+          else state.collapsed.add(group);
+          render();
+        });
+        head.appendChild(toggle);
+        if (group) {
+          const renameBtn = el('button', {
+            class: 'icon-btn h-7 w-7 shrink-0',
+            type: 'button',
+            'data-tip': i18n.t('sshSettings.renameGroup'),
+          });
+          renameBtn.innerHTML = Icons.edit(15);
+          renameBtn.addEventListener('click', () => {
+            state.renamingGroup = group;
+            state.renameValue = group;
+            state.renameError = '';
+            render();
+          });
+          head.appendChild(renameBtn);
+        }
+        item.appendChild(head);
+      }
+
       const body = el('div', { class: 'accordion-body' });
       for (const host of hosts) body.appendChild(buildRow(host));
-      item.append(head, body);
+      item.appendChild(body);
       return item;
+    }
+
+    async function commitRename(from, rawValue) {
+      const to = String(rawValue || '').trim();
+      if (!to || to.toLowerCase() === from.toLowerCase()) {
+        state.renamingGroup = null;
+        state.renameError = '';
+        render();
+        return;
+      }
+      const duplicate = namedGroups().some(
+        (g) => g.toLowerCase() === to.toLowerCase() && g.toLowerCase() !== from.toLowerCase()
+      );
+      if (duplicate) {
+        state.renameError = i18n.t('sshSettings.groupExists');
+        state.renameValue = to;
+        render();
+        return;
+      }
+      await window.ships.sshConfig.renameGroup({ from, to });
+      if (state.collapsed.has(from)) {
+        state.collapsed.delete(from);
+        state.collapsed.add(to);
+      }
+      state.renamingGroup = null;
+      state.renameError = '';
+      await reload();
     }
 
     function buildRow(host) {

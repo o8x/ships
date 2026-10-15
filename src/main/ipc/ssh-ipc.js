@@ -68,6 +68,9 @@ function registerSshIpc(ipcMain) {
   ipcMain.handle(IPC.SSH_CONFIG_READ, () => configService.list());
   ipcMain.handle(IPC.SSH_CONFIG_UPSERT, (_event, host) => configService.upsert(host));
   ipcMain.handle(IPC.SSH_CONFIG_REMOVE, (_event, alias) => configService.remove(alias));
+  ipcMain.handle(IPC.SSH_CONFIG_RENAME_GROUP, (_event, payload) =>
+    configService.renameGroup(payload && payload.from, payload && payload.to)
+  );
 
   ipcMain.handle(IPC.SSH_CONFIG_EXPORT, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);

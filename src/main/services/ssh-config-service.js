@@ -240,6 +240,25 @@ function upsert(host) {
   return list();
 }
 
+/* 重命名分组：把 config 里所有匹配 `from` 的 `# group:` 注释改成 `to`（不区分大小写）。
+   若目标名与已有分组同名，会在 config 中产生同名标记（UI 层已拦截，避免意外合并）。 */
+function renameGroup(from, to) {
+  const source = String(from || '').trim();
+  const target = String(to || '').trim();
+  if (!source || !target || source.toLowerCase() === target.toLowerCase()) return list();
+  const entries = parseEntries(readContent());
+  let changed = false;
+  for (const entry of entries) {
+    if (entry.kind === 'group' && (entry.name || '').toLowerCase() === source.toLowerCase()) {
+      entry.name = target;
+      entry.lines = [`# group: ${target}`];
+      changed = true;
+    }
+  }
+  if (changed) writeContent(serializeEntries(entries));
+  return list();
+}
+
 function remove(alias) {
   const target = String(alias || '').toLowerCase();
   if (!target) return list();
@@ -260,6 +279,7 @@ module.exports = {
   listGroups,
   upsert,
   remove,
+  renameGroup,
   _parseEntries: parseEntries,
   _serializeEntries: serializeEntries,
   CONFIG_FILE: SSH_CONFIG_FILE,

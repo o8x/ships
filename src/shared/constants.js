@@ -113,6 +113,7 @@ const IPC = {
   SSH_CONFIG_READ: 'ssh-config:read',
   SSH_CONFIG_UPSERT: 'ssh-config:upsert',
   SSH_CONFIG_REMOVE: 'ssh-config:remove',
+  SSH_CONFIG_RENAME_GROUP: 'ssh-config:rename-group',
   SSH_CONFIG_EXPORT: 'ssh-config:export',
 };
 

@@ -140,17 +140,19 @@
     function buildGroupSection(group, hosts) {
       const collapsed = state.collapsed.has(group);
       const item = el('div', { class: collapsed ? 'accordion-item collapsed' : 'accordion-item' });
-      const head = el('button', { class: 'accordion-header', type: 'button' });
+      const head = el('div', { class: 'accordion-header' });
+      const toggle = el('button', { class: 'accordion-toggle', type: 'button' });
       const chevron = el('span', { class: 'accordion-chevron inline-flex' });
       chevron.innerHTML = Icons.chevronDown(14);
       const name = el('span', { class: 'accordion-name truncate' });
       name.textContent = group || i18n.t('ssh.ungrouped');
-      head.append(chevron, name, el('span', { class: 'accordion-count' }, String(hosts.length)));
-      head.addEventListener('click', () => {
+      toggle.append(chevron, name, el('span', { class: 'accordion-count' }, String(hosts.length)));
+      toggle.addEventListener('click', () => {
         if (state.collapsed.has(group)) state.collapsed.delete(group);
         else state.collapsed.add(group);
         render();
       });
+      head.appendChild(toggle);
       const body = el('div', { class: 'accordion-body' });
       for (const host of hosts) body.appendChild(buildRow(host));
       item.append(head, body);
