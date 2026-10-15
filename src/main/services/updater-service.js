@@ -7,7 +7,7 @@ const logger = require('../utils/logger');
 /* 自动更新（electron-updater + GitHub Releases）：
    - 启动后静默检查一次；发现新版本才「提示后下载」。
    - 下载完成再「提示后安装」；选稍后则退出时自动安装（autoInstallOnAppQuit）。
-   - 设置 → Ships → 关于 可手动「检查更新」（会提示已是最新 / 失败原因）。
+   - 设置 → Ships → 关于 可手动「检查更新」（提示已是最新 / 暂时无法检查，不报技术错误）。
    仅打包后的 macOS / Windows 生效；开发模式不检查。 */
 
 const COPY = {
@@ -19,10 +19,9 @@ const COPY = {
     readyTitle: '更新已就绪',
     readyMessage: (v) => `v${v} 已下载完成。现在重启并安装吗？（选择「稍后」将在退出应用时自动安装）`,
     install: '重启安装',
-    notAvailableTitle: '检查更新',
+    checkTitle: '检查更新',
     notAvailable: '当前已是最新版本',
-    errorTitle: '检查更新失败',
-    errorMessage: (m) => `无法检查更新：${m}`,
+    notCheckable: '暂时无法检查更新，请稍后再试',
     devMessage: '开发模式不检查更新',
   },
   en: {
@@ -34,10 +33,9 @@ const COPY = {
     readyMessage: (v) =>
       `v${v} has been downloaded. Restart and install now? (Choosing "Later" installs it when you quit.)`,
     install: 'Restart & install',
-    notAvailableTitle: 'Check for updates',
+    checkTitle: 'Check for updates',
     notAvailable: 'You are on the latest version',
-    errorTitle: 'Update check failed',
-    errorMessage: (m) => `Could not check for updates: ${m}`,
+    notCheckable: 'Unable to check for updates right now. Please try again later.',
     devMessage: 'Update check is disabled in development',
   },
 };
@@ -124,7 +122,7 @@ function initUpdater() {
     if (manualCheck) {
       manualCheck = false;
       const c = copy();
-      showBox({ type: 'info', buttons: ['OK'], defaultId: 0, title: c.notAvailableTitle, message: c.notAvailable }).catch(
+      showBox({ type: 'info', buttons: ['OK'], defaultId: 0, title: c.checkTitle, message: c.notAvailable }).catch(
         () => {}
       );
     }
@@ -137,16 +135,17 @@ function initUpdater() {
     promptInstall(info).catch(() => {});
   });
   updater.on('error', (err) => {
+    // 详细错误只写日志；面向用户不报技术错误：手动检查时给一句友好提示，静默检查时完全不打扰。
     logger.warn('[updater] error:', (err && err.message) || err);
     if (manualCheck) {
       manualCheck = false;
       const c = copy();
       showBox({
-        type: 'error',
+        type: 'info',
         buttons: ['OK'],
         defaultId: 0,
-        title: c.errorTitle,
-        message: c.errorMessage((err && err.message) || String(err)),
+        title: c.checkTitle,
+        message: c.notCheckable,
       }).catch(() => {});
     }
   });
@@ -159,13 +158,13 @@ function initUpdater() {
   }, 5000);
 }
 
-/* 设置界面「检查更新」（手动）：会提示已最新 / 失败原因。 */
+/* 设置界面「检查更新」（手动）：会提示已最新 / 暂时无法检查（不报技术错误）。 */
 async function checkForUpdatesInteractive(win) {
   if (!supported()) {
     return { ok: false, error: 'unsupported', message: copy().devMessage };
   }
   const updater = loadUpdater();
-  if (!updater) return { ok: false, error: 'unavailable' };
+  if (!updater) return { ok: false, error: 'unavailable', message: copy().notCheckable };
   if (interactiveChecking) return { ok: true, checking: true };
   interactiveChecking = true;
   promptWindow = win || promptWindow;
@@ -173,8 +172,10 @@ async function checkForUpdatesInteractive(win) {
   try {
     await updater.checkForUpdates();
   } catch (err) {
+    // 详细错误只写日志；面向用户给一句友好提示。
     manualCheck = false;
-    return { ok: false, error: (err && err.message) || String(err) };
+    logger.warn('[updater] manual check failed:', (err && err.message) || err);
+    return { ok: false, error: 'check-failed', message: copy().notCheckable };
   } finally {
     interactiveChecking = false;
   }

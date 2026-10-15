@@ -319,7 +319,7 @@ Ships/
 | `app:open-console` | — | `{ ok, error? }` | 打开 macOS 系统「控制台」App（`/System/Applications/Utilities/Console.app`，缺失时退回 `/Applications/Utilities/Console.app`）；非 macOS 返回 `{ ok: false, error: 'unsupported' }`；由设置 → 日志的「打开控制台 App」按钮调用 |
 | `app:clear-data` | — | `{ ok }` | 一键清理**非业务数据**：删除 `terminal-window.json`、`file-window.json`、`file-layout.json`、`file-window-layout.json`、`cd-history.json`（窗口位置 / 尺寸、列宽 / 面板高度、cd 历史）；**不动** `settings.json`、日志与 `~/.ssh/config`；由设置 → Ships 的「清理数据」（二次确认后）调用 |
 | `app:open-external` | `url` | `{ ok, error? }` | 仅允许 `http(s)` |
-| `app:check-updates` | — | `{ ok, checking?, error?, message? }` | 设置 → Ships → 关于 的「检查更新」：触发一次自动更新检查（`updater-service`）。打包后由主进程弹窗提示「有新版本 / 已是最新 / 失败原因」；开发模式返回 `{ ok: false, error: 'unsupported', message }` 由界面就地提示 |
+| `app:check-updates` | — | `{ ok, checking?, error?, message? }` | 设置 → Ships → 关于 的「检查更新」：触发一次自动更新检查（`updater-service`）。打包后由主进程弹窗提示「有新版本 / 已是最新 / 暂时无法检查」（**失败只给一句友好提示，不暴露技术错误**，详情写日志）；开发模式返回 `{ ok: false, error: 'unsupported', message }` 由界面就地提示 |
 | `settings:get` | — | `settings` | |
 | `settings:set` | `patch` | 合并后的 `settings` | 副作用：写盘 + 广播 + 可能修改登录项 |
 | `ssh:list` | — | `{ hosts, detected }` | 读 `~/.ssh/config` |
@@ -523,7 +523,7 @@ flowchart TD
   C -- 是 --> D["弹窗：发现 vX，是否下载？"]
   C -- 否（手动） --> N[弹窗：已是最新]
   C -- 否（静默） --> Z[结束]
-  C -- 出错（手动） --> E[弹窗：失败原因]
+  C -- 出错（手动） --> E[弹窗：暂时无法检查]
   D -- 稍后 --> Z
   D -- 下载 --> F[downloadUpdate 差量下载]
   F --> G[update-downloaded]
@@ -568,7 +568,7 @@ flowchart TD
   - 启动后**静默检查一次**（延迟 5s，不打扰）；`autoDownload=false`、`autoInstallOnAppQuit=true`。
   - **提示后下载**：`update-available` → 弹窗「发现新版本 vX（当前 vY），现在下载吗？」→ 确认才 `downloadUpdate()`。
   - **提示后安装**：`update-downloaded` → 弹窗「现在重启并安装吗？」→ 确认 `quitAndInstall()`；选「稍后」则在退出应用时自动安装。
-  - **手动检查**：设置 → Ships → 关于「检查更新」（`app:check-updates`）触发，会提示「已是最新 / 失败原因」。
+  - **手动检查**：设置 → Ships → 关于「检查更新」（`app:check-updates`）触发，会提示「已是最新 / 暂时无法检查」。**出错时不报技术错误**：手动检查给一句友好提示（详情写日志），启动时的静默检查出错则完全不提示。
   - **差量下载**：依赖发布时随产物上传的 `*.zip.blockmap` 与 `latest-mac.yml`；旧版本通过更新器安装过才可差量，否则整包。
   - **签名要求**：macOS 自动更新需**稳定 Developer ID 签名**（ad-hoc 兜底不满足，会导致更新校验失败）。
 - **图标生成**：`node scripts/gen-icons.mjs` 在 `assets/imgs/` 生成 `trayTemplate*.png`、`app.png`，在 macOS 上经 `iconutil` 额外生成 `icon.icns`。
