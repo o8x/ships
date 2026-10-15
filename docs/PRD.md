@@ -134,7 +134,7 @@ Ships/
 2. 计算 `x = 托盘中心 - 面板宽/2`，`y = 托盘底部 + gapBelowTray`（`package.json` 的 `ships.window.gapBelowTray`，当前 **2px**，使面板紧贴菜单栏），并按所在显示器工作区夹取。
 3. 显示并聚焦主面板。
 4. 再次点击、或面板失焦（点击别处）时隐藏；`Escape` 亦隐藏。
-5. 打开设置窗口会使主面板失焦并隐藏（与设置互斥）。
+5. 打开设置窗口会使主面板失焦并隐藏（与设置互斥）；若面板与设置窗口同时打开，面板失焦（含焦点转到设置窗口）同样自动隐藏。
 6. **固定悬浮**（底部栏图钉，对应 `settings.pinWindow`）：开启后失焦不再隐藏、保持置顶，并允许通过顶部左侧「应用图标 + 名称」拖动窗口，位置在多次显示间保留；再次点击取消时会立即隐藏，且下次显示重新回到托盘下方默认位置（未固定时窗口不可移动，始终吸附托盘）。
 
 ### 3.3 打开设置
@@ -177,7 +177,7 @@ Ships/
 ### 3.8 网络测试（设置窗口）
 
 1. **入口**：设置 → 网络测试（导航分区 `network`）；主面板底部栏的「网络测试」图标（`wifi`）会打开设置并直接定位到该分区（`window:open-settings` 携带 `section`）。
-2. **执行位置**：自绘下拉选择 **本地** 或 `~/.ssh/config` 里的任一主机；选主机时整条命令包一层 `ssh … '<命令>'`，即在**该主机上**执行同一份命令（跳板机语义）。凭据沿用主机配置（端口 / 私钥 / ProxyJump）与 ssh-agent（`SSH_AUTH_SOCK` 优先取环境变量，回退 `launchctl getenv SSH_AUTH_SOCK`）；一次性执行、不分配 TTY。
+2. **执行位置**：自绘下拉选择 **本地** 或 `~/.ssh/config` 里的任一主机（主机多个分组时，两组之间显示分组小标题，见 §5.1）；选主机时整条命令包一层 `ssh … '<命令>'`，即在**该主机上**执行同一份命令（跳板机语义）。凭据沿用主机配置（端口 / 私钥 / ProxyJump）与 ssh-agent（`SSH_AUTH_SOCK` 优先取环境变量，回退 `launchctl getenv SSH_AUTH_SOCK`）；一次性执行、不分配 TTY。
 3. **类型与端口**：**单行 TAB 式分段控件**（`ShipsUI.segmented` + `.segment-compact`，7 段）选择 **TCP / UDP / HTTP / ICMP / ARP / 扫描应用 / 扫描主机**（标签短，完整含义与命令见悬浮提示；列表在 `src/renderer/scripts/constants.js` 的 `NET_TEST_PROTOCOLS`，需与主进程 `src/main/utils/net-test.js` 的 `PROTOCOLS` 一致）。**ICMP / ARP / 扫描主机不使用端口**（端口禁用）；**扫描应用的端口可留空**（留空 = 扫该目标常用端口，填了 = 精确扫该端口）；端口默认 **80**、只接受 1–65535。目标支持 **IPv4 或网段**；**扫描主机必须填网段**（前缀 16–30，超出提示「网段前缀需在 16–30 之间」）。
 4. **执行**：点「测试」→ `net-test:command`（`{ id, protocol, target, port, host? }`，`id` 是本节的终端会话）。主进程先校验（IPv4 / 网段 / 端口 / 协议白名单 / 主机别名，非法直接拒绝、绝不拼接未校验内容），先用 `Ctrl-U` 清空终端当前输入行并回车换行（避免覆盖上一条命令未换行的输出），再把命令**送进终端里正在运行的 shell**（等价于手敲：回显、Ctrl-C、管道、重定向都走真实终端）：
    - TCP → `nc -vz -w 3 <ip> <port>`；UDP → `nc -uzv -w 3 <ip> <port>`
@@ -196,7 +196,7 @@ Ships/
 2. **窗口**：默认 **1024 × 768**（`ships.terminalWindow.width/height`，**可在 设置 → 终端 → 窗口大小 调整**，见 §5.1；`terminalWindowWidth` / `terminalWindowHeight`），可缩放、最小 `ships.terminalWindow.minWidth × minHeight` = 350×200；改设置立即 `setSize`，手动拖动窗口（非最大化 / 全屏）防抖 400ms 写回设置。`titleBarStyle: hiddenInset`，但**系统红绿灯由主进程 `setWindowButtonVisibility(false)` 隐藏**，头栏左侧改为**自绘小红绿灯**；终端内容**上下不留边距、左侧留 2px**（`--term-padding-y: 0`，`#term-host` 左内边距 2px；`vim` 之类的全屏程序左右基本铺满）；窗口可自由拉伸，**拖动过程中不干预**（下边框严格跟手、绝不中途改尺寸），松手后按实测余量把窗口对齐到整格（见下条）。
    - **头栏（`#term-header`，默认 22px）**：左侧自绘小红绿灯（**尺寸随头栏字号缩放**：`--traffic-size = 字号 × 0.75`、`--traffic-glyph-size = 字号 × 0.5`，12px 字号 = 9px 圆点 / 6px 符号；**左右 padding 均为 10px**：左边距 10px = 第一个圆点到窗口左边缘的距离、右侧图标区距右边缘 10px；悬浮符号 `×` / `−` / `⤢`，颜色取 `--traffic-*`；悬浮任意一个时三个都显示符号，窗口失焦时整体变灰并隐藏符号 —— 与系统观感一致），点击分别调 `window:control` 的 `close` / `minimize` / `zoom`（只作用于发起窗口）；**不显示任何标题文字**（当前 SSH 信息仅用于内部逻辑，不在头栏显示，见下条），右侧图标区（**SSH 主机下拉** + **文件** `folder`、**在 iTerm 中打开并关闭此窗口**、**行号** `eye`/`eye-off`、**窗口分裂** `split`（点击**新开一扇终端窗口**，与主面板底部栏的终端按钮行为一致）；**已去掉置顶（图钉）按钮**，置顶只由设置里的 `terminalAlwaysOnTop` 决定）。头部不挂 `data-tip` 悬浮提示，为拖拽区（红绿灯与图标区为 `no-drag`）。
    - **头栏尺寸随终端字号缩放（永远 = 终端字号 + 1px）**：字号取 CSS 变量 `--term-header-font-size`（`styles/constants.css` 定义、`terminal.js` 的 `applyFontSize()` 在改设置 / `Cmd +`/`Cmd -`/`Cmd 0` 缩放时写入为 `终端字号 + 1`）；头栏高 `max(22px, 字号 + 6px)`、图标按钮 `字号 + 6px`（符号 `字号`）、SSH 下拉**固定 135px 宽**（与下拉条目同宽，超出省略号）/ 字号**固定 11px**（与终端字号无关）/ 高 **固定 14px** 且在头栏内**上下居中**，下拉箭头也固定 11px。下拉菜单（挂在 `body` 上）宽度 **135px**（与下拉同宽、左右对齐；`createSelect` 传 `matchTrigger: true`，打开时把菜单宽设为触发器实测宽度）、**条目 `width: 100%`、高 20px、四周留 3px（菜单 `padding: 3px` + 条目间距 3px）、字号 11px、圆角 5px**（悬浮高亮为固定宽度的内缩圆角矩形，与右键菜单观感一致）、**无分隔线**。
-   - **头部 SSH 下拉**（图标区最左）：列出 `~/.ssh/config` 里的主机，条目文本为 `用户名@主机地址`（无 `User` 时只显示主机地址），首项为占位「SSH」；选中任意主机 → `ssh:connect`（带 `inTerminal: true`）→ 由主进程用 `ssh-service.buildCommand()` 拼 `ssh [-p 端口] [-i 私钥] [-J 跳板机] [user@]host` 并**注入当前终端会话**（等价于在这个终端里手敲 `ssh …`，不新建会话、不重建窗口、不弹 iTerm —— 因此也不受「SSH 使用内置终端连接」开关影响）；**同一台主机可以重复选**（每次选择都重新执行，便于断开后重连）。下拉**禁用**并降低不透明度当 `~/.ssh/config` 里没有主机；主机列表在窗口启动与 `settings:changed` 广播时重新读取。控件用 `select-compact`，宽度**按内容自适应（最小 100px、最大 200px）**、高 14px，与头部图标按钮同一观感。
+    - **头部 SSH 下拉**（图标区最左）：列出 `~/.ssh/config` 里的主机，条目文本为 `用户名@主机地址`（无 `User` 时只显示主机地址），首项为占位「SSH」；**存在多个分组时，在两组条目之间插入一个分组小标题**（不可点，未分组的主机归入「未分组」；只有一个分组时不显示标题）——分组来自 config 的 `# group:` 注释（见 §5.1）。选中任意主机 → `ssh:connect`（带 `inTerminal: true`）→ 由主进程用 `ssh-service.buildCommand()` 拼 `ssh [-p 端口] [-i 私钥] [-J 跳板机] [user@]host` 并**注入当前终端会话**（等价于在这个终端里手敲 `ssh …`，不新建会话、不重建窗口、不弹 iTerm —— 因此也不受「SSH 使用内置终端连接」开关影响）；**同一台主机可以重复选**（每次选择都重新执行，便于断开后重连）。下拉**禁用**并降低不透明度当 `~/.ssh/config` 里没有主机；主机列表在窗口启动与 `settings:changed` 广播时重新读取。控件用 `select-compact`，宽度**按内容自适应（最小 100px、最大 200px）**、高 14px，与头部图标按钮同一观感。
    - **屏幕 / 位置 / 尺寸记忆**（`terminal-window.json`，单槽）：打开、移动、缩放、关闭时把「所在屏幕 + 位置 + 尺寸」写入 `terminal-window.json`（关闭前同步落盘，拖动后立刻关窗也不会丢；写盘读窗口**此刻**的真实几何，程序化改尺寸不会被旧快照覆盖）。下次打开时：**该屏幕还在**（`id` + `scaleFactor` + `bounds` 全一致）→ 应用记忆的位置与尺寸（越界部分夹回该屏幕工作区，整窗可见）；**换屏 / 拔掉外接屏 / 分辨率或排列变了 / 无记录** → 用设置里的默认尺寸在当前屏幕（鼠标所在屏幕）工作区内居中。屏幕签名一致才复用，是因为分辨率 / 排列变化后记忆里的绝对坐标不再是同一块屏幕上的同一位置。
 3. **置顶与全屏**：默认置顶（`ships.terminalWindow.alwaysOnTop` / `settings.terminalAlwaysOnTop`，缺省为开；`alwaysOnTop` 且 `setAlwaysOnTop(true, 'screen-saver')`）。**头栏没有置顶（图钉）按钮**，置顶只由设置 `terminalAlwaysOnTop`（`terminal:set-top` 仍可被设置界面 / 其它入口调用）决定。**该开关只作用于终端窗口，不影响主面板**（面板恒定置顶，见 §8.1）。空格行为是 `setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true })` = `NSWindowCollectionBehaviorDefault | FullScreenAuxiliary` —— **带全屏辅助、但不加入所有桌面**：可以浮在（当前桌面里的）全屏应用之上，同时**不会跟随桌面切换**，始终留在打开它的那个桌面。**该声明在窗口创建时、以及每次获得焦点时（此刻窗口就在活动桌面上）执行**（`skipTransformProcessType: true`：应用已是 `LSUIElement` 菜单栏 Agent，无需进程类型转换，转换会短暂隐藏窗口 / Dock 并改变激活行为）；**变球时不再重新声明**（变球发生在用户已切到其它桌面之后，此时再设会按 macOS 语义把窗口重新分配到「当前活动桌面」→ 球会跟着切换桌面，见 §3.9-12）；放大回来时最后重申一次，便于经全局快捷键把窗口带到当前桌面。iTerm 会强制切桌面，所以 SSH 连接改走这里。
 4. **终端**：与 §3.8 同一套 xterm.js + `pty-bridge.py` 真实 PTY，运行 shell（取设置 → 终端的**默认 shell**，`terminalShell`；留空或文件不存在时回退 `$SHELL` / `os.userInfo().shell`）；**滚动缓冲与字号取设置**（`terminalScrollback` / `terminalFontSize`，默认 10000 行 / 12px；`app:info.terminalScrollback` 仅作为配置缺失时的兜底）；窗口尺寸变化会同步 PTY 尺寸，关闭窗口即结束会话。
@@ -240,7 +240,7 @@ Ships/
     - **连接凭据**：以当前 ssh 目标（§3.9-4 的进程树检测结果，如 `user@host` / 别名）为键 → 命中 `~/.ssh/config`（SSH 管理）记录时按记录的 `HostName`/`Port`/`User`/`IdentityFile` 连接（命令行给了同名用户时优先用命令行用户）；无记录时用命令里的用户名（缺省用本机用户名）+ 默认私钥 `~/.ssh/id_ed25519`。命中记录带 **ProxyJump 时 ssh2 不支持、连接失败并在状态栏提示**。SSH 私钥优先，其次 ssh-agent。
     - **状态机**：**检测到 ssh 目标即自动建立 SFTP 连接**（面板仍保持隐藏，状态栏显示「正在连接」）—— 这样终端里的 **cd 跟随在面板未展开时也生效**；点文件按钮展开面板（已连接则直接显示）；**再次点按钮只隐藏面板、保留连接**；手动切换 / 断开 ssh（目标变化）→ **销毁该 SFTP 连接**（面板随之收起）；连接失败（认证 / 超时 / ProxyJump / 无法启动子系统）只在状态栏提示。窗口销毁时该窗口的连接一并关闭。
     - **下载 / 上传进度**：下载与上传（含拖拽多文件逐个）都在状态栏用**进度条**显示百分比（主进程经 `sftp:progress` 事件回传 `transferred/total`）。下载保存到设置的下载目录（默认 `~/Downloads`，重名自动加 ` (n)`，见 §5.1），成功后状态栏显示本地路径。
-11. **独立文件窗口**（`file-window.html`，见 §8.6）：文件管理可**分离为单独窗口**——内嵌面板**路径行最左的「分离为独立窗口」按钮**或 **SSH 管理的 `folder` 图标**（自动连接该主机）打开；点分离按钮时会**关闭并销毁当前内嵌容器**（连同其 SFTP 连接）再开独立窗口，并把**当前所在目录一并带过去**（`file-window:open` 带 `path`，连上后进入该目录；SSH 管理 `folder` 图标无当前目录则从家目录开始）。窗口与终端同为**悬浮 panel**：`alwaysOnTop`（默认开，由设置 `fileWindowAlwaysOnTop` 决定）、可浮在全屏之上但不跟随桌面切换、`titleBarStyle: hiddenInset` + 自绘小红绿灯（**头栏无置顶 / 图钉按钮**）；窗口底色随主题（避免拖动露白，同 §8.5）。**拖拽窗口高度后文件列表区域自动对齐到文件行的整数倍**（行高随字号，见 §8.6）。头栏含一个 **SSH 下拉**切换连接（列出 `~/.ssh/config`，选中即重连），**无终端**；字体 / 样式 / `Cmd +/-` 缩放与终端配置一致（用 `--file-font-size`，`file-window:zoom`），但**字号最小 13px**——终端字体小于 13px 时不再跟随；头栏与红绿灯同样随字号缩放。**连接与内嵌面板彼此独立**（各自一个 SFTP 会话，可各连不同 ssh），并**不随终端里的 ssh 关闭而关闭**。几何（屏幕 / 位置 / 尺寸）记入 `file-window.json`（单槽，同终端窗口的记忆方式）。
+11. **独立文件窗口**（`file-window.html`，见 §8.6）：文件管理可**分离为单独窗口**——内嵌面板**路径行最左的「分离为独立窗口」按钮**或 **SSH 管理的 `folder` 图标**（自动连接该主机）打开；点分离按钮时会**关闭并销毁当前内嵌容器**（连同其 SFTP 连接）再开独立窗口，并把**当前所在目录一并带过去**（`file-window:open` 带 `path`，连上后进入该目录；SSH 管理 `folder` 图标无当前目录则从家目录开始）。窗口与终端同为**悬浮 panel**：`alwaysOnTop`（默认开，由设置 `fileWindowAlwaysOnTop` 决定）、可浮在全屏之上但不跟随桌面切换、`titleBarStyle: hiddenInset` + 自绘小红绿灯（**头栏无置顶 / 图钉按钮**）；窗口底色随主题（避免拖动露白，同 §8.5）。**拖拽窗口高度后文件列表区域自动对齐到文件行的整数倍**（行高随字号，见 §8.6）。头栏含一个 **SSH 下拉**切换连接（列出 `~/.ssh/config`，选中即重连；存在多个分组时在两组之间显示分组小标题，见 §3.9-2），**无终端**；字体 / 样式 / `Cmd +/-` 缩放与终端配置一致（用 `--file-font-size`，`file-window:zoom`），但**字号最小 13px**——终端字体小于 13px 时不再跟随；头栏与红绿灯同样随字号缩放。**连接与内嵌面板彼此独立**（各自一个 SFTP 会话，可各连不同 ssh），并**不随终端里的 ssh 关闭而关闭**。几何（屏幕 / 位置 / 尺寸）记入 `file-window.json`（单槽，同终端窗口的记忆方式）。
 12. **悬浮球（失去焦点缩成圆形小窗）**：终端窗口**失去焦点后延迟 `terminalBallDelayMs`（默认 0.2s）**缩成一个 **`terminalBallSize`（默认 75px、宽高强制 1:1、40–200px）的圆形、无标题栏窗口**，形如悬浮球：
     - **开关与延迟**：设置 → 终端「自动缩成悬浮球」（`settings.terminalBallEnabled`，默认开）、「缩成悬浮球延迟」（下拉：200ms / 500ms / 1s / 5s / 10s / 15s / 30s / 60s，默认 200ms）、「悬浮球大小」（`settings.terminalBallSize`，默认 75px，1:1）、「悬浮球图标」（`settings.terminalBallIcon`，选项为 `assets/icons/ball/` 下所有 SVG，默认 `ball.svg`，**实时生效**）、「悬浮球暗色模式」（`settings.terminalBallDark`，默认**开** = **始终暗色底**；关 = **跟随全局主题**（亮 / 暗随 `data-theme`）；**图标始终保留原色、不去色**）；**延迟内焦点回来则取消缩球**（`blur` 起计时、`focus` 清除）。
     - **窗口形态**：终端窗口以 `frame: false` + `transparent: true` + `hasShadow: false` + **`roundedCorners: false`**（圆角由 CSS 画，避免系统把四角边框裁掉）+ **`acceptFirstMouse: true`** 创建（macOS：让悬浮球浮在其它应用 / 全屏应用之上时**第一次点击**就落到窗口内容，而不必先激活、点两次）；底座 `#term-shell` 负责底色 / 圆角 / 描边，悬浮球为 `#term-ball`（**固定 `--term-ball-size` 的圆形 + 设置的悬浮球图标**（`assets/icons/ball/*.svg`，默认 `ball.svg`））——球尺寸固定、**锚在窗口右上角**（`top:0; right:0`）。
@@ -271,14 +271,14 @@ Ships/
 | IP / 网段与掩码 | 输入 `IP`、`IP/前缀`、`IP 掩码`、纯数字或 `0x` 十六进制；自上而下显示：**归属地** → **IP 进制（十进制 / 十六进制 / 二进制）** → 网段结果（网络地址、广播地址、可用范围、主机数、掩码、反掩码、前缀、掩码二进制、地址类型）；IPv6 仅显示 IP 进制 | 未给掩码时按 `/24` 计算并提示；IPv6 不查归属地；归属地卡片固定高度，无运营商显示 `-`；归属地右侧两个图标按钮用浏览器打开 `https://ipgeolocation.io/what-is-my-ip/<ip>` 与 `https://iplocation.io/ip/<ip>`（IP 自动替换；无有效 IPv4 时禁用） |
 | 进制转换 | 2/8/10/16 进制四行双向实时同步；另有 2–36 自定义进制（自绘下拉）；“位宽/字节”统计 | 任一行输入即联动其余 |
 | JSON 格式化 | 粘贴/失焦后**原地格式化**（固定 4 空格缩进）并语法高亮；工具栏单行：文本/结构切换、键排序、复制、压缩、清空；错误定位（行列）；**结构查看**（可折叠树） | 超过 1MB 仅格式化不高亮；输入改变仅重高亮；编辑器高度 180px |
-| SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示系统图标、`user@host(:port)`（22 不显示端口）、别名与**连接按钮**；**双击条目（按钮除外）等同于连接**（连接在置顶终端窗口里执行，见 §3.9，不会切换桌面）；列表在打开面板时自动刷新（无手动刷新按钮）；系统图标来自缓存的探测结果（品牌彩色图标，探测在「设置 · SSH 管理」进行）；行内 `folder` 图标**打开独立文件窗口并自动连接该主机**（`file-window:open`，见 §3.9-11） | 忽略通配符主机（如 `Host *`）；未探测显示通用主机图标 |
+| SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示系统图标、`user@host(:port)`（22 不显示端口）、别名与**连接按钮**；**双击条目（按钮除外）等同于连接**（连接在置顶终端窗口里执行，见 §3.9，不会切换桌面）；列表在打开面板时自动刷新（无手动刷新按钮）；系统图标来自缓存的探测结果（品牌彩色图标，探测在「设置 · SSH 管理」进行）；行内 `folder` 图标**打开独立文件窗口并自动连接该主机**（`file-window:open`，见 §3.9-11）；**按分组显示为手风琴**（分组来自 config 的 `# group:` 注释，**默认全部展开**，点分组标题折叠 / 展开；命名分组在前、未分组在后；没有任何命名分组时保持扁平列表） | 忽略通配符主机（如 `Host *`）；未探测显示通用主机图标 |
 | 剪贴板 | 主进程按设置周期轮询系统剪贴板，展示最近 N 条记录（默认 **3**，可在设置调整）；文本固定 2 行截断预览，图片渲染为小缩略图，**SVG 代码也渲染为小图（固定 64×64 框内等比缩放）**；每条可复制，支持一键清空历史 | 历史仅存内存、退出即清空；文本超 10 万字截断；图片按「大小+哈希」去重；SVG 超 20 万字符按文本处理 |
 | 编码转换 | 字符串 / Base64 / 十六进制 / URL 编码 / ASCII 十进制 五个字段双向实时同步（UTF-8） | 输入非法时标红不联动 |
 | 哈希计算 | 计算 **MD5 / SHA1 / SHA256**；支持输入字符串或**选择本地文件**（流式计算，适合大文件）；切换类型时清空结果 | 字符串输入防抖 200ms；文件经系统对话框选择 |
 | 营养成分 | 输入商品名与每 100g 的能量(kJ)/蛋白质/脂肪/碳水/钠及商品总重，实时换算：盐、千卡、千焦（含每日推荐 2250kcal / 9410kJ 对比与超出量）、慢跑与步行消耗（公里 / 分钟 / 步数）；底部提供**清空（图标）**与**一个复制按钮（复制输入与结果）** | 输入不做历史记录、不落盘，每次打开为默认值；不做历史列表与商品保存 |
 | 设置 · Ships | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、固定悬浮（置顶常驻、失焦不隐藏）、**Liquid Glass**（主界面启用系统玻璃背景：macOS 26+ 用原生 Liquid Glass，旧系统回退 hud 毛玻璃，见 §8.1）、剪贴板条数、剪贴板轮询间隔、打开数据文件夹、**清理数据**（二次确认后删除窗口位置 / 大小、列宽 / 面板高度、cd 历史等**非业务数据**）、关于（版本号 + **检查更新**按钮（`app:check-updates`，见 §7）+ **开发者模式开关** `settings.developerMode`，默认关，值持久化）、开发者（**仅开发者模式开启时显示**；打开悬浮界面 / 设置界面 / **终端界面** / 文件界面 DevTools，`devtools:open` 的 `main` / `settings` / `terminal` / `file`） | 见 §5.1 |
 | 设置 · 日志 | **日志保留天数**（下拉：1 / 3 / 7 / 14 / 30 / 90，默认 7）、**日志文件夹**（按钮，打开日志目录 `~/Library/Logs/Ships`，**只打开文件夹**不打开日志文件）、**打开控制台 App**（按钮，位于最下，仅 macOS：打开系统「控制台」App 查看「日志报告」下的 Ships 日志） | 对应 `settings.json` 的 `logRetentionDays`；默认值来自 `package.json` 的 `ships.logRetentionDays`（7） |
-| 设置 · SSH | `~/.ssh/config` 主机的增删改（别名/HostName/User/Port/IdentityFile/ProxyJump）；列表左侧显示系统图标；新增时自动预填 **用户 root / 端口 22 / 私钥 `~/.ssh/id_ed25519`**，**私钥支持手动选择文件**（对话框默认 `~/.ssh`，选后转为 `~` 路径），保存时别名默认取主机地址；表单内含「探测系统」，**探测成功后才允许保存**，探测失败**保留表单内容**；支持**导出 config** | 别名与主机地址至少填一项；删除二次确认 |
+| 设置 · SSH | `~/.ssh/config` 主机的增删改（别名/HostName/User/Port/IdentityFile/ProxyJump/**分组**）；列表左侧显示系统图标；**按分组显示为手风琴**（分组来自 config 的 `# group:` 注释，**默认全部展开**，命名分组在前、未分组在后，无命名分组时保持扁平列表）；新增时自动预填 **用户 root / 端口 22 / 私钥 `~/.ssh/id_ed25519`**，**私钥支持手动选择文件**（对话框默认 `~/.ssh`，选后转为 `~` 路径），保存时别名默认取主机地址；**新增 / 编辑表单含「分组」控件：可从已有分组中选择，或选「新建分组…」后输入新名称（写入 config 注释 `# group: <名>`）**；表单内含「探测系统」，**探测成功后才允许保存**，探测失败**保留表单内容**；支持**导出 config** | 别名与主机地址至少填一项；删除二次确认 |
 | 设置 · 终端 | 配置置顶终端窗口：**默认 shell**（留空 = 系统默认 `$SHELL`，可手填或用「选择文件」挑，写入前校验文件存在）、**字体大小**（8–24px，默认 12）、**窗口大小**（宽 × 高，最小 350 × 200，默认 1024 × 768；改完立即作用到已打开的终端窗口，手动拖动窗口也会写回；这是「换屏 / 无记忆」时的默认尺寸，同屏则优先沿用终端窗口自己的位置与尺寸）、**缓冲区大小**（默认 10000 行）、**打开终端的全局快捷键**（默认 `⌘⇧Z`；点按钮后按新组合键改绑，`Backspace` 清除、`Esc` 取消，至少含 Command / Control / Alt 之一，被占用 / 非法时红字提示且不落盘）、**SSH 使用内置终端连接**（开关：开 = 点「连接」在置顶终端执行 `ssh`，关 = 改用 iTerm）、**关闭按钮行为**（分段控件：隐藏窗口 / 销毁窗口，默认销毁）、**自动缩成悬浮球**（开关，默认开）、**缩成悬浮球延迟**（下拉：200ms / 500ms / 1s / 5s / 10s / 15s / 30s / 60s，默认 200ms）、**悬浮球大小**（数字，40–200px、1:1，默认 75，见 §3.9-12）、**悬浮球图标**（带预览的下拉，选项为 `assets/icons/ball/` 下所有 SVG，默认 `ball.svg`，**实时生效**）、**悬浮球暗色模式**（开关，默认开：开 = 始终暗色底 / 关 = 跟随全局主题；图标始终保留原色）、**SFTP 下载目录**（文本 + 「选择目录」，默认 `~/Downloads`，见 §3.9-10）、**重置**（二次确认后把以上终端设置恢复默认值，并清掉 `terminal-window.json` 里记住的屏幕 / 位置 / 大小） | 对应 `settings.json` 的 `terminalShell`/`terminalFontSize`/`terminalWindowWidth`/`terminalWindowHeight`/`terminalScrollback`/`terminalHotkey`/`terminalCloseAction`/`sshBuiltinTerminal`/`terminalBallEnabled`/`terminalBallDelayMs`/`terminalBallSize`/`terminalBallIcon`/`terminalBallDark`/`sftpDownloadDir`；默认值来自 `package.json` 的 `ships.terminalWindow`/`ships.sshBuiltinTerminal`/`ships.sftpDownloadDir`；窗口位置 / 屏幕在 `terminal-window.json`（见 §5.1、§3.9） |
 | 设置 · 网络测试 | 在本地或通过 `~/.ssh/config` 里的主机执行测试命令（TCP / UDP / HTTP(S) / ICMP / ARP / 扫描应用 / 扫描主机）；下方是**可直接输入命令的交互终端**（真实 PTY + 默认登录 shell + xterm.js），「测试」把校验过的命令送进终端执行（选主机时包一层 `ssh`）、「停止」发送 Ctrl-C；详见 §3.8 | 端口默认 80；扫描主机需网段（前缀 16–30）；扫描应用端口可留空；输入不落盘 |
 | 底部栏 | 左显示版本号（`vX.Y.Z`；**开发者模式开启时**版本号右侧加一枚强调色描边的「开发者模式」标记，取 `settings.developerMode` 与 `i18n` 的 `developerMode` 文案）；右侧依次为**终端图标**（`terminal`，每次**新开**一扇置顶终端窗口，见 §3.9）、**文件管理图标**（`folder`，打开独立文件窗口且**不选中任何连接**，`file-window:open` 传空 `target`）、**网络测试图标**（打开设置 → 网络测试分区）、**外观图标**（`monitor`/`sun`/`moon`，点击在**跟随系统 → 浅色 → 深色 → 跟随系统**间循环，写 `settings.theme`；非 system 时图标用强调色）、**图钉（固定悬浮）**与设置入口 | 图钉状态取 `settings.pinWindow`；外观取 `settings.theme`；版本取 `package.json`；开发者模式标记取 `settings.developerMode` |
@@ -301,7 +301,7 @@ Ships/
 | `file-window-layout.json` | 同上目录 | 同 `file-layout.json` 结构（**独立文件窗口**自己的布局记录，与内嵌面板**分开保存**） | 持久；独立窗口拖动分隔线 / 列宽时写入 |
 | `cd-history.json` | 同上目录 | `{ [“用户名@主机”]: string[] }`（文件面板每个 ssh 目标最近 cd 到的远端目录，去重、越新越靠前、最多 `CD_HISTORY_MAX` = 10 条） | 持久；仅记录通过 cd 到达的目录（终端跟随 / `cd 到此目录` 按钮 / 点历史条目），手动浏览不记录；「清理数据」可删除 |
 | 剪贴板历史 | 内存（不落盘） | 最近 5 条 `{ id, type, text?, thumb?, width?, height?, truncated?, at }` | 随进程退出丢失 |
-| `~/.ssh/config` | 用户主目录 | 标准 OpenSSH 配置 | 由设置内 SSH 管理读写；未加密（非机密） |
+| `~/.ssh/config` | 用户主目录 | 标准 OpenSSH 配置；**分组用一行注释 `# group: <名称>` 标记**（紧随其后的 Host 属于该分组，直到下一个标记；未标记的属「未分组」；ssh 忽略注释，不影响连接） | 由设置内 SSH 管理读写；未加密（非机密） |
 
 - 机密数据：本应用不保存密码 / 令牌；SSH 私钥仍由用户自行管理与使用，不复制、不落盘到应用数据目录。
 - 设置默认值来自 `package.json` 的 `ships.defaultLocale/defaultTheme/defaultAccent`。
@@ -319,10 +319,10 @@ Ships/
 | `app:open-console` | — | `{ ok, error? }` | 打开 macOS 系统「控制台」App（`/System/Applications/Utilities/Console.app`，缺失时退回 `/Applications/Utilities/Console.app`）；非 macOS 返回 `{ ok: false, error: 'unsupported' }`；由设置 → 日志的「打开控制台 App」按钮调用 |
 | `app:clear-data` | — | `{ ok }` | 一键清理**非业务数据**：删除 `terminal-window.json`、`file-window.json`、`file-layout.json`、`file-window-layout.json`、`cd-history.json`（窗口位置 / 尺寸、列宽 / 面板高度、cd 历史）；**不动** `settings.json`、日志与 `~/.ssh/config`；由设置 → Ships 的「清理数据」（二次确认后）调用 |
 | `app:open-external` | `url` | `{ ok, error? }` | 仅允许 `http(s)` |
-| `app:check-updates` | — | `{ ok, checking?, error?, message? }` | 设置 → Ships → 关于 的「检查更新」：触发一次自动更新检查（`updater-service`）。打包后由主进程弹窗提示「有新版本 / 已是最新 / 暂时无法检查」（**失败只给一句友好提示，不暴露技术错误**，详情写日志）；开发模式返回 `{ ok: false, error: 'unsupported', message }` 由界面就地提示 |
+| `app:check-updates` | — | `{ ok, checking?, error?, message? }` | 设置 → Ships → 关于 的「检查更新」：触发一次自动更新检查（`updater-service`）。**每次手动检查都会给出反馈**（有新版本 / 已是最新 / 暂时无法检查，均弹窗），反复点击不会静默无响应；检查进行中再次点击返回 `{ ok: true, checking: true }`，界面就地提示「正在检查…」。打包后由主进程弹窗（**失败只给一句友好提示，不暴露技术错误**，详情写日志）；开发模式返回 `{ ok: false, error: 'unsupported', message }` 由界面就地提示 |
 | `settings:get` | — | `settings` | |
 | `settings:set` | `patch` | 合并后的 `settings` | 副作用：写盘 + 广播 + 可能修改登录项 |
-| `ssh:list` | — | `{ hosts, detected }` | 读 `~/.ssh/config` |
+| `ssh:list` | — | `{ hosts, detected }` | 读 `~/.ssh/config`；每个 host 含 `group` 字段（分组名，未分组为 `''`，来自 `# group:` 注释，见 §5.1） |
 | `ssh:connect` | `{ alias, inTerminal? }` | `{ ok, command?, error? }` | 按 alias 查表并拼 `ssh …`：`inTerminal: true`（终端窗口头部的 SSH 下拉）**强制注入当前置顶终端窗口**、不受 `sshBuiltinTerminal` 影响；省略时按 `settings.sshBuiltinTerminal` 决定走置顶终端或 iTerm |
 | `ssh:detect` | `{ alias }` | `{ queued }` | 异步，结果经 `ssh:detected` 回传（兼容保留） |
 | `ssh:detect-host` | `{ alias?, hostName, user?, port?, identityFile?, proxyJump? }` | `{ ok, alias, info }` | 对任意主机（可尚未保存）同步探测，结果写入缓存并广播 |
@@ -365,9 +365,9 @@ Ships/
 | `terminal:ensure-size` | `{ width, height }` | `{ ok, width?, height? }` | 打开内嵌文件面板时把本窗口**只放大不缩小**到至少给定内容尺寸（首次无布局记录时用，见 §3.9-10）；受屏幕工作区限制，不写回几何记忆；只接受来自终端窗口本身的请求 |
 | `window:control` | `{ action: 'close' \| 'minimize' \| 'zoom' }` | `{ ok, action }` | 终端窗口自绘小红绿灯的窗口控制：只作用于**发起请求的那个窗口**（`BrowserWindow.fromWebContents(event.sender)`），未知 action 返回 `{ ok: false }`；`close` 在终端窗口上按「关闭按钮行为」收缩成悬浮球或销毁（见 §3.9-9） |
 | `net-test:command` | `{ id, protocol, target, port, host? }` | `{ ok, command?, error? }` | 校验后把测试命令注入指定终端会话；`host` 为 SSH 别名时整条命令包一层 `ssh` |
-| `ssh-config:read` | — | `hosts` | |
-| `ssh-config:upsert` | `host` | 更新后的 `hosts` | 保留未管理指令与注释 |
-| `ssh-config:remove` | `alias` | 更新后的 `hosts` | |
+| `ssh-config:read` | — | `hosts` | 每个 host 含 `group` 字段（见 §5.1） |
+| `ssh-config:upsert` | `host`（含可选 `group`、`originalAlias`） | 更新后的 `hosts` | 保留未管理指令与注释；`group` 有值时写入 / 复用 `# group: <名称>` 注释并归入该分组，空串 / 缺省 = 未分组；改分组时把主机移动到目标分组末尾，分组清空后自动移除其注释标记 |
+| `ssh-config:remove` | `alias` | 更新后的 `hosts` | 删除该分组最后一个主机后自动移除其 `# group:` 注释标记 |
 | `ssh-config:export` | — | `{ ok, path?, canceled?, error? }` | 经保存对话框导出 `~/.ssh/config` 副本 |
 | `geo:lookup` | `ip`（IPv4 字符串） | `{ iso_3166, country, province, city, isp }` 或 `null` | 本地 `assets/geoip.json` 查询；内网返回 `{ isp: '保留地址' }`；**逐级回退**（省 / 市只有中国、台湾有数据，缺失不影响国家级结果；只有 ISP 命中时仅返回 `isp`；都不命中返回 `null`） |
 | `devtools:open` | `'main' \| 'settings' \| 'terminal' \| 'file'` | `{ ok }` | 打开对应窗口的开发者工具（detach 模式；主面板会先显示，`'terminal'` / `'file'` 未打开时先打开对应窗口） |
@@ -517,7 +517,7 @@ flowchart TD
 ```mermaid
 flowchart TD
   A[应用启动（打包后）] --> B[延迟 5s 静默 checkForUpdates]
-  J[设置→关于→检查更新] --> K[手动 checkForUpdates]
+  J[设置→关于→检查更新] --> K["手动 checkForUpdates（每次点击都有反馈）"]
   B --> C{有新版本?}
   K --> C
   C -- 是 --> D["弹窗：发现 vX，是否下载？"]
@@ -568,7 +568,7 @@ flowchart TD
   - 启动后**静默检查一次**（延迟 5s，不打扰）；`autoDownload=false`、`autoInstallOnAppQuit=true`。
   - **提示后下载**：`update-available` → 弹窗「发现新版本 vX（当前 vY），现在下载吗？」→ 确认才 `downloadUpdate()`。
   - **提示后安装**：`update-downloaded` → 弹窗「现在重启并安装吗？」→ 确认 `quitAndInstall()`；选「稍后」则在退出应用时自动安装。
-  - **手动检查**：设置 → Ships → 关于「检查更新」（`app:check-updates`）触发，会提示「已是最新 / 暂时无法检查」。**出错时不报技术错误**：手动检查给一句友好提示（详情写日志），启动时的静默检查出错则完全不提示。
+  - **手动检查**：设置 → Ships → 关于「检查更新」（`app:check-updates`）触发，会提示「已是最新 / 暂时无法检查」；**每次点击都必须有反馈**（有新版本同样会重新弹窗，反复点击不会静默无响应）；检查进行中再次点击返回 `{ ok: true, checking: true }`，界面就地提示「正在检查…」。**出错时不报技术错误**：手动检查给一句友好提示（详情写日志），启动时的静默检查出错则完全不提示。
   - **差量下载**：依赖发布时随产物上传的 `*.zip.blockmap` 与 `latest-mac.yml`；旧版本通过更新器安装过才可差量，否则整包。
   - **签名要求**：macOS 自动更新需**稳定 Developer ID 签名**（ad-hoc 兜底不满足，会导致更新校验失败）。
 - **图标生成**：`node scripts/gen-icons.mjs` 在 `assets/imgs/` 生成 `trayTemplate*.png`、`app.png`，在 macOS 上经 `iconutil` 额外生成 `icon.icns`。
@@ -710,9 +710,10 @@ flowchart TD
 **组件**
 
 - 输入 `field`、按钮 `btn` / `btn-accent`、图标按钮 `icon-btn`、结果行 `row-card`、TAB `tab` / `tab-active`、开关 `switch`、分段控件 `segment`、色块 `swatch`。
+- **分组手风琴** `accordion` / `accordion-item` / `accordion-header`（含 `.accordion-chevron` / `.accordion-name` / `.accordion-count`）/ `accordion-body`：用于 SSH 管理（设置页与主界面工具）按分组折叠展示，**默认全部展开**，点击标题切换、`.accordion-item.collapsed` 时旋转箭头（-90°）并隐藏 `.accordion-body`。
 - **纵向间距统一 10px**：工具/设置分区用 `.section`（`gap: 10px`、`margin-bottom: 10px`）；结果行、输入、区块之间的间距均为 10px（不再混用 8/12/16px）。
 - **统一标题**：每个工具内容区顶部由 `app.js` 渲染统一头部 `.tool-head`（标题取 `tools.<id>`、说明取 `toolDesc.<id>`）；切换 TAB 时内容区自动滚动回顶部。
-- 自绘控件：下拉框 `select-trigger` / `select-menu` / `select-option`（`ShipsUI.createSelect`，替代系统 `<select>`；`.select-trigger.select-compact` 是头栏尺寸变体 —— 内边距 6px / 圆角取更紧凑的 `--radius-control-sm`（4px，比常规控件的 8px 小），字号与高度由 `#term-actions` 规则按头栏字号推导；终端窗口的下拉菜单由 `body.term-window .select-menu` 限定为 **100–200px 自适应宽**、条目高度与下拉本体一致，用于终端窗口头栏里的 SSH 主机下拉）；**终端窗口自绘小红绿灯** `.traffic-light`（`.traffic-close` / `.traffic-minimize` / `.traffic-zoom`，9px 圆点 + 悬浮符号，见 §3.9-2）；悬浮提示 `ships-tip`（`ShipsUI.initTooltips`，元素加 `data-tip`，时间戳工具的偏移输入框用 `data-tip` 说明表达式语法）；JSON 覆盖式高亮编辑器 `json-editor` 与结构树 `json-tree`。
+- 自绘控件：下拉框 `select-trigger` / `select-menu` / `select-option`（`ShipsUI.createSelect`，替代系统 `<select>`；`.select-trigger.select-compact` 是头栏尺寸变体 —— 内边距 6px / 圆角取更紧凑的 `--radius-control-sm`（4px，比常规控件的 8px 小），字号与高度由 `#term-actions` 规则按头栏字号推导；终端窗口的下拉菜单由 `body.term-window .select-menu` 限定为 **100–200px 自适应宽**、条目高度与下拉本体一致，用于终端窗口头栏里的 SSH 主机下拉；支持 `{ header: true, label }` 形式的分组小标题 `select-group-title`（不可点、`pointer-events: none`，用于 SSH 下拉在两组之间区分，终端窗口内更紧凑））；**终端窗口自绘小红绿灯** `.traffic-light`（`.traffic-close` / `.traffic-minimize` / `.traffic-zoom`，9px 圆点 + 悬浮符号，见 §3.9-2）；悬浮提示 `ships-tip`（`ShipsUI.initTooltips`，元素加 `data-tip`，时间戳工具的偏移输入框用 `data-tip` 说明表达式语法）；JSON 覆盖式高亮编辑器 `json-editor` 与结构树 `json-tree`。
 - 输入校验态：普通输入框加 `.invalid` 时描红（`border-color: var(--color-danger)`），时间戳工具的两个偏移输入框即用它表示偏移表达式非法；`.field:disabled` 半透明 + `not-allowed` 光标（IP 工具网络测试在 ICMP / ARP / 扫描主机下禁用端口输入）。
 - 分段控件：`ShipsUI.segmented(options, value, onSelect, { className })` 支持选项 `disabled`（置灰不可点选，`.segment button:disabled` 透明 0.4）、`tip`（悬浮提示，配合 `data-tip`）与 `setOptions()`（原地重建，用于跟随状态变化）；`.segment-compact` 为单行多段变体（内边距 4px / 6px），设置 → 网络测试的类型切换即用它。
 - 文件管理路径行图标（分离为独立窗口 / 刷新 / 家目录 / 在终端 cd 到此目录）与列表头操作常驻显示，不做悬浮显隐。

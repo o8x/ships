@@ -20,6 +20,7 @@
         detectedAs: '系统：{os}',
         detectDone: '{host}：{os}',
         files: '打开文件管理',
+        ungrouped: '未分组',
       },
     },
     en: {
@@ -37,6 +38,7 @@
         detectedAs: 'OS: {os}',
         detectDone: '{host}: {os}',
         files: 'Open file manager',
+        ungrouped: 'Ungrouped',
       },
     },
   });
@@ -60,6 +62,8 @@
       detected: {},
       disposers: [],
       statusTimer: null,
+      // 折叠的分组（默认空 = 全部分组展开）。key 为分组名，未分组用 ''。
+      collapsed: new Set(),
     };
 
     const status = el('div', { class: 'mb-2.5 hidden text-[11px]' }, '');
@@ -119,13 +123,60 @@
       return row;
     }
 
+    function namedGroups() {
+      const seen = new Set();
+      const groups = [];
+      for (const host of state.hosts) {
+        const group = host.group || '';
+        if (!group) continue;
+        const key = group.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        groups.push(group);
+      }
+      return groups;
+    }
+
+    function buildGroupSection(group, hosts) {
+      const collapsed = state.collapsed.has(group);
+      const item = el('div', { class: collapsed ? 'accordion-item collapsed' : 'accordion-item' });
+      const head = el('button', { class: 'accordion-header', type: 'button' });
+      const chevron = el('span', { class: 'accordion-chevron inline-flex' });
+      chevron.innerHTML = Icons.chevronDown(14);
+      const name = el('span', { class: 'accordion-name truncate' });
+      name.textContent = group || i18n.t('ssh.ungrouped');
+      head.append(chevron, name, el('span', { class: 'accordion-count' }, String(hosts.length)));
+      head.addEventListener('click', () => {
+        if (state.collapsed.has(group)) state.collapsed.delete(group);
+        else state.collapsed.add(group);
+        render();
+      });
+      const body = el('div', { class: 'accordion-body' });
+      for (const host of hosts) body.appendChild(buildRow(host));
+      item.append(head, body);
+      return item;
+    }
+
     function render() {
       list.innerHTML = '';
       if (!state.hosts.length) {
         list.appendChild(el('div', { class: 'py-10 text-center text-[12px] text-fg-muted' }, i18n.t('ssh.empty')));
         return;
       }
-      for (const host of state.hosts) list.appendChild(buildRow(host));
+      const named = namedGroups();
+      if (!named.length) {
+        for (const host of state.hosts) list.appendChild(buildRow(host));
+        return;
+      }
+      const accordion = el('div', { class: 'accordion' });
+      for (const group of named) {
+        accordion.appendChild(
+          buildGroupSection(group, state.hosts.filter((host) => (host.group || '') === group))
+        );
+      }
+      const ungrouped = state.hosts.filter((host) => !host.group);
+      if (ungrouped.length) accordion.appendChild(buildGroupSection('', ungrouped));
+      list.appendChild(accordion);
     }
 
     async function load() {

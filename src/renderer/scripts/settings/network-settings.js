@@ -11,6 +11,7 @@
         subtitle: '在本地或 SSH 主机上执行测试命令，下方是可直接输入的交互终端',
         runOn: '执行位置',
         local: '本地',
+        ungrouped: '未分组',
         type: '类型',
         target: 'IP / 网段',
         targetPlaceholder: '如 172.16.3.155 或 172.16.3.0/24',
@@ -46,6 +47,7 @@
         subtitle: 'Run test commands locally or on an SSH host in the terminal below',
         runOn: 'Run on',
         local: 'Local',
+        ungrouped: 'Ungrouped',
         type: 'Type',
         target: 'IP / subnet',
         targetPlaceholder: 'e.g. 172.16.3.155 or 172.16.3.0/24',
@@ -388,16 +390,24 @@
       .read()
       .then((hosts) => {
         state.hosts = Array.isArray(hosts) ? hosts : [];
-        targetSelect.setOptions([
-          { value: '', label: i18n.t('netTest.local') },
-          ...state.hosts.map((host) => {
-            const address = `${host.user ? `${host.user}@` : ''}${host.hostName}`;
-            return {
-              value: host.alias,
-              label: host.alias && host.alias !== host.hostName ? `${host.alias} · ${address}` : address,
-            };
-          }),
-        ]);
+        const options = [{ value: '', label: i18n.t('netTest.local') }];
+        // 多个分组时，在两组之间插入分组小标题（唯一分组 / 未分组不显示）。
+        const groups = new Set(state.hosts.map((host) => host.group || ''));
+        const showHeaders = groups.size > 1;
+        let lastGroup = null;
+        for (const host of state.hosts) {
+          const group = host.group || '';
+          if (showHeaders && group !== lastGroup) {
+            options.push({ header: true, label: group || i18n.t('netTest.ungrouped') });
+          }
+          lastGroup = group;
+          const address = `${host.user ? `${host.user}@` : ''}${host.hostName}`;
+          options.push({
+            value: host.alias,
+            label: host.alias && host.alias !== host.hostName ? `${host.alias} · ${address}` : address,
+          });
+        }
+        targetSelect.setOptions(options);
       })
       .catch((err) => console.error(err));
 

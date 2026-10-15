@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerSshSettings() {
-  const { Icons, el, field, inputField, osIconInfo } = window.ShipsUI;
+  const { Icons, el, field, inputField, osIconInfo, createSelect } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   const DEFAULT_IDENTITY = '~/.ssh/id_ed25519';
@@ -34,6 +34,10 @@
         export: '导出',
         exportDone: '已导出到 {path}',
         exportFailed: '导出失败：{error}',
+        group: '分组',
+        ungrouped: '未分组',
+        newGroup: '新建分组…',
+        groupPlaceholder: '输入新分组名称',
       },
     },
     en: {
@@ -63,6 +67,10 @@
         export: 'Export',
         exportDone: 'Exported to {path}',
         exportFailed: 'Export failed: {error}',
+        group: 'Group',
+        ungrouped: 'Ungrouped',
+        newGroup: 'New group…',
+        groupPlaceholder: 'New group name',
       },
     },
   });
@@ -79,6 +87,8 @@
       error: '',
       message: '',
       messageTimer: null,
+      // 折叠的分组（默认空 = 全部分组展开）。key 为分组名，未分组用 ''。
+      collapsed: new Set(),
     };
     const root = el('div', {});
     pane.appendChild(root);
@@ -136,6 +146,7 @@
           port: 22,
           identityFile: DEFAULT_IDENTITY,
           proxyJump: '',
+          group: '',
         };
         state.error = '';
         state.detected = null;
@@ -156,9 +167,58 @@
         return;
       }
 
-      const list = el('div', { class: 'flex flex-col gap-2.5' });
-      for (const host of state.hosts) list.appendChild(buildRow(host));
-      root.appendChild(list);
+      const named = namedGroups();
+      // 没有任何命名分组时保持扁平列表；有分组时按分组手风琴展示（默认全部展开）。
+      if (!named.length) {
+        const list = el('div', { class: 'flex flex-col gap-2.5' });
+        for (const host of state.hosts) list.appendChild(buildRow(host));
+        root.appendChild(list);
+        return;
+      }
+
+      const accordion = el('div', { class: 'accordion' });
+      for (const group of named) {
+        accordion.appendChild(
+          buildGroupSection(group, state.hosts.filter((host) => (host.group || '') === group))
+        );
+      }
+      const ungrouped = state.hosts.filter((host) => !host.group);
+      if (ungrouped.length) accordion.appendChild(buildGroupSection('', ungrouped));
+      root.appendChild(accordion);
+    }
+
+    function namedGroups() {
+      const seen = new Set();
+      const groups = [];
+      for (const host of state.hosts) {
+        const group = host.group || '';
+        if (!group) continue;
+        const key = group.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        groups.push(group);
+      }
+      return groups;
+    }
+
+    function buildGroupSection(group, hosts) {
+      const collapsed = state.collapsed.has(group);
+      const item = el('div', { class: collapsed ? 'accordion-item collapsed' : 'accordion-item' });
+      const head = el('button', { class: 'accordion-header', type: 'button' });
+      const chevron = el('span', { class: 'accordion-chevron inline-flex' });
+      chevron.innerHTML = Icons.chevronDown(14);
+      const name = el('span', { class: 'accordion-name truncate' });
+      name.textContent = group || i18n.t('sshSettings.ungrouped');
+      head.append(chevron, name, el('span', { class: 'accordion-count' }, String(hosts.length)));
+      head.addEventListener('click', () => {
+        if (state.collapsed.has(group)) state.collapsed.delete(group);
+        else state.collapsed.add(group);
+        render();
+      });
+      const body = el('div', { class: 'accordion-body' });
+      for (const host of hosts) body.appendChild(buildRow(host));
+      item.append(head, body);
+      return item;
     }
 
     function buildRow(host) {
@@ -265,6 +325,42 @@
         inputs[key] = built.input;
         form.appendChild(built.wrapper);
       }
+
+      // 分组：从已有分组中选，或选「新建分组…」后输入新名称（写回 config 注释 `# group: <名>`）。
+      const NEW_GROUP = '__new__';
+      const existingGroups = namedGroups();
+      const currentGroup = editing.group || '';
+      const matchedExisting = existingGroups.find((g) => g.toLowerCase() === currentGroup.toLowerCase());
+      const groupInput = el('input', {
+        class: 'field min-w-0 flex-1',
+        spellcheck: 'false',
+        placeholder: i18n.t('sshSettings.groupPlaceholder'),
+      });
+      groupInput.dataset.key = 'group';
+      groupInput.value = currentGroup;
+      groupInput.style.display = currentGroup && !matchedExisting ? '' : 'none';
+      const groupSelect = createSelect({
+        options: [
+          { value: '', label: i18n.t('sshSettings.ungrouped') },
+          ...existingGroups.map((g) => ({ value: g, label: g })),
+          { value: NEW_GROUP, label: i18n.t('sshSettings.newGroup') },
+        ],
+        value: matchedExisting || (currentGroup ? NEW_GROUP : ''),
+        className: 'shrink-0',
+        onChange: (value) => {
+          if (value === NEW_GROUP) {
+            groupInput.style.display = '';
+            groupInput.value = '';
+            groupInput.focus();
+          } else {
+            groupInput.style.display = 'none';
+            groupInput.value = value;
+          }
+        },
+      });
+      const groupRow = el('div', { class: 'flex items-center gap-2' });
+      groupRow.append(groupSelect.el, groupInput);
+      form.appendChild(inputField(i18n.t('sshSettings.group'), groupRow));
 
       if (state.error) {
         form.appendChild(el('div', { class: 'text-[11px] text-danger' }, state.error));
@@ -374,6 +470,7 @@
         port: Number(value.port) || 22,
         identityFile: value.identityFile,
         proxyJump: value.proxyJump,
+        group: (value.group || '').trim(),
       });
       state.editing = null;
       state.detected = null;

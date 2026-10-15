@@ -99,6 +99,52 @@
   .row-card {
     @apply flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-2;
   }
+  /* SSH 分组手风琴（设置 · SSH 管理、主界面 SSH 管理）。默认全部展开。 */
+  .accordion {
+    @apply flex flex-col gap-2.5;
+  }
+  .accordion-item {
+    @apply overflow-hidden rounded-card border border-border bg-surface;
+  }
+  .accordion-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 12px;
+    border: none;
+    background: transparent;
+    color: var(--color-fg);
+    font-size: 12px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+  }
+  .accordion-header:hover {
+    background: var(--color-surface-2);
+  }
+  .accordion-chevron {
+    color: var(--color-fg-muted);
+    transition: transform 0.15s ease;
+  }
+  .accordion-item.collapsed .accordion-chevron {
+    transform: rotate(-90deg);
+  }
+  .accordion-name {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .accordion-count {
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: var(--color-fg-muted);
+  }
+  .accordion-body {
+    @apply flex flex-col gap-2 p-2;
+  }
+  .accordion-item.collapsed .accordion-body {
+    display: none;
+  }
   .tab {
     @apply icon-btn h-9 w-9;
   }
@@ -362,6 +408,20 @@ input[type='color'].swatch::-webkit-color-swatch {
 }
 .select-option.active {
   color: var(--color-accent);
+}
+/* 下拉里的分组小标题（不可点，用于 SSH 下拉区分分组）。 */
+.select-group-title {
+  padding: 5px 8px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 /* Popovers need a touch more fill than in-flow cards to stand out from the glass. */
 [data-vibrancy='on'] .select-menu {
@@ -710,6 +770,11 @@ body.term-window:not(.file-window) .select-menu .select-option {
 body.term-window:not(.file-window) .select-menu .select-option svg {
   width: 11px;
   height: 11px;
+}
+/* 终端窗口头栏 SSH 下拉里的分组小标题：更紧凑。 */
+body.term-window .select-menu .select-group-title {
+  padding: 3px 8px 1px;
+  font-size: 10px;
 }
 
 .xterm .xterm-viewport,

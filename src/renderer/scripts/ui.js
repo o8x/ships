@@ -272,7 +272,7 @@ window.ShipsUI = (function createUI() {
     trigger.append(label, chevron);
 
     function currentItem() {
-      return items.find((item) => String(item.value) === String(current));
+      return items.find((item) => !item.header && String(item.value) === String(current));
     }
 
     function syncLabel() {
@@ -287,9 +287,10 @@ window.ShipsUI = (function createUI() {
         if (item.label) label.appendChild(el('span', { class: 'truncate' }, item.label));
       }
       if (menu) {
-        Array.from(menu.children).forEach((node) =>
-          node.classList.toggle('active', String(node.dataset.value) === String(current))
-        );
+        Array.from(menu.children).forEach((node) => {
+          if (node.dataset.value === undefined) return;
+          node.classList.toggle('active', String(node.dataset.value) === String(current));
+        });
       }
     }
 
@@ -318,6 +319,13 @@ window.ShipsUI = (function createUI() {
       if (menu) return;
       menu = el('div', { class: `select-menu ${options.menuClassName || ''}` });
       for (const item of items) {
+        // 分组小标题（只能看、不可点）：用于 SSH 下拉在两组之间区分。
+        if (item.header) {
+          const title = el('div', { class: 'select-group-title' });
+          title.textContent = item.label || '';
+          menu.appendChild(title);
+          continue;
+        }
         const opt = el('button', { type: 'button', class: 'select-option', dataset: { value: item.value } });
         if (item.icon) {
           const iconWrap = el('span', { class: 'select-option-icon inline-flex' });

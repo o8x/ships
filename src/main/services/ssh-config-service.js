@@ -7,6 +7,11 @@ const logger = require('../utils/logger');
 
 const MANAGED_KEYS = new Set(['hostname', 'user', 'port', 'identityfile', 'proxyjump']);
 
+/* 分组：在 `~/.ssh/config` 里用一行注释 `# group: <名称>` 作为分组标记，
+   紧随其后的 Host 属于该分组，直到遇到下一个分组标记或文件结束。
+   未标记的 Host 属于「未分组」（group = ''）。ssh 会忽略注释，不影响连接行为。 */
+const GROUP_RE = /^\s*#\s*group\s*:\s*(\S.*?)\s*$/i;
+
 function isHostLine(line) {
   return !/^\s*#/.test(line) && /^\s*Host\s+/i.test(line);
 }
@@ -15,16 +20,30 @@ function isMatchLine(line) {
   return !/^\s*#/.test(line) && /^\s*Match\s+/i.test(line);
 }
 
+function isGroupLine(line) {
+  return GROUP_RE.test(line);
+}
+
+function groupNameFromLine(line) {
+  const match = GROUP_RE.exec(line);
+  return match ? match[1].trim() : '';
+}
+
 function parseEntries(content) {
   const lines = content.length ? content.split(/\r?\n/) : [];
   const entries = [];
   let current = { kind: 'raw', lines: [] };
   entries.push(current);
+  let group = '';
 
   for (const line of lines) {
     if (isHostLine(line)) {
       const patterns = line.replace(/^\s*Host\s+/i, '').trim().split(/\s+/).filter(Boolean);
-      current = { kind: 'host', patterns, lines: [line] };
+      current = { kind: 'host', patterns, group, lines: [line] };
+      entries.push(current);
+    } else if (isGroupLine(line)) {
+      group = groupNameFromLine(line);
+      current = { kind: 'group', name: group, lines: [line] };
       entries.push(current);
     } else if (isMatchLine(line)) {
       current = { kind: 'raw', lines: [line] };
@@ -36,13 +55,26 @@ function parseEntries(content) {
   return entries;
 }
 
+function trimBlankEdges(lines) {
+  let start = 0;
+  let end = lines.length;
+  while (start < end && lines[start].trim() === '') start += 1;
+  while (end > start && lines[end - 1].trim() === '') end -= 1;
+  return lines.slice(start, end);
+}
+
 function serializeEntries(entries) {
-  // Drop a leading empty raw block so the file never starts with a blank line.
-  const list =
-    entries.length && entries[0].kind === 'raw' && entries[0].lines.every((line) => line.trim() === '')
-      ? entries.slice(1)
-      : entries;
-  return list.map((entry) => entry.lines.join('\n')).join('\n');
+  // 块之间留一个空行；分组标记紧跟其首个 Host（不留空行）。
+  let out = '';
+  let prevKind = null;
+  for (const entry of entries) {
+    const lines = trimBlankEdges(entry.lines);
+    if (!lines.length) continue;
+    if (out !== '') out += prevKind === 'group' && entry.kind === 'host' ? '\n' : '\n\n';
+    out += lines.join('\n');
+    prevKind = entry.kind;
+  }
+  return out;
 }
 
 function parseFields(entry) {
@@ -65,6 +97,7 @@ function hostFromEntry(entry) {
     alias,
     aliases: entry.patterns,
     wildcard,
+    group: entry.group || '',
     hostName: fields.hostname || alias,
     user: fields.user || '',
     port: Number(fields.port) || 22,
@@ -98,6 +131,23 @@ function list() {
     .filter((host) => !host.wildcard);
 }
 
+/* 列出所有分组名（按在文件中出现的先后、去重、忽略大小写；不含未分组）。 */
+function listGroups() {
+  const entries = parseEntries(readContent());
+  const seen = new Set();
+  const groups = [];
+  for (const entry of entries) {
+    if (entry.kind !== 'group') continue;
+    const name = (entry.name || '').trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    groups.push(name);
+  }
+  return groups;
+}
+
 function serializeHost(host, preservedLines) {
   const lines = [`Host ${host.alias}`];
   if (host.hostName && host.hostName !== host.alias) lines.push(`  HostName ${host.hostName}`);
@@ -119,6 +169,49 @@ function preservedFrom(entry) {
   });
 }
 
+/* 删除没有跟随任何 Host 的分组标记（例如删掉某分组最后一个主机后）。 */
+function pruneEmptyGroups(entries) {
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    if (entries[i].kind !== 'group') continue;
+    let hasHost = false;
+    for (let j = i + 1; j < entries.length; j += 1) {
+      if (entries[j].kind === 'group') break;
+      if (entries[j].kind === 'host') {
+        hasHost = true;
+        break;
+      }
+    }
+    if (!hasHost) entries.splice(i, 1);
+  }
+}
+
+/* 把主机块插到合适位置：未分组接在文件顶部说明之后；有分组接在该分组末尾。 */
+function insertHostEntry(entries, hostEntry) {
+  const groupName = (hostEntry.group || '').toLowerCase();
+
+  if (!groupName) {
+    const at = entries[0] && entries[0].kind === 'raw' ? 1 : 0;
+    entries.splice(at, 0, hostEntry);
+    return;
+  }
+
+  const gi = entries.findIndex(
+    (entry) => entry.kind === 'group' && (entry.name || '').toLowerCase() === groupName
+  );
+  if (gi >= 0) {
+    let at = gi + 1;
+    for (let i = gi + 1; i < entries.length; i += 1) {
+      if (entries[i].kind === 'group') break;
+      at = i + 1;
+    }
+    entries.splice(at, 0, hostEntry);
+    return;
+  }
+
+  entries.push({ kind: 'group', name: hostEntry.group, lines: [`# group: ${hostEntry.group}`] });
+  entries.push(hostEntry);
+}
+
 function upsert(host) {
   if (!host || !host.alias) return list();
   const entries = parseEntries(readContent());
@@ -127,18 +220,21 @@ function upsert(host) {
     (entry) => entry.kind === 'host' && (entry.patterns[0] || '').toLowerCase() === targetAlias
   );
 
+  const group = String(host.group || '').trim();
   const preserved = preservedFrom(index >= 0 ? entries[index] : null);
   const lines = serializeHost(host, preserved);
+  const hostEntry = { kind: 'host', patterns: [host.alias], group, lines };
 
-  if (index >= 0) {
-    entries[index] = { kind: 'host', patterns: [host.alias], lines };
-  } else {
-    const last = entries[entries.length - 1];
-    if (last && last.lines.length && last.lines[last.lines.length - 1].trim() !== '') {
-      last.lines.push('');
-    }
-    entries.push({ kind: 'host', patterns: [host.alias], lines });
+  // 分组未变：就地替换，保持原位置（避免每次编辑都挪到分组末尾）。
+  if (index >= 0 && (entries[index].group || '').toLowerCase() === group.toLowerCase()) {
+    entries[index] = hostEntry;
+    writeContent(serializeEntries(entries));
+    return list();
   }
+
+  if (index >= 0) entries.splice(index, 1);
+  pruneEmptyGroups(entries);
+  insertHostEntry(entries, hostEntry);
 
   writeContent(serializeEntries(entries));
   return list();
@@ -153,6 +249,7 @@ function remove(alias) {
   );
   if (index >= 0) {
     entries.splice(index, 1);
+    pruneEmptyGroups(entries);
     writeContent(serializeEntries(entries));
   }
   return list();
@@ -160,6 +257,7 @@ function remove(alias) {
 
 module.exports = {
   list,
+  listGroups,
   upsert,
   remove,
   _parseEntries: parseEntries,

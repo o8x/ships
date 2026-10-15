@@ -12,6 +12,7 @@
       terminalWin: {
         sshPlaceholder: 'SSH',
         sshFailed: '连接失败：{error}',
+        ungrouped: '未分组',
         linesOn: '隐藏行号',
         linesOff: '显示行号',
         newWindow: '新建窗口',
@@ -25,6 +26,7 @@
       terminalWin: {
         sshPlaceholder: 'SSH',
         sshFailed: 'Connect failed: {error}',
+        ungrouped: 'Ungrouped',
         linesOn: 'Hide line numbers',
         linesOff: 'Show line numbers',
         newWindow: 'New window',
@@ -463,7 +465,16 @@
       hosts = [];
     }
     const options = [{ value: '', label: i18n.t('terminalWin.sshPlaceholder') }];
+    // 多个分组时，在两组之间插入一个分组小标题（唯一分组则不显示标题）。
+    const groups = new Set(hosts.map((host) => host.group || ''));
+    const showHeaders = groups.size > 1;
+    let lastGroup = null;
     for (const host of hosts) {
+      const group = host.group || '';
+      if (showHeaders && group !== lastGroup) {
+        options.push({ header: true, label: group || i18n.t('terminalWin.ungrouped') });
+      }
+      lastGroup = group;
       const address = host.user ? `${host.user}@${host.hostName}` : String(host.hostName || host.alias || '');
       options.push({ value: host.alias, label: address });
     }
