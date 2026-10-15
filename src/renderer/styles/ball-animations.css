@@ -33,7 +33,7 @@
 }
 
 /* 动画常驻但默认暂停；有输出时由 terminal.js 加 .term-ball-bounce 恢复播放，
- * 1s 内无输出再移除该类。暂停 / 恢复不重建动画，避免从 0% 重播。 */
+ * 2s 内无输出再移除该类。暂停 / 恢复不重建动画，避免从 0% 重播。 */
 .term-ball-icon {
   will-change: transform;
   backface-visibility: hidden;

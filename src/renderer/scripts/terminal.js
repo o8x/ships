@@ -666,8 +666,8 @@
   function applyBallDark(forceDark) {
     document.documentElement.dataset.ballDark = forceDark ? 'on' : 'auto';
   }
-  // 终端持续有输出时，悬浮球图标做流畅的上下弹跳；1s 内无输出则停止。
-  const BALL_IDLE_STOP_MS = 1000;
+  // 终端持续有输出时，悬浮球图标做流畅的上下弹跳；2s 内无输出则停止。
+  const BALL_IDLE_STOP_MS = 2000;
   // 弹跳一个完整循环的时长（读 styles/ball-animations.css 的 --ball-bounce-duration，带兜底）。
   function ballBounceDurationMs() {
     const raw = getComputedStyle(document.documentElement)
@@ -679,7 +679,7 @@
   }
   let ballBounceOn = false; // 是否正在播放弹跳
   let ballBounceStartedAt = 0; // 本轮播放起始时间（算相位与累计时长）
-  let ballIdleTimer = null; // 无输出满 1s 的计时
+  let ballIdleTimer = null; // 无输出满 2s 的计时
   let ballSettleTimer = null; // 「走到循环边界再停」的计时
   let ballHovered = false; // 鼠标是否悬停在球上（由 pointerenter/leave 维护，不依赖 :hover 轮询）
   let ballClockRaf = null; // 悬停显示时的刷新帧（只在可见时运行）
