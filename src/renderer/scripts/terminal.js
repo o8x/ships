@@ -660,9 +660,9 @@
     ballIconEl.innerHTML = svg;
   }
   applyBallIcon(ballIconName);
-  // 悬浮球底色：暗色模式（默认）/ 白天模式；不跟随全局主题。图标始终保留原色。
-  function applyBallDark(dark) {
-    document.documentElement.dataset.ballDark = dark ? 'on' : 'off';
+  // 悬浮球底色：暗色模式开启 = 始终暗色；关闭 = 跟随全局主题（由 CSS 依 data-theme 推导）。图标始终保留原色。
+  function applyBallDark(forceDark) {
+    document.documentElement.dataset.ballDark = forceDark ? 'on' : 'auto';
   }
   // 终端持续有输出时，悬浮球图标做轻微弹簧跳动；1s 内无输出则停止。
   let ballPulseTimer = null;

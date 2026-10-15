@@ -429,11 +429,12 @@ input[type='color'].swatch::-webkit-color-swatch {
   width: calc(var(--term-ball-size, 75px) * 0.58);
   height: calc(var(--term-ball-size, 75px) * 0.58);
 }
-/* 悬浮球底色：暗色（默认）/ 白天；不跟随全局主题。图标始终保留原色（不去色）。 */
-[data-ball-dark='on'] #term-ball {
+/* 悬浮球底色：暗色模式开 = 始终暗色；关 = 跟随全局主题（依 data-theme）。图标始终保留原色（不去色）。 */
+[data-ball-dark='on'] #term-ball,
+[data-ball-dark='auto'][data-theme='dark'] #term-ball {
   background: color-mix(in srgb, #2a2a2c 92%, transparent);
 }
-[data-ball-dark='off'] #term-ball {
+[data-ball-dark='auto'][data-theme='light'] #term-ball {
   background: color-mix(in srgb, #ffffff 92%, transparent);
 }
 /* 终端持续有输出时，悬浮球内的**图标**做轻微「弹簧跳动」（球本身不动，无输出 1s 后由 JS 移除该类）。
