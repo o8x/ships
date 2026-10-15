@@ -14,6 +14,7 @@ const { registerNetTestIpc } = require('./ipc/net-test-ipc');
 const { registerTerminalIpc } = require('./ipc/terminal-ipc');
 const { registerSftpIpc } = require('./ipc/sftp-ipc');
 const { registerFileWindowIpc } = require('./ipc/file-window-ipc');
+const { registerUpdateIpc } = require('./ipc/update-ipc');
 const { installApplicationMenu } = require('./menu');
 const logger = require('./utils/logger');
 const { DATA_FILES } = require('./utils/paths');
@@ -43,6 +44,7 @@ function onReady() {
   registerTerminalIpc(ipcMain);
   registerSftpIpc(ipcMain);
   registerFileWindowIpc(ipcMain);
+  registerUpdateIpc(ipcMain);
 
   installApplicationMenu();
   wm.createMainWindow();

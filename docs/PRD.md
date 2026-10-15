@@ -52,7 +52,7 @@
 
 - **主进程**（`src/main/`）：创建托盘与窗口、读写本地数据、解析 `~/.ssh/config`、执行 iTerm 连接与 SSH 探测、注册 IPC。
 - **预加载脚本**（`src/preload/`）：在 `contextIsolation: true`、`nodeIntegration: false`、`sandbox: false` 下运行，用 `contextBridge` 暴露白名单 API（主面板用 `main-preload.js`，设置窗口用 `settings-preload.js`）。
-- **渲染进程**（`src/renderer/`）：两个页面 —— 托盘主面板 `index.html` 与设置窗口 `settings.html`；不含 Node 能力，仅通过 `window.ships`（能力）、`window.shipsIcons`（内部 SVG 图标）与 `window.shipsFlags`（国旗 SVG）与主进程 / 预加载通信。
+- **渲染进程**（`src/renderer/`）：多个页面 —— 托盘主面板 `index.html`、设置窗口 `settings.html`、置顶终端窗口 `terminal.html`、独立文件窗口 `file-window.html`、更新下载窗口 `update.html`；不含 Node 能力，仅通过 `window.ships`（能力）、`window.shipsIcons`（内部 SVG 图标）与 `window.shipsFlags`（国旗 SVG）与主进程 / 预加载通信（更新下载窗口用独立预加载脚本，只暴露更新相关能力）。
 - **无 Webview**：不内嵌远程 Web，无 guest 进程。
 
 **项目结构**
@@ -87,17 +87,18 @@ Ships/
     │   ├── main.js              # 应用入口：单实例、Dock 隐藏、注册 IPC、创建托盘
     │   ├── tray.js              # 托盘图标与右键菜单
     │   ├── window-manager.js    # 主面板 / 设置窗口 / 置顶终端窗口的创建、定位、几何记忆、显隐、广播
-    │   ├── ipc/                 # IPC 处理器（app / settings / window / ssh / geo / clipboard / hash / net-test / terminal / sftp / file-window）
+    │   ├── ipc/                 # IPC 处理器（app / settings / window / ssh / geo / clipboard / hash / net-test / terminal / sftp / file-window / update）
     │   ├── scripts/             # pty-bridge.py（PTY 桥接，交互终端用；打包时经 build.asarUnpack 解包到 app.asar.unpacked）
     │   ├── services/            # settings / ssh-config / ssh / iterm / terminal / sftp（文件管理 SFTP 会话）/ layout（文件管理布局）/ cd-history（cd 历史）/ vscode（用 VS Code 打开本地文件）/ hotkey / geo / clipboard / hash / updater（自动更新）服务
     │   └── utils/               # logger / json-store / paths / utf8（UTF-8 保真解码 + 非法字节转义）/ net-test（网络测试命令与校验）/ window-geometry（终端窗口几何记忆的纯计算）/ process-tree（终端会话进程树里找 ssh 目标）
-    ├── preload/                 # main-preload.js / settings-preload.js / icons.js（assets/icons/*.svg）/ flags.js（assets/flags/*.svg）
+    ├── preload/                 # main-preload.js / settings-preload.js / update-preload.js（更新下载窗口，仅暴露更新能力）/ icons.js（assets/icons/*.svg）/ flags.js（assets/flags/*.svg）
     └── renderer/
         ├── index.html           # 托盘主面板
         ├── settings.html        # 设置窗口
         ├── terminal.html        # 置顶终端窗口（含内嵌文件面板）
         ├── file-window.html     # 独立文件窗口
-        ├── scripts/             # theme / i18n / ui / registry / tool-order / app / settings / terminal（置顶终端）/ terminal-files（内嵌面板宿主）/ file-manager（文件管理 UI）/ file-window（独立文件窗口）
+        ├── update.html          # 自动更新下载窗口（不可关闭，进度 / 取消 / 重启）
+        ├── scripts/             # theme / i18n / ui / registry / tool-order / app / settings / terminal（置顶终端）/ terminal-files（内嵌面板宿主）/ file-manager（文件管理 UI）/ file-window（独立文件窗口）/ update（更新下载窗口）
         │   ├── tools/           # 每个工具一个文件，注册进 ShipsToolRegistry
         │   └── settings/        # 设置分区，注册进 ShipsSettingsRegistry
         └── styles/              # constants.css（设计变量）+ tailwind.css（入口）
@@ -320,6 +321,9 @@ Ships/
 | `app:clear-data` | — | `{ ok }` | 一键清理**非业务数据**：删除 `terminal-window.json`、`file-window.json`、`file-layout.json`、`file-window-layout.json`、`cd-history.json`（窗口位置 / 尺寸、列宽 / 面板高度、cd 历史）；**不动** `settings.json`、日志与 `~/.ssh/config`；由设置 → Ships 的「清理数据」（二次确认后）调用 |
 | `app:open-external` | `url` | `{ ok, error? }` | 仅允许 `http(s)` |
 | `app:check-updates` | — | `{ ok, checking?, error?, message? }` | 设置 → Ships → 关于 的「检查更新」：触发一次自动更新检查（`updater-service`）。**每次手动检查都会给出反馈**（有新版本 / 已是最新 / 暂时无法检查，均弹窗），反复点击不会静默无响应；检查进行中再次点击返回 `{ ok: true, checking: true }`，界面就地提示「正在检查…」。打包后由主进程弹窗（**失败只给一句友好提示，不暴露技术错误**，详情写日志）；开发模式返回 `{ ok: false, error: 'unsupported', message }` 由界面就地提示 |
+| `update:state` | — | 下载状态快照 `{ phase, version, percent, transferred, total, bytesPerSecond, countdown }` 或 `null` | 更新下载窗口查询当前状态（`phase` ∈ `idle` / `downloading` / `downloaded`）；只接受来自**更新下载窗口**的请求 |
+| `update:cancel` | — | `{ ok }` | 下载窗口「取消」：下载阶段中止下载（`CancellationToken`），已完成则停止倒计时、不立即重启（退出本次更新）；只接受来自更新下载窗口的请求 |
+| `update:install` | — | `{ ok }` | 下载窗口「重启更新」：`quitAndInstall()` 立即重启并安装；只接受来自更新下载窗口的请求 |
 | `settings:get` | — | `settings` | |
 | `settings:set` | `patch` | 合并后的 `settings` | 副作用：写盘 + 广播 + 可能修改登录项 |
 | `ssh:list` | — | `{ hosts, detected }` | 读 `~/.ssh/config`；每个 host 含 `group` 字段（分组名，未分组为 `''`，来自 `# group:` 注释，见 §5.1） |
@@ -408,6 +412,9 @@ Ships/
 | `terminal:zoom` / `file-window:zoom` | `'in' \| 'out' \| 'reset'` | 焦点在终端窗口 / 独立文件窗口时 `Cmd +/-/0` 的字号缩放（见 §5.3） |
 | `sftp:progress` | `{ id, direction: 'upload' \| 'download', name, transferred, total }` | SFTP 上传 / 下载进度，只发给发起该操作、拥有该会话的窗口（渲染层在状态栏显示进度条） |
 | `file-window:target` | `{ target, path }` | 独立文件窗口已打开时，`file-window:open` 带目标再次调用 → 请它切换连接并进入 `path` |
+| `update:progress` | 状态快照 | 下载进度变化（`percent` / `transferred` / `total` / `bytesPerSecond`），只发给更新下载窗口 |
+| `update:downloaded` | 状态快照 | 下载完成（`phase: 'downloaded'`、`countdown: 60`），只发给更新下载窗口 |
+| `update:countdown` | `{ countdown }` | 下载完成后的自动重启倒计时（每秒一次），只发给更新下载窗口 |
 | `settings:open-section` | `sectionId` | 请求设置窗口切换到指定分区（由 `window:open-settings` 的 `section` 触发） |
 
 ### 5.3 菜单与权限映射
@@ -431,11 +438,14 @@ flowchart LR
   Tray[Tray 图标] -->|点击| WM[window-manager]
   WM --> Main[主面板 index.html]
   WM --> Settings[设置窗口 settings.html]
+  WM --> Update[更新下载窗口 update.html]
   Main <-->|invoke/send/event| IPC[IPC 层]
   Settings <-->|invoke/send/event| IPC
+  Update <-->|invoke/event| IPC
   IPC --> SvcSettings[settings-service]
   IPC --> SvcSshConfig[ssh-config-service]
   IPC --> SvcSsh[ssh-service]
+  IPC --> SvcUpdater[updater-service]
   SvcSettings --> F1[(settings.json)]
   SvcSshConfig --> F2[~/.ssh/config]
   SvcSsh --> F3[(ssh-detected.json)]
@@ -525,11 +535,14 @@ flowchart TD
   C -- 否（静默） --> Z[结束]
   C -- 出错（手动） --> E[弹窗：暂时无法检查]
   D -- 稍后 --> Z
-  D -- 下载 --> F[downloadUpdate 差量下载]
+  D -- 下载 --> W["打开下载窗口（不可关闭）：进度条 + 取消 + 禁用的重启按钮"]
+  W --> F[downloadUpdate 差量下载]
+  F -- download-progress --> W
+  F -- 取消 --> X[中止下载 / 关闭窗口：退出本次更新]
   F --> G[update-downloaded]
-  G --> H["弹窗：现在重启并安装？"]
-  H -- 重启安装 --> I[quitAndInstall]
-  H -- 稍后 --> Q[退出应用时自动安装]
+  G --> H["下载窗口：重启按钮可用 + 显示 60 秒倒计时"]
+  H -- 点重启 / 倒计时到 0 --> I[quitAndInstall]
+  H -- 取消 --> X2[关闭窗口：不立即重启]
 ```
 
 ---
@@ -567,7 +580,8 @@ flowchart TD
   - **仅打包后**的 macOS / Windows 生效（`app.isPackaged`）；开发模式不检查。
   - 启动后**静默检查一次**（延迟 5s，不打扰）；`autoDownload=false`、`autoInstallOnAppQuit=true`。
   - **提示后下载**：`update-available` → 弹窗「发现新版本 vX（当前 vY），现在下载吗？」→ 确认才 `downloadUpdate()`。
-  - **提示后安装**：`update-downloaded` → 弹窗「现在重启并安装吗？」→ 确认 `quitAndInstall()`；选「稍后」则在退出应用时自动安装。
+  - **下载窗口**：确认下载后弹出一个**小型、不可关闭（`closable: false` + `frame: false`，无关闭按钮、Cmd-W 无效，仅退出应用时放行）、置顶居中的前台窗口** `update.html`（尺寸 `ships.updateWindow` = 380 × 184）。窗口只有：**实时进度条**（`download-progress` → `update:progress`）、**取消**、**「重启更新」按钮**（下载期间禁用）。下载完成后「重启更新」可用，并显示 **60 秒倒计时**（常量 `UPDATE_COUNTDOWN_SECONDS`）自动 `quitAndInstall()`；点「重启更新」立即安装。**取消 = 退出本次更新**：下载阶段 `CancellationToken.cancel()` 中止下载并关闭窗口，已完成则仅停止倒计时、不立即重启。**`autoInstallOnAppQuit` 必须为 `true`**：macOS 的 `MacUpdater` 只有在该标志为真时才会在下载完成时让 Squirrel 预取更新（否则 `quitAndInstall()` 会静默失败、点按钮无反应）；`MacUpdater` 不注册 JS 的 quit 安装钩子，因此为真也不会「取消后退出应用时自动安装」，安装仅由下载窗口的「重启更新」/ 倒计时触发。
+  - **下载失败**：仅在日志记录详细错误，并关闭下载窗口、给一句友好提示。
   - **手动检查**：设置 → Ships → 关于「检查更新」（`app:check-updates`）触发，会提示「已是最新 / 暂时无法检查」；**每次点击都必须有反馈**（有新版本同样会重新弹窗，反复点击不会静默无响应）；检查进行中再次点击返回 `{ ok: true, checking: true }`，界面就地提示「正在检查…」。**出错时不报技术错误**：手动检查给一句友好提示（详情写日志），启动时的静默检查出错则完全不提示。
   - **差量下载**：依赖发布时随产物上传的 `*.zip.blockmap` 与 `latest-mac.yml`；旧版本通过更新器安装过才可差量，否则整包。
   - **签名要求**：macOS 自动更新需**稳定 Developer ID 签名**（ad-hoc 兜底不满足，会导致更新校验失败）。
@@ -639,6 +653,12 @@ flowchart TD
 - 字体：`.fm-root { font-size: var(--file-font-size) }`；终端窗口由 `terminal.js` 跟随终端字号，独立窗口由 `file-window.js` 跟随设置与 `Cmd +/-`。
 - 独立文件窗口 `file-window.html`：头栏 `#file-header`（自绘小红绿灯 + SSH 下拉 `select-compact`，无置顶按钮），主体 `#file-root` 即 `.fm-root`；`alwaysOnTop` 默认开、`titleBarStyle: hiddenInset`、`setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true })`；屏幕 / 位置 / 尺寸记入 `file-window.json`。**拖拽窗口高度后**（resize 停 200ms）按实测余量请求 `file-window:snap-size`，把「文件列表区域」`.fm-list` 收到**文件行的整数倍**（行高 `.fm-row = 1.95em × --file-font-size`，含上下各 2px 内边距），底部不再露半行。
 
+### 8.7 更新下载窗口
+
+- 尺寸 **380 × 184**（`package.json` 的 `ships.updateWindow` → `constants.js` 的 `UPDATE_WINDOW`）；无边框（`frame: false`）、不可缩放 / 最小化、**不可关闭**（`closable: false`，无关闭按钮、Cmd-W 无效，仅应用退出 / `quitAndInstall` 时放行）、置顶（`alwaysOnTop`）并**居中**显示。
+- 结构（`update.html`）：标题（下载中「正在下载更新 vX」/ 完成「下载完成 vX」）→ **进度条** `update-progress`（宽 = `percent`）→ 状态行（`已下载 / 总量 · 速度`，完成时显示「N 秒后自动重启更新」）→ 底部按钮「取消」与「**重启更新**」（下载期间禁用）。整窗为拖拽区、按钮为 `no-drag`。
+- 行为见 §6.6 / §7：进度实时回填；下载完成后重启按钮可用并显示 60 秒倒计时（到点自动重启安装）；取消 = 退出本次更新。
+
 ---
 
 ## 9. 权限过滤
@@ -692,6 +712,7 @@ flowchart TD
 | --- | --- |
 | 面板尺寸 | 400 × 500 |
 | 设置窗口尺寸 | 800 × 600 |
+| 更新下载窗口尺寸 | 380 × 184（`ships.updateWindow`） |
 | `--tabbar-height` | 46px |
 | `--footer-height` | 34px |
 | `--term-header-height` | 22px（终端窗口头栏最小高度，刚好放下自绘小红绿灯；实际为 `max(22px, --term-header-font-size + 6px)`） |
@@ -711,6 +732,7 @@ flowchart TD
 
 - 输入 `field`、按钮 `btn` / `btn-accent`、图标按钮 `icon-btn`、结果行 `row-card`、TAB `tab` / `tab-active`、开关 `switch`、分段控件 `segment`、色块 `swatch`。
 - **分组手风琴** `accordion` / `accordion-item` / `accordion-header`（含 `.accordion-chevron` / `.accordion-name` / `.accordion-count`）/ `accordion-body`：用于 SSH 管理（设置页与主界面工具）按分组折叠展示，**默认全部展开**，点击标题切换、`.accordion-item.collapsed` 时旋转箭头（-90°）并隐藏 `.accordion-body`。
+- **更新下载窗口组件**：`.update-shell`（整窗拖拽区 + 纵向布局）/ `.update-title` / `.update-progress` + `.update-progress-fill`（强调色进度条，`transition: width 0.15s linear`）/ `.update-status` / `.update-actions`（`no-drag`，右对齐按钮）。
 - **纵向间距统一 10px**：工具/设置分区用 `.section`（`gap: 10px`、`margin-bottom: 10px`）；结果行、输入、区块之间的间距均为 10px（不再混用 8/12/16px）。
 - **统一标题**：每个工具内容区顶部由 `app.js` 渲染统一头部 `.tool-head`（标题取 `tools.<id>`、说明取 `toolDesc.<id>`）；切换 TAB 时内容区自动滚动回顶部。
 - 自绘控件：下拉框 `select-trigger` / `select-menu` / `select-option`（`ShipsUI.createSelect`，替代系统 `<select>`；`.select-trigger.select-compact` 是头栏尺寸变体 —— 内边距 6px / 圆角取更紧凑的 `--radius-control-sm`（4px，比常规控件的 8px 小），字号与高度由 `#term-actions` 规则按头栏字号推导；终端窗口的下拉菜单由 `body.term-window .select-menu` 限定为 **100–200px 自适应宽**、条目高度与下拉本体一致，用于终端窗口头栏里的 SSH 主机下拉；支持 `{ header: true, label }` 形式的分组小标题 `select-group-title`（不可点、`pointer-events: none`，用于 SSH 下拉在两组之间区分，终端窗口内更紧凑））；**终端窗口自绘小红绿灯** `.traffic-light`（`.traffic-close` / `.traffic-minimize` / `.traffic-zoom`，9px 圆点 + 悬浮符号，见 §3.9-2）；悬浮提示 `ships-tip`（`ShipsUI.initTooltips`，元素加 `data-tip`，时间戳工具的偏移输入框用 `data-tip` 说明表达式语法）；JSON 覆盖式高亮编辑器 `json-editor` 与结构树 `json-tree`。

@@ -1476,3 +1476,45 @@ body.file-window {
 .json-tree {
   animation: ships-fade 0.16s ease both;
 }
+
+/* 自动更新下载窗口（body = update.html）：小型、不可关闭的前台窗口。 */
+.update-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 22px 22px 18px;
+  gap: 12px;
+  -webkit-app-region: drag;
+}
+.update-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+.update-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-surface-3);
+  overflow: hidden;
+}
+.update-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--color-accent);
+  transition: width 0.15s linear;
+}
+.update-status {
+  min-height: 14px;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+.update-actions {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}

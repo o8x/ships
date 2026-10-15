@@ -70,6 +70,10 @@
       "minHeight": 320,
       "alwaysOnTop": true
     },
+    "updateWindow": {
+      "width": 380,
+      "height": 184
+    },
     "defaultLocale": "zh",
     "defaultTheme": "system",
     "defaultAccent": "#2e6bfc"

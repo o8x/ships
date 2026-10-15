@@ -3,7 +3,15 @@
 const fs = require('fs');
 const path = require('path');
 const { BrowserWindow, screen, nativeTheme, app } = require('electron');
-const { WINDOW, SETTINGS_WINDOW, TERMINAL_WINDOW, FILE_WINDOW, VIBRANCY, IPC } = require('../shared/constants');
+const {
+  WINDOW,
+  SETTINGS_WINDOW,
+  TERMINAL_WINDOW,
+  FILE_WINDOW,
+  UPDATE_WINDOW,
+  VIBRANCY,
+  IPC,
+} = require('../shared/constants');
 const settings = require('./services/settings-service');
 const { TERMINAL_WINDOW_FILE, FILE_WINDOW_FILE } = require('./utils/paths');
 const { readJson, writeJson } = require('./utils/json-store');
@@ -30,6 +38,7 @@ let settingsWindow = null;
 const terminalWindows = new Set();
 let lastTerminalWindow = null;
 let fileWindow = null;
+let updateWindow = null;
 let fileWindowTarget = '';
 let fileWindowPath = '';
 let fileWindowOwnerId = null;
@@ -100,7 +109,7 @@ function themeBackgroundColor() {
 function applyThemeBackgrounds() {
   const color = themeBackgroundColor();
   // 终端窗口是透明无边框（底色由渲染层 #term-shell 画），不设原生 backgroundColor。
-  for (const win of [getSettingsWindow(), getFileWindow()]) {
+  for (const win of [getSettingsWindow(), getFileWindow(), getUpdateWindow()]) {
     if (win && !win.isDestroyed()) win.setBackgroundColor(color);
   }
 }
@@ -1158,6 +1167,97 @@ function getSettingsWindow() {
   return settingsWindow;
 }
 
+/* ----------------------------- 更新下载窗口 -----------------------------
+   自动更新的下载阶段显示的小型前台窗口：无边框、不可关闭（无关闭按钮、Cmd-W 亦无效）、
+   置顶居中；只有进度条、取消、「重启并更新」按钮。取消 / 重启由 updater-service 处理。 */
+function getUpdateWindow() {
+  if (!updateWindow || updateWindow.isDestroyed()) return null;
+  return updateWindow;
+}
+
+function isUpdateWindow(win) {
+  return Boolean(win) && win === updateWindow && !win.isDestroyed();
+}
+
+function openUpdateWindow() {
+  // 菜单栏 Agent（隐藏 Dock）需要显式抢焦，窗口才会到前台。
+  if (process.platform === 'darwin' && typeof app.focus === 'function') {
+    try {
+      app.focus({ steal: true });
+    } catch (err) {
+      /* ignore */
+    }
+  }
+  if (updateWindow && !updateWindow.isDestroyed()) {
+    updateWindow.show();
+    updateWindow.focus();
+    return updateWindow;
+  }
+
+  updateWindow = new BrowserWindow({
+    width: UPDATE_WINDOW.width,
+    height: UPDATE_WINDOW.height,
+    show: false,
+    frame: false,
+    resizable: false,
+    movable: true,
+    minimizable: false,
+    maximizable: false,
+    // 不可关闭：没有关闭按钮，也不响应 Cmd-W / 关闭事件。
+    closable: false,
+    fullscreenable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    center: true,
+    title: 'Ships',
+    backgroundColor: themeBackgroundColor(),
+    webPreferences: {
+      preload: path.join(PRELOAD_DIR, 'update-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      spellcheck: false,
+    },
+  });
+
+  updateWindow.loadFile(path.join(RENDERER_DIR, 'update.html'));
+  updateWindow.webContents.setZoomFactor(1);
+  updateWindow.webContents.on('did-finish-load', () => {
+    try {
+      updateWindow.webContents.setZoomFactor(1);
+    } catch (err) {
+      /* ignore */
+    }
+  });
+  updateWindow.on('close', (event) => {
+    // 应用退出（如 quitAndInstall）或显式关闭时才放行。
+    if (isQuitting || updateWindow.__forceClose) return;
+    event.preventDefault();
+  });
+  updateWindow.once('ready-to-show', () => {
+    if (!updateWindow || updateWindow.isDestroyed()) return;
+    updateWindow.show();
+    updateWindow.focus();
+  });
+  updateWindow.on('closed', () => {
+    updateWindow = null;
+  });
+
+  return updateWindow;
+}
+
+function closeUpdateWindow() {
+  const win = getUpdateWindow();
+  if (!win) return;
+  win.__forceClose = true;
+  win.destroy();
+}
+
+function sendToUpdateWindow(channel, payload) {
+  const win = getUpdateWindow();
+  if (win) win.webContents.send(channel, payload);
+}
+
 function broadcast(channel, payload) {
   // The always-on-top terminal windows mirror settings too (font size / scrollback /
   // theme / locale); every open terminal window gets the broadcast.
@@ -1199,6 +1299,11 @@ module.exports = {
   openSettingsWindow,
   closeSettingsWindow,
   getSettingsWindow,
+  openUpdateWindow,
+  closeUpdateWindow,
+  getUpdateWindow,
+  isUpdateWindow,
+  sendToUpdateWindow,
   openTerminalWindow,
   getTerminalWindow,
   getFocusedTerminalWindow,

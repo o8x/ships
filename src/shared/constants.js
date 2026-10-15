@@ -19,6 +19,14 @@ const IPC = {
   OPEN_EXTERNAL: 'app:open-external',
   UPDATER_CHECK: 'app:check-updates',
 
+  // 更新下载窗口：状态查询 / 取消 / 立即重启安装（invoke）与进度 / 下载完成 / 倒计时（主→渲染）。
+  UPDATE_STATE: 'update:state',
+  UPDATE_CANCEL: 'update:cancel',
+  UPDATE_INSTALL: 'update:install',
+  UPDATE_PROGRESS: 'update:progress',
+  UPDATE_DOWNLOADED: 'update:downloaded',
+  UPDATE_COUNTDOWN: 'update:countdown',
+
   WINDOW_HIDE: 'window:hide',
   WINDOW_OPEN_SETTINGS: 'window:open-settings',
   WINDOW_CLOSE_SETTINGS: 'window:close-settings',
@@ -156,6 +164,18 @@ const FILE_WINDOW = Object.assign(
   ships.fileWindow || {}
 );
 
+// 更新下载窗口：小、不可关闭、置顶的前台窗口（仅进度 / 取消 / 重启安装）。
+const UPDATE_WINDOW = Object.assign(
+  {
+    width: 380,
+    height: 184,
+  },
+  ships.updateWindow || {}
+);
+
+// 更新下载完成后自动重启安装的倒计时（秒）。
+const UPDATE_COUNTDOWN_SECONDS = 60;
+
 // 日志保留天数（按天写文件，惰性删除更早的日志）。
 const LOG_RETENTION_DAYS = Number.isFinite(ships.logRetentionDays) ? ships.logRetentionDays : 7;
 
@@ -219,6 +239,8 @@ module.exports = {
   SETTINGS_WINDOW,
   TERMINAL_WINDOW,
   FILE_WINDOW,
+  UPDATE_WINDOW,
+  UPDATE_COUNTDOWN_SECONDS,
   LOG_RETENTION_DAYS,
   CD_HISTORY_MAX,
   VIBRANCY,
