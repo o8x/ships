@@ -1,9 +1,10 @@
 /*
  * Ships - 悬浮球动画（独立文件：可在此自由调整，改完无需动其它代码 / 无需重建）
  *
- * 终端持续有输出时，悬浮球内的**图标**做「正弦平滑弹跳」：
- * 一个循环 0% → 50% 上移 → 100% 回到原位，配合 cubic-bezier(0.45, 0, 0.55, 1)
- * 让上下两端平滑减速，接近正弦观感。球本身不动。
+ * 终端持续有输出时，悬浮球内的**图标**做「正弦平滑弹跳」：一个循环
+ * 0% → 50% 上移 → 100% 回到原位，用 cubic-bezier(0.45, 0, 0.55, 1) 让两端平滑减速。
+ * 由于起点 / 中点 / 终点的速度都为 0，首尾衔接自然、循环回弹不卡。球本身不动。
+ * 图标单独提升为合成层（will-change: transform），避免每帧重绘造成卡顿。
  */
 
 /* 可调参数：
@@ -12,7 +13,7 @@
  *   --ball-bounce-duration  一个完整「上 + 下」循环的时长。
  */
 :root {
-  --ball-bounce-distance: 0.18;
+  --ball-bounce-distance: 0.07;
   --ball-bounce-duration: 1.2s;
 }
 
@@ -29,6 +30,7 @@
 /* 动画常驻但默认暂停；有输出时由 terminal.js 加 .term-ball-bounce 恢复播放，
  * 1s 内无输出再移除该类。暂停 / 恢复不重建动画，避免从 0% 重播。 */
 .term-ball-icon {
+  will-change: transform;
   animation: ball-bounce-sine var(--ball-bounce-duration) cubic-bezier(0.45, 0, 0.55, 1) infinite;
   animation-play-state: paused;
 }

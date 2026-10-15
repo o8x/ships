@@ -432,13 +432,6 @@ function ballBoundsFor(orig, size) {
   return clampToWorkArea({ x: orig.x + orig.width - size, y: orig.y, width: size, height: size });
 }
 
-/* 悬浮球玻璃：Liquid Glass 开启时用 CSS 玻璃观感（'glass'），否则纯色（'off'）。
-   注意：原生 `electron-liquid-glass` 的视图**无法移除**、会一直铺满整个窗口，导致「终端收缩」
-   时透出整块玻璃（看起来像整个白窗口）。所以悬浮球不用原生玻璃，改用渲染层 CSS 近似。 */
-function ballGlassKind() {
-  return settings.get('vibrancy') ? 'glass' : 'off';
-}
-
 function enterBallMode(win) {
   if (!isTerminalWindow(win) || win.__ballActive || win.__exitingBall || win.isDestroyed()) return;
   const size = ballSize();
@@ -453,8 +446,7 @@ function enterBallMode(win) {
   // 窗口保持原尺寸，渲染层用 CSS 把终端从 1 缩到球大小（transform，GPU、不跳）。
   const scaleX = size / win.__ballOrig.width;
   const scaleY = size / win.__ballOrig.height;
-  const glass = ballGlassKind();
-  win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'enter', duration: BALL_ANIM_MS, scaleX, scaleY, glass });
+  win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'enter', duration: BALL_ANIM_MS, scaleX, scaleY });
   // 提前切到球（终端缩到接近球大小时就隐藏，避免尾段那一下卡顿）。
   clearBallSettleTimer(win);
   win.__ballSettleTimer = setTimeout(() => {
@@ -464,7 +456,7 @@ function enterBallMode(win) {
     if (typeof win.setResizable === 'function') win.setResizable(false);
     // setBounds 之后再次重申：球固定在它所在的桌面 / 空间（不加入所有桌面、不跟随切换）。
     win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
-    win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'settle', glass });
+    win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'settle' });
   }, Math.round(BALL_ANIM_MS * 0.6));
   logger.file(`[terminal] entered ball mode (${win.id}) size=${size}`);
 }

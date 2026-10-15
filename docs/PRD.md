@@ -244,7 +244,7 @@ Ships/
 12. **悬浮球（失去焦点缩成圆形小窗）**：终端窗口**失去焦点后延迟 `terminalBallDelayMs`（默认 0.2s）**缩成一个 **`terminalBallSize`（默认 75px、宽高强制 1:1、40–200px）的圆形、无标题栏窗口**，形如悬浮球：
     - **开关与延迟**：设置 → 终端「自动缩成悬浮球」（`settings.terminalBallEnabled`，默认开）、「缩成悬浮球延迟」（下拉：200ms / 500ms / 1s / 5s / 10s / 15s / 30s / 60s，默认 200ms）、「悬浮球大小」（`settings.terminalBallSize`，默认 75px，1:1）、「悬浮球图标」（`settings.terminalBallIcon`，选项为 `assets/icons/ball/` 下所有 SVG，默认 `ball.svg`，**实时生效**）、「悬浮球暗色模式」（`settings.terminalBallDark`，默认**开** = **始终暗色底**；关 = **跟随全局主题**（亮 / 暗随 `data-theme`）；**图标始终保留原色、不去色**）；**延迟内焦点回来则取消缩球**（`blur` 起计时、`focus` 清除）。
     - **窗口形态**：终端窗口以 `frame: false` + `transparent: true` + `hasShadow: false` + **`roundedCorners: false`**（圆角由 CSS 画，避免系统把四角边框裁掉）+ **`acceptFirstMouse: true`** 创建（macOS：让悬浮球浮在其它应用 / 全屏应用之上时**第一次点击**就落到窗口内容，而不必先激活、点两次）；底座 `#term-shell` 负责底色 / 圆角 / 描边，悬浮球为 `#term-ball`（**固定 `--term-ball-size` 的圆形 + 设置的悬浮球图标**（`assets/icons/ball/*.svg`，默认 `ball.svg`））——球尺寸固定、**锚在窗口右上角**（`top:0; right:0`）。
-    - **玻璃效果**：设置 → Ships 的 **Liquid Glass** 开启时，悬浮球用 **CSS 玻璃观感**（半透明 + `backdrop-filter` 模糊 + 高光描边）；关闭时为纯色球。**注意**：不用原生 `electron-liquid-glass`——它的视图**无法移除、会持续铺满整个窗口**，会让「终端收缩」透出整块玻璃（像整个白窗口）；`glass` 随 `terminal:ball` 事件下发（`glass`/`off`）。
+    - **外观（纯色不透明）**：悬浮球为**不透明纯色**（暗 / 亮底由下方「悬浮球暗色模式」决定），**不做半透明、不做 `backdrop-filter` 毛玻璃 / 高光描边等玻璃特效**（省性能）。球由 CSS 画圆形、底座透明窗口只透出球体本身。
     - **空间归属**：球固定在它所在的桌面 / 空间，**切换桌面时不跟随**（进入球模式重新声明 `setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true })`）。
     - **位置稳定**：球 = 原窗口**右上角**的 `size×size` 方块；若用户没拖动过球，放大时**原样恢复**原 bounds（多次「终端 ↔ 球」往返位置不变）；拖动过则以球位置为右上角展开回原尺寸（夹回工作区）。
     - **缩放动画（渲染层 CSS transform）**：窗口尺寸只在**动画首 / 尾各改一次**（`setBounds`，非逐帧）：收缩时窗口保持原尺寸，渲染层把 `#term-shell` 以 `transform-origin: top right` 从 `scale(1)` 过渡到 `scale(size/宽, size/高)`；放大时窗口先一次性还原，再把 shell 从球 scale 过渡到 `1`。由 GPU 合成，**右上角严格不动、不左右弹跳**（原生窗口动画做不到精确锚点）。`BALL_ANIM_MS = 420ms`，`scaleX/scaleY` 由主进程随事件下发。
@@ -253,7 +253,7 @@ Ships/
     - **拖动**：渲染层指针事件（pointer capture）→ 主进程按光标位置持续 `setPosition`（16ms）；「按下到松开位移 ≤ 3px」判定为**点击**（聚焦后按住不放视为拖动，松开即展开）。
     - **放大回来**：点击球、或按**终端全局快捷键**（`toggleTerminalWindow`）→ `terminal:ball-restore` → 还原窗口并放大，动画结束恢复最小尺寸 / 可缩放 / 置顶、`win.focus()`。**不在窗口 `focus` 时自动放大**（避免拖动即触发）。
     - **最小化按钮禁用**：终端窗口头栏「最小化」红绿灯失效（灰显不可点）。
-    - **输出活动提示**：球模式下，若终端会话**持续有输出**（收到 `terminal:data`），悬浮球**内的图标**做**正弦平滑弹跳**（球本身不动）：一个循环 `0% → 50%` 上移 `--ball-bounce-distance`（相对球尺寸的比例，默认 `0.18`；超过约 `0.21` 会被窗口裁切）→ `100%` 回到原位，时长 `--ball-bounce-duration`（默认 `1.2s`），缓动 `cubic-bezier(0.45, 0, 0.55, 1)`（两端平滑减速）。动画定义在**独立样式文件 `src/renderer/styles/ball-animations.css`**（由 `terminal.html` 直接引入、不走 Tailwind 构建，改完无需重建）。该动画常驻但默认 `animation-play-state: paused`，有输出时切 `.term-ball-bounce` 恢复播放，避免切类重建动画导致从 0% 重播；**1s 内无输出**则自动停止（每次输出重置 1s 计时）。
+    - **输出活动提示**：球模式下，若终端会话**持续有输出**（收到 `terminal:data`），悬浮球**内的图标**做**正弦平滑弹跳**（球本身不动）：一个循环 `0% → 50%` 上移 `--ball-bounce-distance`（相对球尺寸的比例，默认 `0.07`；超过约 `0.21` 会被窗口裁切）→ `100%` 回到原位，时长 `--ball-bounce-duration`（默认 `1.2s`），缓动 `cubic-bezier(0.45, 0, 0.55, 1)`（起 / 中 / 终点速度均为 0，首尾衔接自然、循环不卡）。图标提升为合成层（`will-change: transform`）避免重绘卡顿。动画定义在**独立样式文件 `src/renderer/styles/ball-animations.css`**（由 `terminal.html` 直接引入、不走 Tailwind 构建，改完无需重建）。该动画常驻但默认 `animation-play-state: paused`，有输出时切 `.term-ball-bounce` 恢复播放，避免切类重建动画导致从 0% 重播；**1s 内无输出**则自动停止（每次输出重置 1s 计时）。
     - **右键垃圾桶（销毁）**：在球上**右键** → 球上悬浮一个半透明**垃圾桶**图标；此时**再点一下球**（未拖动）即**销毁终端**（`terminal:destroy`）；拖动球会取消该状态。
     - **「固定」按钮（仅当前窗口，默认关）**：头栏红绿灯**右侧**新增固定按钮（`pin`/`pin-off` 图标，开时强调色）；开启后该窗口 `blur` 不再缩球（主进程 `win.__ballPin` 标记，**不持久**、仅作用于当前终端）。
     - **iTerm 交接 / 会话结束不缩球**：`TERMINAL_OPEN_ITERM`、`terminal:destroy`（exit）走 `destroyTerminalWindow`，会先置 `__suppressBall` 再销毁，直接关闭窗口而不是变球。
@@ -399,7 +399,7 @@ Ships/
 | `terminal:data` | `{ id, type: 'data', data }` | PTY 输出（原样文本，含 ANSI），只发给拥有该会话的窗口 |
 | `terminal:exit` | `{ id, type: 'exit', code, signal }` 或 `{ id, type: 'error', message }` | 会话结束 / 启动失败 |
 | `terminal:session` | `{ id, type: 'session', ssh, target }` | 会话进程树里检测到的当前 SSH 目标：`ssh` 为显示用标签（命中配置别名时解析成 `user@hostname`）、`target` 为命令行里的原始目标 token（供文件面板连接用），未连接时均为 `null`；仅在值变化时推送（主进程每秒扫描一次进程树，见 §3.9-4、§3.9-10；**不在头栏显示**） |
-| `terminal:ball` | `{ active, size, phase, duration, scaleX, scaleY, glass }` | 悬浮球状态（见 §3.9-12）：`phase` ∈ `enter`（终端按缩放缩小）/ `settle`（切球或切终端）/ `grow`（终端从球 scale 放大）；`size` 球边长、`scaleX/scaleY` 起止缩放、`duration` 过渡时长、`glass` ∈ `glass`/`off`。只发给对应终端窗口 |
+| `terminal:ball` | `{ active, size, phase, duration, scaleX, scaleY }` | 悬浮球状态（见 §3.9-12）：`phase` ∈ `enter`（终端按缩放缩小）/ `settle`（切球或切终端）/ `grow`（终端从球 scale 放大）；`size` 球边长、`scaleX/scaleY` 起止缩放、`duration` 过渡时长。只发给对应终端窗口 |
 | `terminal:ball-pin` | `{ value: boolean }` | `{ ok, value }` | 头栏「固定」按钮：设置该终端窗口是否**失焦不缩球**（`win.__ballPin`，仅当前窗口、不持久）；只接受来自该终端窗口本身的请求 |
 | `terminal:recalibrate` | — | 拖动结束后请终端窗口重新测量并按整行对齐高度（拖动期间主进程不改窗口尺寸，见 §3.9-4） |
 | `terminal:drag-active` | — | 主进程检测到终端窗口开始被拖动（`will-resize`）：渲染层据此在拖动期间不发对齐请求 |

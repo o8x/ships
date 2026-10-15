@@ -748,7 +748,6 @@
     const scaleX = (payload && payload.scaleX) || 1;
     const scaleY = (payload && payload.scaleY) || 1;
     if (size) document.documentElement.style.setProperty('--term-ball-size', `${size}px`);
-    document.documentElement.dataset.ballGlass = (payload && payload.glass) || 'off';
     if (active && phase === 'enter') {
       // 收缩：终端保持可见，用 CSS transform 缩到右上角球大小（窗口尺寸不动 → 不跳）。
       ballMode = true;

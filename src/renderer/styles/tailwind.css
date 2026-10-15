@@ -380,7 +380,7 @@ input[type='color'].swatch::-webkit-color-swatch {
   border-radius: var(--radius-window);
   border: 1px solid var(--color-border);
 }
-/* 悬浮球：固定尺寸的圆形，锚在窗口**右上角**。半透明磨砂底 + 不透明图标。 */
+/* 悬浮球：固定尺寸的圆形，锚在窗口**右上角**。纯色不透明底（不做半透明 / 玻璃 / 毛玻璃，省性能）。 */
 #term-ball {
   position: fixed;
   top: 0;
@@ -391,11 +391,8 @@ input[type='color'].swatch::-webkit-color-swatch {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--color-surface) 97%, transparent);
+  background: #2a2a2c;
   border: 1px solid color-mix(in srgb, #808080 55%, transparent);
-  -webkit-backdrop-filter: blur(30px) saturate(1.5);
-  backdrop-filter: blur(30px) saturate(1.5);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #808080 30%, transparent);
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
@@ -407,10 +404,6 @@ input[type='color'].swatch::-webkit-color-swatch {
 }
 [data-ball='on'] #term-shell {
   display: none;
-}
-/* Liquid Glass 开关不影响球的底色（底色由暗色/白天设置决定）。 */
-[data-ball='on'][data-ball-glass='glass'] #term-ball {
-  border-color: color-mix(in srgb, #808080 55%, transparent);
 }
 #term-ball:active {
   cursor: grabbing;
@@ -426,13 +419,13 @@ input[type='color'].swatch::-webkit-color-swatch {
   width: calc(var(--term-ball-size, 75px) * 0.58);
   height: calc(var(--term-ball-size, 75px) * 0.58);
 }
-/* 悬浮球底色：暗色模式开 = 始终暗色；关 = 跟随全局主题（依 data-theme）。图标始终保留原色（不去色）。 */
+/* 悬浮球底色：暗色模式开 = 始终暗色；关 = 跟随全局主题（依 data-theme）。均为不透明纯色；图标始终保留原色。 */
 [data-ball-dark='on'] #term-ball,
 [data-ball-dark='auto'][data-theme='dark'] #term-ball {
-  background: color-mix(in srgb, #2a2a2c 92%, transparent);
+  background: #2a2a2c;
 }
 [data-ball-dark='auto'][data-theme='light'] #term-ball {
-  background: color-mix(in srgb, #ffffff 92%, transparent);
+  background: #ffffff;
 }
 /* 设置 → 终端：悬浮球图标选择器的预览框。 */
 .ball-icon-preview {
@@ -495,7 +488,7 @@ input[type='color'].swatch::-webkit-color-swatch {
   display: none;
 }
 [data-ball-trash='on'] #term-ball {
-  background: color-mix(in srgb, var(--color-danger) 26%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 30%, #2a2a2c);
 }
 @keyframes ships-ball-in {
   from {
