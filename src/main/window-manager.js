@@ -783,8 +783,9 @@ function createWindowWindow() {
     minimizable: true,
     maximizable: false,
     fullscreenable: false,
-    // 普通层级、不置顶；固定在自己的桌面（不加入所有桌面）。
-    alwaysOnTop: false,
+    // 像终端窗口一样的置顶悬浮 panel：可浮在全屏应用之上，但**不加入所有桌面**
+    // （固定在自己的桌面，切换桌面时不跟随）。
+    alwaysOnTop: true,
     backgroundColor: themeBackgroundColor(),
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'main-preload.js'),
@@ -795,6 +796,8 @@ function createWindowWindow() {
     },
   });
 
+  // 置顶到 screen-saver 层级（可浮在全屏应用之上）+ 固定在自己的桌面（不加入所有桌面）。
+  mainWindow.setAlwaysOnTop(true, 'screen-saver');
   mainWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
   mainWindow.loadFile(path.join(RENDERER_DIR, 'index.html'));
   mainWindow.webContents.setZoomFactor(1);
@@ -803,6 +806,12 @@ function createWindowWindow() {
       mainWindow.webContents.setZoomFactor(1);
     } catch (err) {
       /* ignore */
+    }
+  });
+  // 获得焦点时重申「固定在自己的桌面」（此刻窗口就在活动桌面，与终端窗口一致）。
+  mainWindow.on('focus', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
     }
   });
   mainWindow.on('resize', scheduleMainWindowGeometrySave);
@@ -864,6 +873,10 @@ function showMainWindow() {
     }
     const win = getMainWindow() || createMainWindow();
     if (win.isMinimized && win.isMinimized()) win.restore();
+    // 每次显示都重申「置顶到 screen-saver + 固定在自己的桌面」：可浮在全屏应用之上，
+    // 但切换桌面时不跟随（与终端窗口一致）。
+    win.setAlwaysOnTop(true, 'screen-saver');
+    win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
     win.show();
     win.focus();
     if (typeof win.moveTop === 'function') win.moveTop();
