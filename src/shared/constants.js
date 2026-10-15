@@ -137,15 +137,11 @@ const SETTINGS_WINDOW = Object.assign(
   ships.settingsWindow || {}
 );
 
-// 窗口模式（非悬浮）的主窗口：居中显示的标准窗口，默认 / 最小 640×480，最大 1440×900。
+// 窗口模式（非悬浮）的主窗口：固定 640×480 的标准窗口（不可缩放），仅位置可拖动。
 const MAIN_WINDOW = Object.assign(
   {
     width: 640,
     height: 480,
-    minWidth: 640,
-    minHeight: 480,
-    maxWidth: 1440,
-    maxHeight: 900,
   },
   ships.mainWindow || {}
 );

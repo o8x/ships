@@ -1360,7 +1360,19 @@ body.file-window {
   padding-left: 80px;
   -webkit-app-region: drag;
 }
+/* 品牌区（应用图标 + 名称）也可拖动：图标本身禁用原生图片拖拽，否则会抢走窗口拖动。 */
+[data-window-mode='window'] #brand {
+  -webkit-app-region: drag;
+}
+[data-window-mode='window'] #brand img {
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+/* TAB 区铺满右侧（flex-1）且右对齐：整条仍可拖动，只有真正的 TAB 按钮 no-drag。 */
 [data-window-mode='window'] #tablist {
+  -webkit-app-region: drag;
+}
+[data-window-mode='window'] #tablist .tab {
   -webkit-app-region: no-drag;
 }
 [data-window-mode='window'] #content {

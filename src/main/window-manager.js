@@ -634,21 +634,19 @@ function isWindowMode() {
 let mainWindowState = readJson(MAIN_WINDOW_FILE, null);
 let mainWindowGeometryTimer = null;
 
+// 窗口模式固定 640×480（不可缩放）。
 function mainWindowSize() {
-  return {
-    width: clampNumber(MAIN_WINDOW.width, MAIN_WINDOW.minWidth, MAIN_WINDOW.maxWidth, MAIN_WINDOW.width),
-    height: clampNumber(MAIN_WINDOW.height, MAIN_WINDOW.minHeight, MAIN_WINDOW.maxHeight, MAIN_WINDOW.height),
-  };
+  return { width: MAIN_WINDOW.width, height: MAIN_WINDOW.height };
 }
 
-/* 有记忆且记忆的屏幕还在 → 沿用位置 / 尺寸；否则在鼠标所在屏幕居中。 */
+/* 尺寸固定；有位置记忆且记忆的屏幕还在 → 沿用位置（夹回工作区），否则在新屏幕居中。 */
 function mainWindowBoundsForOpen() {
   const size = mainWindowSize();
-  const min = { width: MAIN_WINDOW.minWidth, height: MAIN_WINDOW.minHeight };
   const saved = mainWindowState && mainWindowState.bounds ? mainWindowState : null;
   const matched = saved ? displayBySignature(screen.getAllDisplays(), saved.display) : null;
-  if (matched) return clampBounds(saved.bounds, matched, size, min);
-  return clampBounds(null, anchorDisplay(), size, min);
+  const display = matched || anchorDisplay();
+  const position = saved ? { x: saved.bounds.x, y: saved.bounds.y } : null;
+  return clampBounds(position, display, size, size);
 }
 
 function saveMainWindowGeometry() {
@@ -769,15 +767,12 @@ function createWindowWindow() {
     y: bounds.y,
     width: bounds.width,
     height: bounds.height,
-    minWidth: MAIN_WINDOW.minWidth,
-    minHeight: MAIN_WINDOW.minHeight,
-    maxWidth: MAIN_WINDOW.maxWidth,
-    maxHeight: MAIN_WINDOW.maxHeight,
     title: 'Ships',
     show: false,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 14, y: 16 },
-    resizable: true,
+    // 固定 640×480：不可缩放 / 最大化，但可拖动位置。
+    resizable: false,
     movable: true,
     minimizable: true,
     maximizable: false,

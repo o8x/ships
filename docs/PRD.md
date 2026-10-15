@@ -9,7 +9,7 @@
 | 当前版本 | 3.21.1 |
 | 发布方式 | 本地/CI 通过 `electron-builder` 打包 macOS arm64 **DMG + ZIP**（`pnpm dist:mac`）；打 `v*` tag 时发布到 GitHub Releases；更新用 `electron-updater` 做版本检测，**macOS 下载 DMG 手动安装**（挂载 DMG 后拖入 Applications）、Windows 走 `electron-updater` 自动安装（见 §7）；暂未签名 / 公证 |
 
-**核心设计**：应用常驻系统托盘、不占用 Dock。主界面有**两种模式**（设置 → 应用设置 → 悬浮模式切换）：**窗口模式（默认）**为 640×480（最大 1440×900）的独立标准窗口，点托盘在当前桌面居中显示 / 带到前台、不跨桌面切换、记忆位置尺寸；**悬浮模式**为托盘图标正下方弹出的 400×500 圆角面板。两种模式都以顶部 TAB 切换工具、底部显示版本与设置入口；所有输入实时反馈，无需点击“计算”按钮。
+**核心设计**：应用常驻系统托盘、不占用 Dock。主界面有**两种模式**（设置 → 应用设置 → 悬浮模式切换）：**窗口模式（默认）**为**固定 640×480（不可缩放）**的独立标准窗口，点托盘在当前桌面居中显示 / 带到前台、不跨桌面切换、记忆位置；**悬浮模式**为托盘图标正下方弹出的 400×500 圆角面板。两种模式都以顶部 TAB 切换工具、底部显示版本与设置入口；所有输入实时反馈，无需点击“计算”按钮。
 
 ---
 
@@ -140,7 +140,7 @@ Ships/
 3. 窗口是**独立的标准窗口**（`titleBarStyle: hiddenInset` + 系统红绿灯、普通层级不置顶、可缩放），**固定在自己的桌面**（`setVisibleOnAllWorkspaces(false, …)`），**不跨桌面跟随**。
 4. **再次点击**托盘（窗口已存在）→ 显示 / 带到前台；若它在别的桌面，聚焦 / 激活会让系统**切到它所在的桌面**（不做隐藏切换）。
 5. 关闭按钮（系统红绿灯）= **隐藏**（应用常驻托盘）；`Escape` 亦隐藏。位置 / 尺寸在拖动 / 缩放后写入 `main-window.json`（单槽，见 §5.1）。
-6. 尺寸：默认 / 最小 **640 × 480**，最大 **1440 × 900**（`package.json` 的 `ships.mainWindow`）。
+6. 尺寸：**固定 640 × 480、不可缩放**（`package.json` 的 `ships.mainWindow`；仅位置可拖动 / 记忆）。
 
 **悬浮模式（`floatMode = true`）**
 
@@ -311,7 +311,7 @@ Ships/
 | `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/ships/settings.json`） | `{ locale, theme, accent, launchAtLogin, floatMode, pinWindow, vibrancy, developerMode, clipboardLimit, clipboardPollMs, terminalShell, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, terminalHotkey, terminalCloseAction, sshBuiltinTerminal, sftpDownloadDir, terminalBallEnabled, terminalBallDelayMs, terminalBallSize, terminalBallIcon, terminalBallDark, fileWindowAlwaysOnTop, logRetentionDays }` | 持久；重启保留 |
 | `ships-YYYY-MM-DD.log` | **macOS：`~/Library/Logs/Ships/`**（Console.app 的「日志报告」会收录该目录，与 JetBrains/CLion 一致，与用户数据目录分离）；其它平台：`app.getPath('userData')` 的 `logs/` 子目录（`src/main/utils/paths.js` 的 `LOG_DIR`，按 `process.platform` 选择） | 按天追加的文本日志（启动信息、SSH 探测 / SFTP / 终端 / 文件管理等）；启动时把数据文件清单也写进去 | 持久；**惰性清理**：每天首次写日志时删除保留期之前的日志文件（保留天数取设置 `logRetentionDays`，默认 **7 天**，来自 `package.json` 的 `ships.logRetentionDays`） |
 | `ssh-detected.json` | 同上目录 | `{ [alias]: { os, family, label, at } }` | 持久；缓存探测结果 |
-| `main-window.json` | 同上目录 | `{ display: { id, scaleFactor, bounds: { x, y, width, height } }, bounds: { x, y, width, height } }`（**窗口模式**主窗口最近一次的所在屏幕 + 位置 + 尺寸） | 持久；窗口模式下拖动 / 缩放主窗口时写入；同屏再次打开沿用，换屏 / 无记录则按 `ships.mainWindow` 默认尺寸（640×480）在鼠标所在屏幕居中；「清理数据」可删除 |
+| `main-window.json` | 同上目录 | `{ display: { id, scaleFactor, bounds: { x, y, width, height } }, bounds: { x, y, width, height } }`（**窗口模式**主窗口最近一次的所在屏幕 + 位置；尺寸固定 640×480） | 持久；窗口模式下拖动主窗口时写入；同屏再次打开沿用位置，换屏 / 无记录则在鼠标所在屏幕居中；「清理数据」可删除 |
 | `terminal-window.json` | 同上目录 | `{ display: { id, scaleFactor, bounds: { x, y, width, height } }, bounds: { x, y, width, height } }`（置顶终端窗口最近一次的所在屏幕 + 位置 + 尺寸） | 持久；打开 / 拖动 / 缩放 / 关闭时写入（含「实际生效」的几何，恢复时被夹取过也记夹取后的值）；同一块屏幕再次打开即沿用，换屏 / 拔屏 / 无记录则改用默认尺寸居中 |
 | `file-window.json` | 同上目录 | 同 `terminal-window.json` 的结构（独立文件窗口的屏幕 + 位置 + 尺寸） | 持久；记忆方式与终端窗口一致 |
 | `file-layout.json` | 同上目录 | `{ treeWidth, name, size, perm, time, panelHeight, sortKey, sortDir }`（**内嵌面板**的目录树宽、文件名 / 体积 / 权限 / 时间列宽、面板高度，单位 px；默认 `300 / 160 / 60 / 90 / 130 / 260`；`time` 默认 130 是**默认值**，最小可拖到 60；`sortKey` ∈ `''`（不排序）/`name`/`size`/`time`、`sortDir` ∈ `asc`/`desc`） | 持久；拖动分隔线 / 列宽、点击列头排序时写入；**有记录时不再套用首次的最小布局**（§3.9-10） |
@@ -625,10 +625,10 @@ flowchart TD
 
 **窗口模式（默认）**
 
-- **标准窗口**：`titleBarStyle: 'hiddenInset'` + **系统红绿灯**（`trafficLightPosition {14,16}`）、可缩放、普通层级（不置顶）、不占 Dock；默认 / 最小 **640 × 480**、最大 **1440 × 900**（`ships.mainWindow`）。
+- **标准窗口**：`titleBarStyle: 'hiddenInset'` + **系统红绿灯**（`trafficLightPosition {14,16}`）、普通层级（不置顶）、不占 Dock；**固定 640 × 480、不可缩放**（`resizable: false`，`ships.mainWindow`），仅位置可拖动。
 - **桌面归属**：`setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true })` —— **固定在自己的桌面、不跨桌面跟随**；点托盘显示 / 带到前台（聚焦让系统切到它所在的桌面）。
 - **几何记忆**：位置 / 尺寸写入 `main-window.json`（单槽，见 §5.1）；无记录时在鼠标所在屏幕居中。
-- **布局适配**：顶部栏 `#tabbar` 左侧留出 **80px** 给系统红绿灯并作为拖动区（TAB 区 `no-drag`）；内容区加宽（`padding: 16px 20px`），工具内容 `#content > .tool-body` 用 `repeat(auto-fit, minmax(320px, 1fr))` 网格**自适应多列**（单项自动铺满、多项自动分栏）；面板圆角取消（`#panel border-radius:0`）。**图钉（固定悬浮）按钮隐藏**（仅悬浮模式有意义），毛玻璃不启用（普通不透明窗口）。
+- **布局适配**：顶部栏 `#tabbar` 左侧留出 **80px** 给系统红绿灯；**整条顶部栏可拖动窗口**——`#tabbar` / `#brand` / `#tablist` 均为 `-webkit-app-region: drag`（TAB 区虽铺满右侧，但其空白处也可拖动），仅真正的 **TAB 按钮**（`#tablist .tab`）为 `no-drag` 保证可点击，品牌图标禁用原生图片拖拽以免抢走窗口拖动；内容区加宽（`padding: 16px 20px`），工具内容 `#content > .tool-body` 用 `repeat(auto-fit, minmax(320px, 1fr))` 网格（固定 640 宽下为单列，窗口更宽时自动分栏）；面板圆角取消（`#panel border-radius:0`）。**图钉（固定悬浮）按钮隐藏**（仅悬浮模式有意义），毛玻璃不启用（普通不透明窗口）。
 
 **悬浮模式（`floatMode = true`，原主面板行为）**
 
@@ -749,7 +749,7 @@ flowchart TD
 | 名称 | 值 |
 | --- | --- |
 | 悬浮面板尺寸 | 400 × 500 |
-| 窗口模式主窗口尺寸 | 默认 / 最小 640 × 480，最大 1440 × 900（`ships.mainWindow`） |
+| 窗口模式主窗口尺寸 | 固定 640 × 480（不可缩放；`ships.mainWindow`） |
 | 设置窗口尺寸 | 800 × 600 |
 | 更新下载窗口尺寸 | 380 × 160（`ships.updateWindow`） |
 | `--tabbar-height` | 46px |
