@@ -2,8 +2,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const https = require('https');
 const { spawn } = require('child_process');
-const { app, dialog, net } = require('electron');
+const { app, dialog } = require('electron');
 const settings = require('./settings-service');
 const logger = require('../utils/logger');
 const wm = require('../window-manager');
@@ -57,7 +59,7 @@ let promptedVersion = '';
 
 // 下载窗口状态（可查询、可广播）。
 let downloadToken = null; // Windows（electron-updater）下载的取消令牌
-let dmgRequest = null; // macOS DMG 下载的 net 请求（可 abort）
+let dmgRequest = null; // macOS DMG 下载的 http(s) 请求（可 destroy 取消）
 let countdownTimer = null;
 let countdownRemaining = 0;
 const dl = {
@@ -239,33 +241,42 @@ async function resolveDmgUrl(version) {
   return direct;
 }
 
-function httpGetJson(url) {
+/* 用 Node 原生 http(s) 发起请求并跟随重定向（而非 Electron `net`）。
+   原因：`net` 走 Chromium 网络栈，会触及加密的 Cookie 存储（打包时翻转了
+   EnableCookieEncryption fuse），从而弹出 macOS「钥匙串」访问授权框；Node 原生请求
+   完全不碰 Chromium 会话 / Cookie，因此更新检查 / 下载不再触发该弹框。 */
+function requestStream(url, redirects = 0, onRequest) {
   return new Promise((resolve, reject) => {
-    const request = net.request({
-      url,
-      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Ships-Updater' },
-    });
-    let body = '';
-    request.on('response', (response) => {
-      if (response.statusCode !== 200) {
-        reject(new Error(`HTTP ${response.statusCode}`));
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch (err) {
+      reject(err);
+      return;
+    }
+    const mod = parsed.protocol === 'http:' ? http : https;
+    const req = mod.get(parsed, { headers: { 'User-Agent': 'Ships-Updater', Accept: '*/*' } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects < 5) {
+        res.resume();
+        resolve(requestStream(new URL(res.headers.location, parsed).toString(), redirects + 1, onRequest));
         return;
       }
-      response.on('data', (chunk) => {
-        body += chunk.toString('utf8');
-      });
-      response.on('end', () => {
-        try {
-          resolve(JSON.parse(body));
-        } catch (err) {
-          reject(err);
-        }
-      });
-      response.on('error', reject);
+      resolve({ req, res });
     });
-    request.on('error', reject);
-    request.end();
+    if (typeof onRequest === 'function') onRequest(req);
+    req.on('error', reject);
   });
+}
+
+async function httpGetJson(url) {
+  const { res } = await requestStream(url);
+  if (res.statusCode !== 200) {
+    res.resume();
+    throw new Error(`HTTP ${res.statusCode}`);
+  }
+  const chunks = [];
+  for await (const chunk of res) chunks.push(chunk);
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
 async function startDmgDownload() {
@@ -298,39 +309,42 @@ async function startDmgDownload() {
 function downloadDmg(url, destPath) {
   return new Promise((resolve, reject) => {
     let settled = false;
-    const file = fs.createWriteStream(destPath);
-    const request = net.request({ url });
-    dmgRequest = request;
-    let total = 0;
-    let transferred = 0;
-    let lastTime = Date.now();
-    let lastBytes = 0;
-    let bytesPerSecond = 0;
-
+    let file = null;
     const cleanup = (err) => {
       if (settled) return;
       settled = true;
       dmgRequest = null;
       try {
-        file.destroy();
-      } catch (e) {
-        /* ignore */
-      }
-      try {
-        request.abort();
+        if (file) file.destroy();
       } catch (e) {
         /* ignore */
       }
       reject(err);
     };
 
-    request.on('response', (response) => {
-      if (response.statusCode !== 200) {
-        cleanup(new Error(`HTTP ${response.statusCode}`));
+    (async () => {
+      let res;
+      try {
+        const stream = await requestStream(url, 0, (req) => {
+          dmgRequest = req;
+        });
+        res = stream.res;
+      } catch (err) {
+        cleanup(err);
         return;
       }
-      total = Number(response.headers['content-length']) || 0;
-      response.on('data', (chunk) => {
+      if (res.statusCode !== 200) {
+        res.resume();
+        cleanup(new Error(`HTTP ${res.statusCode}`));
+        return;
+      }
+      file = fs.createWriteStream(destPath);
+      const total = Number(res.headers['content-length']) || 0;
+      let transferred = 0;
+      let lastTime = Date.now();
+      let lastBytes = 0;
+      let bytesPerSecond = 0;
+      res.on('data', (chunk) => {
         transferred += chunk.length;
         file.write(chunk);
         const now = Date.now();
@@ -341,7 +355,7 @@ function downloadDmg(url, destPath) {
         }
         reportProgress(transferred, total, bytesPerSecond);
       });
-      response.on('end', () => {
+      res.on('end', () => {
         file.end(() => {
           if (settled) return;
           settled = true;
@@ -349,17 +363,15 @@ function downloadDmg(url, destPath) {
           resolve();
         });
       });
-      response.on('error', cleanup);
-    });
-    request.on('error', cleanup);
-    request.end();
+      res.on('error', cleanup);
+    })();
   });
 }
 
 function abortDmgDownload() {
   if (dmgRequest) {
     try {
-      dmgRequest.abort();
+      dmgRequest.destroy();
     } catch (err) {
       /* ignore */
     }
