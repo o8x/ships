@@ -391,8 +391,10 @@ input[type='color'].swatch::-webkit-color-swatch {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+  /* 圆环描边色；计时文字复用同一颜色（见 .term-ball-timer）。 */
+  --term-ball-border-color: color-mix(in srgb, #808080 55%, transparent);
   background: #2a2a2c;
-  border: 1px solid color-mix(in srgb, #808080 55%, transparent);
+  border: 1px solid var(--term-ball-border-color);
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
@@ -429,7 +431,7 @@ input[type='color'].swatch::-webkit-color-swatch {
   line-height: 1;
   font-family: var(--font-mono);
   white-space: nowrap;
-  color: var(--color-accent);
+  color: var(--term-ball-border-color);
   user-select: none;
   -webkit-user-select: none;
 }
