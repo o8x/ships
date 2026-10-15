@@ -131,8 +131,8 @@ const TERMINAL_WINDOW = Object.assign(
   {
     width: 1024,
     height: 768,
-    minWidth: 480,
-    minHeight: 320,
+    minWidth: 350,
+    minHeight: 200,
     alwaysOnTop: true,
     scrollback: 10000,
     ballSize: 75,

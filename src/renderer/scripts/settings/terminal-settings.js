@@ -16,7 +16,7 @@
         fontSize: '字体大小',
         fontSizeHint: '8–24px，默认 12px（Cmd + / Cmd - 临时调整，不写回设置）',
         windowSize: '窗口大小',
-        windowSizeHint: '宽 × 高，最小 480 × 320，默认 1024 × 768；拖动窗口也会写回这里。终端会记住所在屏幕与位置：同一块屏幕沿用记忆，换屏或没有记录时按这里居中显示',
+        windowSizeHint: '宽 × 高，最小 350 × 200，默认 1024 × 768；拖动窗口也会写回这里。终端会记住所在屏幕与位置：同一块屏幕沿用记忆，换屏或没有记录时按这里居中显示',
         scrollback: '缓冲区大小',
         scrollbackHint: '保留的历史行数，默认 10000',
         downloadDir: 'SFTP 下载目录',
@@ -66,7 +66,7 @@
         fontSize: 'Font size',
         fontSizeHint: '8–24px, default 12px (Cmd + / Cmd - adjust temporarily)',
         windowSize: 'Window size',
-        windowSizeHint: 'width × height, min 480 × 320, default 1024 × 768; resizing the window writes back here. The terminal remembers its screen and position: the same screen restores it, otherwise this size is used, centered',
+        windowSizeHint: 'width × height, min 350 × 200, default 1024 × 768; resizing the window writes back here. The terminal remembers its screen and position: the same screen restores it, otherwise this size is used, centered',
         scrollback: 'Scrollback',
         scrollbackHint: 'History lines to keep, default 10000',
         downloadDir: 'SFTP download folder',
@@ -240,8 +240,8 @@
 
     /* window size (applied immediately when the terminal window is open) */
     const sizeDefs = [
-      { key: 'terminalWindowWidth', min: 480, max: 10000, fallback: 1024 },
-      { key: 'terminalWindowHeight', min: 320, max: 10000, fallback: 768 },
+      { key: 'terminalWindowWidth', min: 350, max: 10000, fallback: 1024 },
+      { key: 'terminalWindowHeight', min: 200, max: 10000, fallback: 768 },
     ];
     const sizeControls = el('div', { class: 'flex shrink-0 items-center gap-2' });
     const sizeFields = [];
