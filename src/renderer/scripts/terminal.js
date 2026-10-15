@@ -664,23 +664,65 @@
   function applyBallDark(forceDark) {
     document.documentElement.dataset.ballDark = forceDark ? 'on' : 'auto';
   }
-  // 终端持续有输出时，悬浮球图标做轻微弹簧跳动；1s 内无输出则停止。
-  let ballPulseTimer = null;
+  // 终端持续有输出时，悬浮球图标做流畅的上下弹跳；1s 内无输出则停止。
+  const BALL_IDLE_STOP_MS = 1000;
+  // 弹跳一个完整循环的时长（读 styles/ball-animations.css 的 --ball-bounce-duration，带兜底）。
+  function ballBounceDurationMs() {
+    const raw = getComputedStyle(document.documentElement)
+      .getPropertyValue('--ball-bounce-duration')
+      .trim();
+    const value = parseFloat(raw);
+    if (!Number.isFinite(value) || value <= 0) return 1200;
+    return /ms$/.test(raw) ? value : value * 1000;
+  }
+  let ballBounceOn = false; // 是否正在播放弹跳
+  let ballBounceStartedAt = 0; // 本轮播放起始时间（算相位用）
+  let ballIdleTimer = null; // 无输出满 1s 的计时
+  let ballSettleTimer = null; // 「走到循环边界再停」的计时
+  function startBallBounce() {
+    if (ballBounceOn || !ballEl) return;
+    ballBounceOn = true;
+    ballBounceStartedAt = performance.now();
+    ballEl.classList.add('term-ball-bounce');
+  }
+  function pauseBallBounce() {
+    if (ballEl) ballEl.classList.remove('term-ball-bounce');
+    ballBounceOn = false;
+  }
   function pulseBall() {
     if (!ballMode || !ballEl) return;
-    ballEl.classList.add('term-ball-bounce');
-    clearTimeout(ballPulseTimer);
-    ballPulseTimer = setTimeout(() => {
-      ballPulseTimer = null;
-      if (ballEl) ballEl.classList.remove('term-ball-bounce');
-    }, 1000);
+    startBallBounce();
+    // 有输出：取消「准备停止」，并重开 1s 空闲计时。
+    if (ballSettleTimer) {
+      clearTimeout(ballSettleTimer);
+      ballSettleTimer = null;
+    }
+    clearTimeout(ballIdleTimer);
+    ballIdleTimer = setTimeout(onBallIdle, BALL_IDLE_STOP_MS);
+  }
+  function onBallIdle() {
+    ballIdleTimer = null;
+    if (!ballBounceOn) return;
+    // 等当前循环走完（回到 translateY(0)）再停，避免停在半空 / 顶部 / 底部显得「卡」。
+    const duration = ballBounceDurationMs();
+    const phase = (performance.now() - ballBounceStartedAt) % duration;
+    const wait = phase === 0 ? 0 : duration - phase;
+    ballSettleTimer = setTimeout(() => {
+      ballSettleTimer = null;
+      if (ballIdleTimer) return; // 期间又有输出 → 继续跳
+      pauseBallBounce();
+    }, wait);
   }
   function stopBallPulse() {
-    if (ballPulseTimer) {
-      clearTimeout(ballPulseTimer);
-      ballPulseTimer = null;
+    if (ballIdleTimer) {
+      clearTimeout(ballIdleTimer);
+      ballIdleTimer = null;
     }
-    if (ballEl) ballEl.classList.remove('term-ball-bounce');
+    if (ballSettleTimer) {
+      clearTimeout(ballSettleTimer);
+      ballSettleTimer = null;
+    }
+    pauseBallBounce();
   }
   if (ballTrashEl) ballTrashEl.innerHTML = Icons.trash(24);
   if (ballEl) {
