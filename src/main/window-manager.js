@@ -1201,9 +1201,9 @@ function openUpdateWindow() {
     frame: false,
     resizable: false,
     movable: true,
-    minimizable: false,
+    // 自绘红绿灯：只保留「最小化」，关闭 / 缩放禁用（另见 update.html 的禁用样式）。
+    minimizable: true,
     maximizable: false,
-    // 不可关闭：没有关闭按钮，也不响应 Cmd-W / 关闭事件。
     closable: false,
     fullscreenable: false,
     alwaysOnTop: true,

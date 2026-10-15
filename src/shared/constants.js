@@ -171,7 +171,7 @@ const FILE_WINDOW = Object.assign(
 const UPDATE_WINDOW = Object.assign(
   {
     width: 380,
-    height: 184,
+    height: 160,
   },
   ships.updateWindow || {}
 );

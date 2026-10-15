@@ -43,7 +43,19 @@
     status: document.getElementById('update-status'),
     cancel: document.getElementById('update-cancel'),
     install: document.getElementById('update-install'),
+    lightMinimize: document.getElementById('light-minimize'),
   };
+
+  // 自绘红绿灯：仅「最小化」生效（关闭 / 缩放已禁用）；窗口失焦时整体变灰。
+  if (dom.lightMinimize) {
+    dom.lightMinimize.addEventListener('click', () => window.ships.windowControl('minimize'));
+  }
+  function syncWindowFocus() {
+    document.documentElement.dataset.windowFocus = document.hasFocus() ? 'on' : 'off';
+  }
+  window.addEventListener('focus', syncWindowFocus);
+  window.addEventListener('blur', syncWindowFocus);
+  syncWindowFocus();
 
   dom.cancel.textContent = i18n.t('updateWin.cancel');
   dom.install.textContent = i18n.t('updateWin.install');
@@ -55,7 +67,9 @@
     window.ships.update.cancel();
   });
   dom.install.addEventListener('click', () => {
-    dom.install.disabled = true;
+    // 重启开始：立即禁用「重启更新」与「取消」。
+    current = merge({ restarting: true });
+    render(current);
     window.ships.update.install();
   });
 
@@ -86,10 +100,13 @@
   function render(state) {
     if (!state) return;
     const version = state.version ? ` v${state.version}` : '';
+    // 重启进行中（点了「重启更新」或倒计时到 0）：取消按钮一并禁用。
+    const restarting = state.restarting === true;
+    dom.cancel.disabled = restarting;
     if (state.phase === 'downloaded') {
       dom.title.textContent = `${i18n.t('updateWin.downloaded')}${version}`;
       dom.bar.style.width = '100%';
-      dom.install.disabled = false;
+      dom.install.disabled = restarting;
     } else if (state.phase === 'downloading') {
       dom.title.textContent = `${i18n.t('updateWin.downloading')}${version}`;
       dom.bar.style.width = `${Math.max(0, Math.min(100, state.percent || 0))}%`;
@@ -107,7 +124,16 @@
     return Object.assign({}, current, patch || {});
   }
 
-  let current = { phase: 'idle', version: '', percent: 0, transferred: 0, total: 0, bytesPerSecond: 0, countdown: 0 };
+  let current = {
+    phase: 'idle',
+    version: '',
+    percent: 0,
+    transferred: 0,
+    total: 0,
+    bytesPerSecond: 0,
+    countdown: 0,
+    restarting: false,
+  };
 
   window.ships.update.onProgress((state) => {
     current = merge(state);
@@ -118,7 +144,9 @@
     render(current);
   });
   window.ships.update.onCountdown((payload) => {
-    current = merge({ countdown: payload && payload.countdown });
+    const countdown = payload && payload.countdown;
+    // 倒计时到 0 即自动重启：同样禁用取消。
+    current = merge({ countdown, restarting: countdown <= 0 ? true : current.restarting });
     render(current);
   });
 

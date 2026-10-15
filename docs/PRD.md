@@ -582,7 +582,7 @@ flowchart TD
   - **仅打包后**的 macOS / Windows 生效（`app.isPackaged`）；开发模式不检查。
   - 启动后**静默检查一次**（延迟 5s，不打扰）；`autoDownload=false`、`autoInstallOnAppQuit=true`。
   - **提示后下载**：`update-available` → 弹窗「发现新版本 vX（当前 vY），现在下载吗？」→ 确认才 `downloadUpdate()`。
-  - **下载窗口**：确认下载后弹出一个**小型、不可关闭（`closable: false` + `frame: false`，无关闭按钮、Cmd-W 无效，仅退出应用时放行）、置顶居中的前台窗口** `update.html`（尺寸 `ships.updateWindow` = 380 × 184）。窗口只有：**实时进度条**（`download-progress` → `update:progress`）、**取消**、**「重启更新」按钮**（下载期间禁用）。下载完成后「重启更新」可用，并显示 **60 秒倒计时**（常量 `UPDATE_COUNTDOWN_SECONDS`）自动 `quitAndInstall()`；点「重启更新」立即安装。**取消 = 退出本次更新**：下载阶段 `CancellationToken.cancel()` 中止下载并关闭窗口，已完成则仅停止倒计时、不立即重启。**`autoInstallOnAppQuit` 必须为 `true`**：macOS 的 `MacUpdater` 只有在该标志为真时才会在下载完成时让 Squirrel 预取更新（否则 `quitAndInstall()` 会静默失败、点按钮无反应）；`MacUpdater` 不注册 JS 的 quit 安装钩子，因此为真也不会「取消后退出应用时自动安装」，安装仅由下载窗口的「重启更新」/ 倒计时触发。
+  - **下载窗口**：确认下载后弹出一个**小型、不可关闭（`closable: false` + `frame: false`，无关闭按钮、Cmd-W 无效，仅退出应用时放行）、可最小化、置顶居中的前台窗口** `update.html`（尺寸 `ships.updateWindow` = 380 × 160，见 §8.7）。窗口只有：顶部**自绘红绿灯**（仅「最小化」可用）、**实时进度条**（`download-progress` → `update:progress`）、**取消**、**「重启更新」按钮**（下载期间禁用）。下载完成后「重启更新」可用，并显示 **60 秒倒计时**（常量 `UPDATE_COUNTDOWN_SECONDS`）自动 `quitAndInstall()`；点「重启更新」立即安装。**取消 = 退出本次更新**：下载阶段 `CancellationToken.cancel()` 中止下载并关闭窗口，已完成则仅停止倒计时、不立即重启。**`autoInstallOnAppQuit` 必须为 `true`**：macOS 的 `MacUpdater` 只有在该标志为真时才会在下载完成时让 Squirrel 预取更新（否则 `quitAndInstall()` 会静默失败、点按钮无反应）；`MacUpdater` 不注册 JS 的 quit 安装钩子，因此为真也不会「取消后退出应用时自动安装」，安装仅由下载窗口的「重启更新」/ 倒计时触发。**兜底重启**：调用 `quitAndInstall()` 后若 6 秒内应用仍未退出（未签名构建下 Squirrel 会静默失败），则 `app.relaunch()` + `app.quit()` 强制重启，保证按钮有可见效果；真正的安装仍需稳定签名。
   - **下载失败**：仅在日志记录详细错误，并关闭下载窗口、给一句友好提示。
   - **手动检查**：设置 → Ships → 关于「检查更新」（`app:check-updates`）触发，会提示「已是最新 / 暂时无法检查」；**每次点击都必须有反馈**（有新版本同样会重新弹窗，反复点击不会静默无响应）；检查进行中再次点击返回 `{ ok: true, checking: true }`，界面就地提示「正在检查…」。**出错时不报技术错误**：手动检查给一句友好提示（详情写日志），启动时的静默检查出错则完全不提示。
   - **差量下载**：依赖发布时随产物上传的 `*.zip.blockmap` 与 `latest-mac.yml`；旧版本通过更新器安装过才可差量，否则整包。
@@ -657,9 +657,10 @@ flowchart TD
 
 ### 8.7 更新下载窗口
 
-- 尺寸 **380 × 184**（`package.json` 的 `ships.updateWindow` → `constants.js` 的 `UPDATE_WINDOW`）；无边框（`frame: false`）、不可缩放 / 最小化、**不可关闭**（`closable: false`，无关闭按钮、Cmd-W 无效，仅应用退出 / `quitAndInstall` 时放行）、置顶（`alwaysOnTop`）并**居中**显示。
-- 结构（`update.html`）：标题（下载中「正在下载更新 vX」/ 完成「下载完成 vX」）→ **进度条** `update-progress`（宽 = `percent`）→ 状态行（`已下载 / 总量 · 速度`，完成时显示「N 秒后自动重启更新」）→ 底部按钮「取消」与「**重启更新**」（下载期间禁用）。整窗为拖拽区、按钮为 `no-drag`。
-- 行为见 §6.6 / §7：进度实时回填；下载完成后重启按钮可用并显示 60 秒倒计时（到点自动重启安装）；取消 = 退出本次更新。
+- 尺寸 **380 × 160**（`package.json` 的 `ships.updateWindow` → `constants.js` 的 `UPDATE_WINDOW`）；无边框（`frame: false`）、不可缩放、**不可关闭**（`closable: false`，无关闭按钮、Cmd-W 无效，仅应用退出 / `quitAndInstall` 时放行）、置顶（`alwaysOnTop`）并**居中**显示。**可最小化**（`minimizable: true`）。
+- 顶部**自绘红绿灯**（`#update-lights`，9px 圆点，与终端窗口同一套 `.traffic-light` 样式 / 失焦变灰）：**只保留「最小化」可用**，关闭 / 缩放用 `.traffic-disabled` 置灰且不可点；最小化经 `window:control` 生效。
+- 结构（`update.html`）：红绿灯 → 标题（下载中「正在下载更新 vX」/ 完成「下载完成 vX」）→ **进度条** `update-progress`（宽 = `percent`）→ 状态行（`已下载 / 总量 · 速度`，完成时显示「N 秒后自动重启更新」）→ 底部按钮「取消」与「**重启更新**」（「重启更新」下载期间禁用；**一旦触发重启——点「重启更新」或倒计时到 0——「取消」与「重启更新」一并禁用**；两者紧贴状态行、无多余留白）。整窗为拖拽区、红绿灯与按钮为 `no-drag`。
+- 行为见 §6.6 / §7：进度实时回填；下载完成后重启按钮可用并显示 60 秒倒计时（到点自动重启安装）；取消 = 退出本次更新。**「重启更新」调用 `quitAndInstall()`；若 6 秒内应用仍未退出（如未签名构建下 Squirrel 静默失败），兜底 `app.relaunch()` + `app.quit()` 强制重启**（真正的安装仍需稳定签名，见 §7）。
 
 ---
 
@@ -714,7 +715,7 @@ flowchart TD
 | --- | --- |
 | 面板尺寸 | 400 × 500 |
 | 设置窗口尺寸 | 800 × 600 |
-| 更新下载窗口尺寸 | 380 × 184（`ships.updateWindow`） |
+| 更新下载窗口尺寸 | 380 × 160（`ships.updateWindow`） |
 | `--tabbar-height` | 46px |
 | `--footer-height` | 34px |
 | `--term-header-height` | 22px（终端窗口头栏最小高度，刚好放下自绘小红绿灯；实际为 `max(22px, --term-header-font-size + 6px)`） |

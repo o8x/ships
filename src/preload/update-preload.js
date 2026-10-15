@@ -12,6 +12,8 @@ function on(channel, cb) {
 const api = {
   getSettings: () => ipcRenderer.invoke(IPC.SETTINGS_GET),
   onThemeChanged: (cb) => on(IPC.THEME_CHANGED, cb),
+  // 自绘红绿灯：仅「最小化」可用（关闭 / 缩放按钮在界面上禁用）。
+  windowControl: (action) => ipcRenderer.invoke(IPC.WINDOW_CONTROL, { action }),
   update: {
     state: () => ipcRenderer.invoke(IPC.UPDATE_STATE),
     cancel: () => ipcRenderer.invoke(IPC.UPDATE_CANCEL),

@@ -76,7 +76,8 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
-  .btn:disabled:hover {
+  /* 仅普通按钮在禁用悬浮时回退底色；强调按钮保持自身底色（否则会变成近白的 surface-2）。 */
+  .btn:not(.btn-accent):disabled:hover {
     background: var(--color-surface-2);
   }
   .btn-accent {
@@ -1501,9 +1502,20 @@ body.file-window {
   flex-direction: column;
   height: 100%;
   box-sizing: border-box;
-  padding: 22px 22px 18px;
-  gap: 12px;
+  padding: 12px 16px 14px;
+  gap: 8px;
   -webkit-app-region: drag;
+}
+.update-head {
+  display: flex;
+  align-items: center;
+  height: 14px;
+  -webkit-app-region: no-drag;
+}
+#update-lights {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .update-title {
   margin: 0;
@@ -1529,7 +1541,7 @@ body.file-window {
   color: var(--color-fg-muted);
 }
 .update-actions {
-  margin-top: auto;
+  margin-top: 2px;
   display: flex;
   justify-content: flex-end;
   gap: 8px;

@@ -146,11 +146,40 @@ function installNow() {
   // 放行下载窗口的 close 拦截，避免拖住退出。
   const win = wm.getUpdateWindow();
   if (win) win.__forceClose = true;
+
+  // 兜底重启：某些环境（例如未签名 / ad-hoc 构建）Squirrel 会静默失败、应用完全不退出，
+  // 表现为点了「重启更新」毫无反应。若数秒后应用仍未退出，则强制重启（真正的安装仍需
+  // 稳定 Developer ID 签名，见 PRD §7）。
+  let fallback = setTimeout(() => {
+    fallback = null;
+    logger.warn('[updater] quitAndInstall had no effect; forcing relaunch');
+    try {
+      app.relaunch();
+    } catch (err) {
+      /* ignore */
+    }
+    app.quit();
+  }, 6000);
+  const clearFallback = () => {
+    if (fallback) {
+      clearTimeout(fallback);
+      fallback = null;
+    }
+  };
+  if (typeof app.once === 'function') app.once('before-quit', clearFallback);
+
   setImmediate(() => {
     try {
       autoUpdater.quitAndInstall();
     } catch (err) {
       logger.warn('[updater] quitAndInstall failed:', (err && err.message) || err);
+      clearFallback();
+      try {
+        app.relaunch();
+      } catch (e) {
+        /* ignore */
+      }
+      app.quit();
     }
   });
 }
