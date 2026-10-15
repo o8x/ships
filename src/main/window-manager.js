@@ -5,6 +5,7 @@ const path = require('path');
 const { BrowserWindow, screen, nativeTheme, app } = require('electron');
 const {
   WINDOW,
+  MAIN_WINDOW,
   SETTINGS_WINDOW,
   TERMINAL_WINDOW,
   FILE_WINDOW,
@@ -13,7 +14,7 @@ const {
   IPC,
 } = require('../shared/constants');
 const settings = require('./services/settings-service');
-const { TERMINAL_WINDOW_FILE, FILE_WINDOW_FILE } = require('./utils/paths');
+const { TERMINAL_WINDOW_FILE, FILE_WINDOW_FILE, MAIN_WINDOW_FILE } = require('./utils/paths');
 const { readJson, writeJson } = require('./utils/json-store');
 const { clampNumber, displaySignature, displayBySignature, clampBounds } = require('./utils/window-geometry');
 const logger = require('./utils/logger');
@@ -111,6 +112,11 @@ function applyThemeBackgrounds() {
   // 终端窗口是透明无边框（底色由渲染层 #term-shell 画），不设原生 backgroundColor。
   for (const win of [getSettingsWindow(), getFileWindow(), getUpdateWindow()]) {
     if (win && !win.isDestroyed()) win.setBackgroundColor(color);
+  }
+  // 窗口模式的主窗口是不透明标准窗口，底色也要跟随主题（避免拖动露白）。
+  if (isWindowMode()) {
+    const mw = getMainWindow();
+    if (mw && !mw.isDestroyed()) mw.setBackgroundColor(color);
   }
 }
 
@@ -613,9 +619,81 @@ function setTray(tray) {
   trayRef = tray;
 }
 
+/* ------------------------------- 主窗口模式 -------------------------------
+   悬浮模式（settings.floatMode = true）：托盘下方的无边框透明弹出面板（原行为）。
+   窗口模式（默认，floatMode = false）：当前桌面中央的标准窗口，普通层级、不跨桌面，
+   位置 / 尺寸记入 main-window.json，下次还原；关闭按钮 = 隐藏（应用常驻托盘）。 */
+function isFloatMode() {
+  return settings.get('floatMode') === true;
+}
+
+function isWindowMode() {
+  return !isFloatMode();
+}
+
+let mainWindowState = readJson(MAIN_WINDOW_FILE, null);
+let mainWindowGeometryTimer = null;
+
+function mainWindowSize() {
+  return {
+    width: clampNumber(MAIN_WINDOW.width, MAIN_WINDOW.minWidth, MAIN_WINDOW.maxWidth, MAIN_WINDOW.width),
+    height: clampNumber(MAIN_WINDOW.height, MAIN_WINDOW.minHeight, MAIN_WINDOW.maxHeight, MAIN_WINDOW.height),
+  };
+}
+
+/* 有记忆且记忆的屏幕还在 → 沿用位置 / 尺寸；否则在鼠标所在屏幕居中。 */
+function mainWindowBoundsForOpen() {
+  const size = mainWindowSize();
+  const min = { width: MAIN_WINDOW.minWidth, height: MAIN_WINDOW.minHeight };
+  const saved = mainWindowState && mainWindowState.bounds ? mainWindowState : null;
+  const matched = saved ? displayBySignature(screen.getAllDisplays(), saved.display) : null;
+  if (matched) return clampBounds(saved.bounds, matched, size, min);
+  return clampBounds(null, anchorDisplay(), size, min);
+}
+
+function saveMainWindowGeometry() {
+  if (!isWindowMode()) return;
+  const win = getMainWindow();
+  if (!win || win.isDestroyed() || win.isMinimized() || win.isFullScreen()) return;
+  const bounds = win.getBounds();
+  const next = {
+    display: displaySignature(screen.getDisplayMatching(bounds)),
+    bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
+  };
+  if (!next.display) return;
+  if (JSON.stringify(next) === JSON.stringify(mainWindowState)) return;
+  mainWindowState = next;
+  writeJson(MAIN_WINDOW_FILE, mainWindowState);
+}
+
+function scheduleMainWindowGeometrySave() {
+  if (mainWindowGeometryTimer) clearTimeout(mainWindowGeometryTimer);
+  mainWindowGeometryTimer = setTimeout(() => {
+    mainWindowGeometryTimer = null;
+    saveMainWindowGeometry();
+  }, 400);
+}
+
+function forgetMainWindowGeometry() {
+  mainWindowState = null;
+  if (mainWindowGeometryTimer) {
+    clearTimeout(mainWindowGeometryTimer);
+    mainWindowGeometryTimer = null;
+  }
+  try {
+    fs.rmSync(MAIN_WINDOW_FILE, { force: true });
+  } catch (err) {
+    /* ignore */
+  }
+}
+
 function createMainWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
+  return isFloatMode() ? createFloatWindow() : createWindowWindow();
+}
 
+/* 悬浮模式：托盘下方的无边框透明面板。 */
+function createFloatWindow() {
   const mode = glassMode();
   const glassOptions =
     mode === 'vibrancy' ? { vibrancy: VIBRANCY.type, visualEffectState: VIBRANCY.state } : {};
@@ -683,6 +761,65 @@ function createMainWindow() {
   return mainWindow;
 }
 
+/* 窗口模式：当前桌面中央的标准窗口（hiddenInset 标题栏 + 系统红绿灯）。 */
+function createWindowWindow() {
+  const bounds = mainWindowBoundsForOpen();
+  mainWindow = new BrowserWindow({
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    minWidth: MAIN_WINDOW.minWidth,
+    minHeight: MAIN_WINDOW.minHeight,
+    maxWidth: MAIN_WINDOW.maxWidth,
+    maxHeight: MAIN_WINDOW.maxHeight,
+    title: 'Ships',
+    show: false,
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 14, y: 16 },
+    resizable: true,
+    movable: true,
+    minimizable: true,
+    maximizable: false,
+    fullscreenable: false,
+    // 普通层级、不置顶；固定在自己的桌面（不加入所有桌面）。
+    alwaysOnTop: false,
+    backgroundColor: themeBackgroundColor(),
+    webPreferences: {
+      preload: path.join(PRELOAD_DIR, 'main-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      spellcheck: false,
+    },
+  });
+
+  mainWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
+  mainWindow.loadFile(path.join(RENDERER_DIR, 'index.html'));
+  mainWindow.webContents.setZoomFactor(1);
+  mainWindow.webContents.on('did-finish-load', () => {
+    try {
+      mainWindow.webContents.setZoomFactor(1);
+    } catch (err) {
+      /* ignore */
+    }
+  });
+  mainWindow.on('resize', scheduleMainWindowGeometrySave);
+  mainWindow.on('move', scheduleMainWindowGeometrySave);
+  // 关闭按钮 = 隐藏（应用常驻托盘）；退出应用时才真正关闭。
+  mainWindow.on('close', (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    saveMainWindowGeometry();
+    mainWindow.hide();
+  });
+  mainWindow.on('closed', function onClosed() {
+    if (mainWindow === this) mainWindow = null;
+  });
+
+  return mainWindow;
+}
+
 function getMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return null;
   return mainWindow;
@@ -715,6 +852,22 @@ function positionUnderTray() {
 function showMainWindow() {
   // Menu bar app: only open from the tray (ignore launch-time activation).
   if (!trayRef) return;
+  if (isWindowMode()) {
+    // 窗口模式：显示并聚焦；若它在别的桌面，聚焦 / 激活会让系统切到它所在的桌面。
+    if (process.platform === 'darwin' && typeof app.focus === 'function') {
+      try {
+        app.focus({ steal: true });
+      } catch (err) {
+        /* ignore */
+      }
+    }
+    const win = getMainWindow() || createMainWindow();
+    if (win.isMinimized && win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    if (typeof win.moveTop === 'function') win.moveTop();
+    return;
+  }
   const win = getMainWindow() || createMainWindow();
   const pinned = Boolean(settings.get('pinWindow'));
   if (!pinned || !pinnedPositioned) positionUnderTray();
@@ -728,9 +881,20 @@ function showMainWindow() {
   if (pinned) pinnedPositioned = true;
 }
 
+// 切换「悬浮模式 / 窗口模式」：窗口创建项不同，需销毁重建（此时主窗口通常已隐藏）。
+function rebuildMainWindowForMode() {
+  const win = getMainWindow();
+  if (win) win.destroy();
+  mainWindow = null;
+  pinnedPositioned = false;
+  createMainWindow();
+}
+
 // Applies the pin (keep-on-top) behavior: when pinned the popover can be moved
 // and keeps its position; when unpinned it hides and resets to the tray anchor.
+// 仅悬浮模式有效。
 function applyPin(pinned) {
+  if (isWindowMode()) return;
   const win = getMainWindow();
   if (win && win.setMovable) win.setMovable(Boolean(pinned));
   if (pinned) {
@@ -745,8 +909,9 @@ function applyPin(pinned) {
 // Toggle the native frosted glass. `vibrancy` and `roundedCorners` are
 // creation-time only (and must match so the material is clipped correctly),
 // so rebuild the popover — it is hidden while the settings window is open.
+// 仅悬浮模式有效（窗口模式是普通窗口，无毛玻璃）。
 function applyVibrancy() {
-  if (process.platform !== 'darwin') return;
+  if (process.platform !== 'darwin' || isWindowMode()) return;
   const win = getMainWindow();
   if (!win || win.isDestroyed()) return;
   if (win.isVisible()) win.hide();
@@ -761,6 +926,11 @@ function hideMainWindow() {
 }
 
 function toggleMainWindow() {
+  if (isWindowMode()) {
+    // 窗口模式：始终「显示 / 带到前台」（再次点击切到它所在的桌面），不做隐藏切换。
+    showMainWindow();
+    return;
+  }
   const win = getMainWindow() || createMainWindow();
   if (win.isVisible()) {
     hideMainWindow();
@@ -1279,6 +1449,7 @@ settings.on('changed', (_data, keys) => {
     return;
   }
   if (keys.includes('theme')) applyThemeBackgrounds();
+  if (keys.includes('floatMode')) rebuildMainWindowForMode();
   if (keys.includes('terminalWindowWidth') || keys.includes('terminalWindowHeight')) {
     applyTerminalWindowSize();
   }
@@ -1296,6 +1467,7 @@ module.exports = {
   showMainWindow,
   hideMainWindow,
   toggleMainWindow,
+  forgetMainWindowGeometry,
   openSettingsWindow,
   closeSettingsWindow,
   getSettingsWindow,

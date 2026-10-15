@@ -15,6 +15,7 @@ const {
   FILE_LAYOUT_FILE,
   FILE_WINDOW_LAYOUT_FILE,
   CD_HISTORY_FILE,
+  MAIN_WINDOW_FILE,
 } = require('../utils/paths');
 
 function registerAppIpc(ipcMain) {
@@ -65,6 +66,7 @@ function registerAppIpc(ipcMain) {
   // 不动 settings.json（偏好 / 业务设置）、日志与 ~/.ssh/config。
   ipcMain.handle(IPC.CLEAR_DATA, () => {
     const files = [
+      MAIN_WINDOW_FILE,
       TERMINAL_WINDOW_FILE,
       FILE_WINDOW_FILE,
       FILE_LAYOUT_FILE,

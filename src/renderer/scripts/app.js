@@ -53,7 +53,7 @@
     header.appendChild(el('div', { class: 'tool-head-desc' }, i18n.t(`toolDesc.${id}`)));
     dom.content.appendChild(header);
 
-    const body = el('div', {});
+    const body = el('div', { class: 'tool-body' });
     dom.content.appendChild(body);
 
     try {
@@ -106,6 +106,13 @@
   }
 
   function updatePin() {
+    // 图钉只在悬浮模式有意义；窗口模式隐藏。
+    if (isWindowMode()) {
+      dom.pin.style.display = 'none';
+      dom.brand.classList.remove('brand-drag');
+      return;
+    }
+    dom.pin.style.display = '';
     const pinned = Boolean(state.settings.pinWindow);
     dom.pin.innerHTML = Icons.pin(15);
     dom.pin.setAttribute('data-tip', i18n.t(pinned ? 'common.unpin' : 'common.pin'));
@@ -153,12 +160,18 @@
     renderThemeButton();
   }
 
+  function isWindowMode() {
+    return state.settings.floatMode !== true;
+  }
+
   function applySettings(settings) {
     state.settings = settings || {};
     i18n.setLocale(state.settings.locale || 'zh');
     window.ShipsTheme.set(state.settings);
-    // Glass is macOS-only; on other platforms keep the opaque surfaces.
-    const glass = Boolean(state.settings.vibrancy) && state.platform === 'darwin';
+    // 悬浮 / 窗口模式：供 CSS 切换外观（圆角、内容多列、红绿灯留白等）。
+    document.documentElement.setAttribute('data-window-mode', isWindowMode() ? 'window' : 'float');
+    // Glass 仅 macOS + 悬浮模式；窗口模式是普通窗口，保持不透明。
+    const glass = Boolean(state.settings.vibrancy) && state.platform === 'darwin' && !isWindowMode();
     document.documentElement.setAttribute('data-vibrancy', glass ? 'on' : 'off');
     renderDevBadge();
   }

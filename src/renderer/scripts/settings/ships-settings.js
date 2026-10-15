@@ -9,7 +9,7 @@
     zh: {
       settingsPage: {
         title: '设置',
-        ships: 'Ships 设置',
+        ships: '应用设置',
         ssh: 'SSH',
         language: '语言',
         languageHint: '界面显示语言',
@@ -23,8 +23,10 @@
         accentCustom: '自定义',
         launchAtLogin: '开机自启',
         launchAtLoginHint: '登录时自动启动 Ships',
+        floatMode: '悬浮模式',
+        floatModeHint: '开 = 托盘下方弹出面板（悬浮）；关 = 独立的窗口模式（默认）',
         pin: '固定悬浮',
-        pinHint: '主界面置顶常驻，失焦不自动隐藏',
+        pinHint: '主界面置顶常驻，失焦不自动隐藏（仅悬浮模式）',
         vibrancy: 'Liquid Glass',
         vibrancyHint: '主界面使用 macOS 原生 Liquid Glass 背景（macOS 26+，旧系统回退毛玻璃）',
         clipboardLimit: '剪贴板条数',
@@ -54,7 +56,7 @@
     en: {
       settingsPage: {
         title: 'Settings',
-        ships: 'Ships',
+        ships: 'Application',
         ssh: 'SSH',
         language: 'Language',
         languageHint: 'Interface language',
@@ -68,8 +70,10 @@
         accentCustom: 'Custom',
         launchAtLogin: 'Launch at login',
         launchAtLoginHint: 'Start Ships when you log in',
+        floatMode: 'Floating mode',
+        floatModeHint: 'On = popover under the tray; Off = a standalone window (default)',
         pin: 'Keep on top',
-        pinHint: 'Pin the popover and never auto-hide on blur',
+        pinHint: 'Pin the popover and never auto-hide on blur (floating mode only)',
         vibrancy: 'Liquid Glass',
         vibrancyHint: 'Use the native macOS Liquid Glass background (macOS 26+, with fallback)',
         clipboardLimit: 'Clipboard items',
@@ -193,6 +197,12 @@
     const loginSwitch = switchControl(settings.launchAtLogin, (value) => patch({ launchAtLogin: value }));
     generalSection.appendChild(
       row(i18n.t('settingsPage.launchAtLogin'), i18n.t('settingsPage.launchAtLoginHint'), loginSwitch.root)
+    );
+
+    // 主界面模式：悬浮（托盘弹出面板）/ 窗口（默认，独立标准窗口）。
+    const floatSwitch = switchControl(settings.floatMode === true, (value) => patch({ floatMode: value }));
+    generalSection.appendChild(
+      row(i18n.t('settingsPage.floatMode'), i18n.t('settingsPage.floatModeHint'), floatSwitch.root)
     );
 
     const pinSwitch = switchControl(settings.pinWindow, (value) => patch({ pinWindow: value }));

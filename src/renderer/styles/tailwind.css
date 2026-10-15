@@ -1342,6 +1342,40 @@ body.file-window {
   color: var(--color-fg-muted);
 }
 
+/* 主面板（悬浮模式：圆角浮层）。窗口模式下取消圆角（见文末窗口模式规则）。 */
+#panel {
+  border-radius: var(--radius-window);
+}
+
+/* 窗口模式（设置 · 悬浮模式 = 关）：主界面是独立的普通窗口。
+   - 顶部让出系统红绿灯位置，标题栏区域可拖动；
+   - 内容区加宽，工具内容自适应多列（auto-fit：单项自动铺满、多项自动分栏）。 */
+[data-window-mode='window'] body {
+  background: var(--color-bg);
+}
+[data-window-mode='window'] #panel {
+  border-radius: 0;
+}
+[data-window-mode='window'] #tabbar {
+  padding-left: 80px;
+  -webkit-app-region: drag;
+}
+[data-window-mode='window'] #tablist {
+  -webkit-app-region: no-drag;
+}
+[data-window-mode='window'] #content {
+  padding: 16px 20px 20px;
+}
+[data-window-mode='window'] .tool-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+[data-window-mode='window'] .tool-body > .section {
+  margin-bottom: 0;
+}
+
 /* Uniform vertical rhythm: sections are 10px apart, children 10px apart. */
 .section {
   display: flex;

@@ -137,6 +137,19 @@ const SETTINGS_WINDOW = Object.assign(
   ships.settingsWindow || {}
 );
 
+// 窗口模式（非悬浮）的主窗口：居中显示的标准窗口，默认 / 最小 640×480，最大 1440×900。
+const MAIN_WINDOW = Object.assign(
+  {
+    width: 640,
+    height: 480,
+    minWidth: 640,
+    minHeight: 480,
+    maxWidth: 1440,
+    maxHeight: 900,
+  },
+  ships.mainWindow || {}
+);
+
 // Always-on-top terminal window (floats above full-screen apps, Steam-style).
 const TERMINAL_WINDOW = Object.assign(
   {
@@ -198,6 +211,8 @@ const DEFAULT_SETTINGS = {
   theme: ships.defaultTheme || 'system',
   accent: ships.defaultAccent || '#2e6bfc',
   launchAtLogin: false,
+  // 主界面模式：false = 窗口模式（默认，居中标准窗口）；true = 悬浮模式（托盘下方弹出面板）。
+  floatMode: false,
   pinWindow: false,
   vibrancy: false,
   // 开发者模式：开启后设置页才显示「开发者」工具区，主界面版本号旁显示标记。
@@ -239,6 +254,7 @@ module.exports = {
   ships,
   IPC,
   WINDOW,
+  MAIN_WINDOW,
   SETTINGS_WINDOW,
   TERMINAL_WINDOW,
   FILE_WINDOW,
