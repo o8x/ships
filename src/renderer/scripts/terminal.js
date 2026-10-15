@@ -61,7 +61,6 @@
   const ballEl = document.getElementById('term-ball');
   const ballIconEl = document.getElementById('term-ball-icon');
   const ballTrashEl = document.getElementById('term-ball-trash');
-  const ballTimerEl = document.getElementById('term-ball-timer');
   const ballTimerHmEl = document.getElementById('term-ball-timer-hm');
   const ballTimerSEl = document.getElementById('term-ball-timer-s');
   const pinBtn = document.getElementById('term-pin');
@@ -679,59 +678,63 @@
     return /ms$/.test(raw) ? value : value * 1000;
   }
   let ballBounceOn = false; // 是否正在播放弹跳
-  let ballBounceStartedAt = 0; // 本轮播放起始时间（算相位用）
+  let ballBounceStartedAt = 0; // 本轮播放起始时间（算相位与累计时长）
   let ballIdleTimer = null; // 无输出满 1s 的计时
   let ballSettleTimer = null; // 「走到循环边界再停」的计时
-  let ballClockTimer = null; // 后台累计跳动时长的刷新计时
+  let ballHovered = false; // 鼠标是否悬停在球上（由 pointerenter/leave 维护，不依赖 :hover 轮询）
+  let ballClockRaf = null; // 悬停显示时的刷新帧（只在可见时运行）
   // 本轮累计跳动时长（自开始跳动起）；停止跳动即清空（见 pauseBallBounce）。
   function ballElapsedMs() {
     return ballBounceOn ? Math.max(0, performance.now() - ballBounceStartedAt) : 0;
   }
-  // 拆成上行 h/m（非 0 才显示）与下行 s。
+  // 拆成上行 h/m（非 0 才显示）与下行 s（秒不到两位不补前导 0：5s 而非 05s）。
   function formatBallClock(ms) {
     const total = Math.floor(ms / 1000);
     const h = Math.floor(total / 3600);
     const m = Math.floor((total % 3600) / 60);
     const s = total % 60;
     const hm = `${h > 0 ? `${String(h).padStart(2, '0')}h` : ''}${m > 0 ? `${String(m).padStart(2, '0')}m` : ''}`;
-    return { hm, s: `${String(s).padStart(2, '0')}s` };
+    return { hm, s: `${s}s` };
   }
-  // 悬停在球上且正在跳动 → 显示累计时长；否则隐藏（垃圾桶状态下不显示）。
-  function syncBallClock() {
+  function setBallTimerVisible(on) {
+    const next = on ? 'on' : 'off';
+    if (document.documentElement.dataset.ballTimer !== next) {
+      document.documentElement.dataset.ballTimer = next;
+    }
+  }
+  // 悬停在球上且正在跳动 → 逐帧刷新累计时长；否则隐藏（垃圾桶状态下不显示）。
+  function tickBallClock() {
+    ballClockRaf = null;
     const show =
-      ballBounceOn &&
-      ballEl &&
-      ballEl.matches(':hover') &&
-      document.documentElement.dataset.ballTrash !== 'on';
-    document.documentElement.dataset.ballTimer = show ? 'on' : 'off';
+      ballBounceOn && ballHovered && document.documentElement.dataset.ballTrash !== 'on';
+    setBallTimerVisible(show);
     if (!show) return;
     const clock = formatBallClock(ballElapsedMs());
     if (ballTimerHmEl) ballTimerHmEl.textContent = clock.hm;
     if (ballTimerSEl) ballTimerSEl.textContent = clock.s;
+    ballClockRaf = requestAnimationFrame(tickBallClock);
+  }
+  function syncBallClock() {
+    if (ballClockRaf == null) tickBallClock();
   }
   function startBallBounce() {
     if (ballBounceOn || !ballEl) return;
     ballBounceOn = true;
     ballBounceStartedAt = performance.now();
     ballEl.classList.add('term-ball-bounce');
-    // 后台计时：每秒刷新一次（只在鼠标悬停时真正更新显示）。
-    if (ballClockTimer) clearInterval(ballClockTimer);
-    ballClockTimer = setInterval(syncBallClock, 1000);
     syncBallClock();
   }
   function pauseBallBounce() {
     if (ballEl) ballEl.classList.remove('term-ball-bounce');
     ballBounceOn = false;
     // 停止跳动 → 清空计时器与显示。
-    if (ballClockTimer) {
-      clearInterval(ballClockTimer);
-      ballClockTimer = null;
+    if (ballClockRaf != null) {
+      cancelAnimationFrame(ballClockRaf);
+      ballClockRaf = null;
     }
-    if (ballTimerEl) {
-      if (ballTimerHmEl) ballTimerHmEl.textContent = '';
-      if (ballTimerSEl) ballTimerSEl.textContent = '';
-    }
-    document.documentElement.dataset.ballTimer = 'off';
+    if (ballTimerHmEl) ballTimerHmEl.textContent = '';
+    if (ballTimerSEl) ballTimerSEl.textContent = '';
+    setBallTimerVisible(false);
   }
   function pulseBall() {
     if (!ballMode || !ballEl) return;
@@ -781,8 +784,14 @@
       syncBallClock();
     };
     // 悬停：显示本轮累计跳动时长（停止跳动时不显示）。
-    ballEl.addEventListener('pointerenter', syncBallClock);
-    ballEl.addEventListener('pointerleave', syncBallClock);
+    ballEl.addEventListener('pointerenter', () => {
+      ballHovered = true;
+      syncBallClock();
+    });
+    ballEl.addEventListener('pointerleave', () => {
+      ballHovered = false;
+      syncBallClock();
+    });
     // 球上右键 → 悬浮垃圾桶图标；再点一下球 → 销毁终端。
     ballEl.addEventListener('contextmenu', (event) => {
       event.preventDefault();
