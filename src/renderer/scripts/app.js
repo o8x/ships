@@ -170,8 +170,8 @@
     window.ShipsTheme.set(state.settings);
     // 悬浮 / 窗口模式：供 CSS 切换外观（圆角、内容多列、红绿灯留白等）。
     document.documentElement.setAttribute('data-window-mode', isWindowMode() ? 'window' : 'float');
-    // Glass 仅 macOS + 悬浮模式；窗口模式是普通窗口，保持不透明。
-    const glass = Boolean(state.settings.vibrancy) && state.platform === 'darwin' && !isWindowMode();
+    // Glass 仅 macOS；悬浮与窗口模式都生效。
+    const glass = Boolean(state.settings.vibrancy) && state.platform === 'darwin';
     document.documentElement.setAttribute('data-vibrancy', glass ? 'on' : 'off');
     renderDevBadge();
   }

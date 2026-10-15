@@ -120,8 +120,8 @@ function applyThemeBackgrounds() {
   for (const win of [getSettingsWindow(), getFileWindow(), getUpdateWindow()]) {
     if (win && !win.isDestroyed()) win.setBackgroundColor(color);
   }
-  // 窗口模式的主窗口是不透明标准窗口，底色也要跟随主题（避免拖动露白）。
-  if (isWindowMode()) {
+  // 窗口模式的主窗口：仅「无玻璃」时不透明，底色跟随主题（避免拖动露白）；玻璃开启时保持透明。
+  if (isWindowMode() && glassMode() === 'off') {
     const mw = getMainWindow();
     if (mw && !mw.isDestroyed()) mw.setBackgroundColor(color);
   }
@@ -799,6 +799,10 @@ function createFloatWindow() {
 /* 窗口模式：当前桌面中央的标准窗口（hiddenInset 标题栏 + 系统红绿灯）。 */
 function createWindowWindow() {
   const bounds = mainWindowBoundsForOpen();
+  // Liquid Glass / 毛玻璃在窗口模式同样生效（与悬浮模式一致）。
+  const glass = glassMode();
+  const glassOptions =
+    glass === 'vibrancy' ? { vibrancy: VIBRANCY.type, visualEffectState: VIBRANCY.state } : {};
   mainWindow = new BrowserWindow({
     x: bounds.x,
     y: bounds.y,
@@ -817,7 +821,10 @@ function createWindowWindow() {
     // 像终端窗口一样的置顶悬浮 panel：可浮在全屏应用之上，但**不加入所有桌面**
     // （固定在自己的桌面，切换桌面时不跟随）。
     alwaysOnTop: true,
-    backgroundColor: themeBackgroundColor(),
+    // 玻璃开启时窗口透明（vibrancy 材质 / 原生玻璃视图透出），否则用主题底色。
+    transparent: glass !== 'off',
+    ...glassOptions,
+    backgroundColor: glass !== 'off' ? '#00000000' : themeBackgroundColor(),
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'main-preload.js'),
       contextIsolation: true,
@@ -839,6 +846,10 @@ function createWindowWindow() {
       /* ignore */
     }
   });
+  if (glass === 'liquid') {
+    const win = mainWindow;
+    win.webContents.once('did-finish-load', () => applyLiquidGlass(win));
+  }
   // 获得焦点时重申「固定在自己的桌面」（此刻窗口就在活动桌面，与终端窗口一致）。
   mainWindow.on('focus', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -957,9 +968,9 @@ function applyPin(pinned) {
 // Toggle the native frosted glass. `vibrancy` and `roundedCorners` are
 // creation-time only (and must match so the material is clipped correctly),
 // so rebuild the popover — it is hidden while the settings window is open.
-// 仅悬浮模式有效（窗口模式是普通窗口，无毛玻璃）。
+// 悬浮模式与窗口模式都支持：切换时销毁重建窗口（此时通常已隐藏）。
 function applyVibrancy() {
-  if (process.platform !== 'darwin' || isWindowMode()) return;
+  if (process.platform !== 'darwin') return;
   const win = getMainWindow();
   if (!win || win.isDestroyed()) return;
   if (win.isVisible()) win.hide();
