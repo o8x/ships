@@ -61,6 +61,7 @@
   const ballEl = document.getElementById('term-ball');
   const ballIconEl = document.getElementById('term-ball-icon');
   const ballTrashEl = document.getElementById('term-ball-trash');
+  const ballTimerEl = document.getElementById('term-ball-timer');
   const pinBtn = document.getElementById('term-pin');
 
   let term = null;
@@ -679,15 +680,49 @@
   let ballBounceStartedAt = 0; // 本轮播放起始时间（算相位用）
   let ballIdleTimer = null; // 无输出满 1s 的计时
   let ballSettleTimer = null; // 「走到循环边界再停」的计时
+  let ballClockTimer = null; // 后台累计跳动时长的刷新计时
+  // 本轮累计跳动时长（自开始跳动起）；停止跳动即清空（见 pauseBallBounce）。
+  function ballElapsedMs() {
+    return ballBounceOn ? Math.max(0, performance.now() - ballBounceStartedAt) : 0;
+  }
+  // 格式化为 xxhxxmxxs（各两位、补零）。
+  function formatBallDuration(ms) {
+    const total = Math.floor(ms / 1000);
+    const hh = String(Math.floor(total / 3600)).padStart(2, '0');
+    const mm = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+    const ss = String(total % 60).padStart(2, '0');
+    return `${hh}h${mm}m${ss}s`;
+  }
+  // 悬停在球上且正在跳动 → 显示累计时长；否则隐藏（垃圾桶状态下不显示）。
+  function syncBallClock() {
+    const show =
+      ballBounceOn &&
+      ballEl &&
+      ballEl.matches(':hover') &&
+      document.documentElement.dataset.ballTrash !== 'on';
+    document.documentElement.dataset.ballTimer = show ? 'on' : 'off';
+    if (show && ballTimerEl) ballTimerEl.textContent = formatBallDuration(ballElapsedMs());
+  }
   function startBallBounce() {
     if (ballBounceOn || !ballEl) return;
     ballBounceOn = true;
     ballBounceStartedAt = performance.now();
     ballEl.classList.add('term-ball-bounce');
+    // 后台计时：每秒刷新一次（只在鼠标悬停时真正更新显示）。
+    if (ballClockTimer) clearInterval(ballClockTimer);
+    ballClockTimer = setInterval(syncBallClock, 1000);
+    syncBallClock();
   }
   function pauseBallBounce() {
     if (ballEl) ballEl.classList.remove('term-ball-bounce');
     ballBounceOn = false;
+    // 停止跳动 → 清空计时器与显示。
+    if (ballClockTimer) {
+      clearInterval(ballClockTimer);
+      ballClockTimer = null;
+    }
+    if (ballTimerEl) ballTimerEl.textContent = '';
+    document.documentElement.dataset.ballTimer = 'off';
   }
   function pulseBall() {
     if (!ballMode || !ballEl) return;
@@ -734,7 +769,11 @@
     const setTrash = (on) => {
       trashArmed = on;
       document.documentElement.dataset.ballTrash = on ? 'on' : 'off';
+      syncBallClock();
     };
+    // 悬停：显示本轮累计跳动时长（停止跳动时不显示）。
+    ballEl.addEventListener('pointerenter', syncBallClock);
+    ballEl.addEventListener('pointerleave', syncBallClock);
     // 球上右键 → 悬浮垃圾桶图标；再点一下球 → 销毁终端。
     ballEl.addEventListener('contextmenu', (event) => {
       event.preventDefault();

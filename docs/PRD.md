@@ -254,6 +254,7 @@ Ships/
     - **放大回来**：点击球、或按**终端全局快捷键**（`toggleTerminalWindow`）→ `terminal:ball-restore` → 还原窗口并放大，动画结束恢复最小尺寸 / 可缩放 / 置顶、`win.focus()`。**不在窗口 `focus` 时自动放大**（避免拖动即触发）。
     - **最小化按钮禁用**：终端窗口头栏「最小化」红绿灯失效（灰显不可点）。
     - **输出活动提示**：球模式下，若终端会话**持续有输出**（收到 `terminal:data`），悬浮球**内的图标**做**正弦平滑弹跳**（球本身不动）：一个循环 `0% → 50%` 上移 `--ball-bounce-distance`（相对球尺寸的比例，默认 `0.065`；超过约 `0.21` 会被窗口裁切）→ `100%` 回到原位，时长 `--ball-bounce-duration`（默认 `1.3s`），缓动 `cubic-bezier(0.45, 0, 0.55, 1)`。图标用 `translate3d` + `will-change` + `backface-visibility` 提升为合成层、并在弹跳时把 `shape-rendering` 置回 `auto`，全程只做合成不重绘。动画定义在**独立样式文件 `src/renderer/styles/ball-animations.css`**（由 `terminal.html` 直接引入、不走 Tailwind 构建，改完无需重建）。该动画常驻但默认 `animation-play-state: paused`，有输出时切 `.term-ball-bounce` 恢复播放。**停止不打断循环**：无输出满 1s 后，等当前循环走完（回到 `translateY(0)`）再暂停（`terminal.js` 按 `--ball-bounce-duration` 算到循环边界），因此**不会停在半空 / 顶部 / 底部**；每次输出重置 1s 计时。
+    - **累计跳动时长（悬停显示）**：处于跳动状态时，后台按**开始跳动的时刻**累计时长（`terminal.js` 每秒刷新）。**鼠标悬停在球上**（此时可拖动）且正在跳动时，球内**隐藏图标、显示本轮累计跳动时长**，格式固定为 `xxhxxmxxs`（各两位补零，如 `00h01m23s`）；**停止跳动即清空计时器与显示**，此时悬停也不再显示。元素为 `#term-ball-timer`（`terminal.html`），由 `<html>` 上的 `data-ball-timer="on|off"` 控制显隐（`tailwind.css`）；右键垃圾桶状态下不显示。
     - **右键垃圾桶（销毁）**：在球上**右键** → 球上悬浮一个半透明**垃圾桶**图标；此时**再点一下球**（未拖动）即**销毁终端**（`terminal:destroy`）；拖动球会取消该状态。
     - **「固定」按钮（仅当前窗口，默认关）**：头栏红绿灯**右侧**新增固定按钮（`pin`/`pin-off` 图标，开时强调色）；开启后该窗口 `blur` 不再缩球（主进程 `win.__ballPin` 标记，**不持久**、仅作用于当前终端）。
     - **iTerm 交接 / 会话结束不缩球**：`TERMINAL_OPEN_ITERM`、`terminal:destroy`（exit）走 `destroyTerminalWindow`，会先置 `__suppressBall` 再销毁，直接关闭窗口而不是变球。
