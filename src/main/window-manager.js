@@ -455,8 +455,9 @@ function enterBallMode(win) {
   win.__ballMoved = false;
   win.__ballBounds = ballBoundsFor(win.__ballOrig, size);
   if (terminalAlwaysOnTop()) win.setAlwaysOnTop(true, 'screen-saver');
-  // 悬浮球固定在它所在的桌面 / 空间，不跟随桌面切换。
-  win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
+  // 注意：**不要**在这里调用 setVisibleOnAllWorkspaces —— 变球是在「用户已切到别的桌面」之后
+  // （blur 延迟）触发的，此刻再设一次会把窗口重新分配到「当前活动桌面」，于是球会跟着切换桌面。
+  // 桌面归属在窗口创建 / 获得焦点时（那时窗口就在活动桌面上）已经固定，这里保持不动。
   win.setMinimumSize(size, size);
   // 窗口保持原尺寸，渲染层用 CSS 把终端从 1 缩到球大小（transform，GPU、不跳）。
   const scaleX = size / win.__ballOrig.width;
@@ -469,8 +470,6 @@ function enterBallMode(win) {
     if (win.isDestroyed() || !win.__ballActive) return;
     win.setBounds(win.__ballBounds, false);
     if (typeof win.setResizable === 'function') win.setResizable(false);
-    // setBounds 之后再次重申：球固定在它所在的桌面 / 空间（不加入所有桌面、不跟随切换）。
-    win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
     win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'settle' });
   }, Math.round(BALL_ANIM_MS * 0.6));
   logger.file(`[terminal] entered ball mode (${win.id}) size=${size}`);
@@ -897,6 +896,9 @@ function openTerminalWindow() {
     win.__everFocused = true;
     lastTerminalWindow = win;
     clearBallTimer(win); // 延迟内焦点回来 → 取消缩球
+    // 窗口此刻就在活动桌面上 → 在这里固定「属于本桌面、不加入所有桌面」（之后变球时不再动它，
+    // 否则会把球重新分配到别的桌面）。
+    win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
   });
   // 失去焦点 → 延迟后缩成圆形悬浮球（延时内焦点回来则取消；DevTools 打开 / iTerm 交接时不动）。
   win.on('blur', () => {
