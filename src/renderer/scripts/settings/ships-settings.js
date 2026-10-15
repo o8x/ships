@@ -41,6 +41,7 @@
         version: '版本',
         checkUpdates: '检查更新',
         check: '检查',
+        checking: '正在检查…',
         developerMode: '开发者模式',
         developerModeHint: '开启后显示下方的开发者工具，并在主界面版本号旁标记',
         developer: '开发者',
@@ -85,6 +86,7 @@
         version: 'Version',
         checkUpdates: 'Check for updates',
         check: 'Check',
+        checking: 'Checking…',
         developerMode: 'Developer mode',
         developerModeHint: 'Show the developer tools below, and mark it next to the version in the main panel',
         developer: 'Developer',
@@ -291,7 +293,8 @@
       checkBtn.disabled = true;
       try {
         const res = await window.ships.checkUpdates();
-        if (res && res.ok === false) updateNote.textContent = res.message || res.error || '';
+        if (res && res.checking) updateNote.textContent = i18n.t('settingsPage.checking');
+        else if (res && res.ok === false) updateNote.textContent = res.message || res.error || '';
       } catch (err) {
         updateNote.textContent = String((err && err.message) || err);
       } finally {

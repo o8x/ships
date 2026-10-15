@@ -111,21 +111,22 @@ function initUpdater() {
   updater.autoInstallOnAppQuit = true;
 
   updater.on('update-available', (info) => {
+    const wasManual = manualCheck;
     manualCheck = false;
-    if (info && info.version && info.version === promptedVersion) return;
+    // 手动检查每次都要有反馈；启动时的静默检查对同一版本只提示一次，避免重复打扰。
+    if (!wasManual && info && info.version && info.version === promptedVersion) return;
     promptedVersion = info && info.version;
     logger.info(`[updater] update available: ${info && info.version}`);
     promptDownload(info).catch(() => {});
   });
   updater.on('update-not-available', () => {
     logger.info('[updater] already up to date');
-    if (manualCheck) {
-      manualCheck = false;
-      const c = copy();
-      showBox({ type: 'info', buttons: ['OK'], defaultId: 0, title: c.checkTitle, message: c.notAvailable }).catch(
-        () => {}
-      );
-    }
+    if (!manualCheck) return;
+    manualCheck = false;
+    const c = copy();
+    showBox({ type: 'info', buttons: ['OK'], defaultId: 0, title: c.checkTitle, message: c.notAvailable }).catch(
+      () => {}
+    );
   });
   updater.on('download-progress', (p) => {
     logger.file(`[updater] downloading ${Math.round((p && p.percent) || 0)}%`);
@@ -172,12 +173,17 @@ async function checkForUpdatesInteractive(win) {
   try {
     await updater.checkForUpdates();
   } catch (err) {
-    // 详细错误只写日志；面向用户给一句友好提示。
+    // 详细错误只写日志；「error」事件的处理器已给出手动检查的友好提示，这里不再重复。
     manualCheck = false;
     logger.warn('[updater] manual check failed:', (err && err.message) || err);
-    return { ok: false, error: 'check-failed', message: copy().notCheckable };
+    return { ok: true };
   } finally {
     interactiveChecking = false;
+  }
+  // 兜底：整次检查没有触发任何事件（理论上仅当更新被停用），也要给用户一个反馈。
+  if (manualCheck) {
+    manualCheck = false;
+    return { ok: false, error: 'no-result', message: copy().notCheckable };
   }
   return { ok: true };
 }

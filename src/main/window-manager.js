@@ -663,7 +663,7 @@ function createMainWindow() {
   mainWindow.on('blur', () => {
     if (blurSuppressed) return;
     if (settings.get('pinWindow')) return;
-    if (settingsWindow && settingsWindow.isFocused()) return;
+    // 打开设置窗口时主面板已先隐藏；若两者同时打开，失焦（包括焦点转到设置窗口）也照常隐藏。
     hideMainWindow();
   });
 
