@@ -62,6 +62,8 @@
   const ballIconEl = document.getElementById('term-ball-icon');
   const ballTrashEl = document.getElementById('term-ball-trash');
   const ballTimerEl = document.getElementById('term-ball-timer');
+  const ballTimerHmEl = document.getElementById('term-ball-timer-hm');
+  const ballTimerSEl = document.getElementById('term-ball-timer-s');
   const pinBtn = document.getElementById('term-pin');
 
   let term = null;
@@ -685,13 +687,14 @@
   function ballElapsedMs() {
     return ballBounceOn ? Math.max(0, performance.now() - ballBounceStartedAt) : 0;
   }
-  // 格式化为 xxhxxmxxs（各两位、补零）。
-  function formatBallDuration(ms) {
+  // 拆成上行 h/m（非 0 才显示）与下行 s。
+  function formatBallClock(ms) {
     const total = Math.floor(ms / 1000);
-    const hh = String(Math.floor(total / 3600)).padStart(2, '0');
-    const mm = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
-    const ss = String(total % 60).padStart(2, '0');
-    return `${hh}h${mm}m${ss}s`;
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    const hm = `${h > 0 ? `${String(h).padStart(2, '0')}h` : ''}${m > 0 ? `${String(m).padStart(2, '0')}m` : ''}`;
+    return { hm, s: `${String(s).padStart(2, '0')}s` };
   }
   // 悬停在球上且正在跳动 → 显示累计时长；否则隐藏（垃圾桶状态下不显示）。
   function syncBallClock() {
@@ -701,7 +704,10 @@
       ballEl.matches(':hover') &&
       document.documentElement.dataset.ballTrash !== 'on';
     document.documentElement.dataset.ballTimer = show ? 'on' : 'off';
-    if (show && ballTimerEl) ballTimerEl.textContent = formatBallDuration(ballElapsedMs());
+    if (!show) return;
+    const clock = formatBallClock(ballElapsedMs());
+    if (ballTimerHmEl) ballTimerHmEl.textContent = clock.hm;
+    if (ballTimerSEl) ballTimerSEl.textContent = clock.s;
   }
   function startBallBounce() {
     if (ballBounceOn || !ballEl) return;
@@ -721,7 +727,10 @@
       clearInterval(ballClockTimer);
       ballClockTimer = null;
     }
-    if (ballTimerEl) ballTimerEl.textContent = '';
+    if (ballTimerEl) {
+      if (ballTimerHmEl) ballTimerHmEl.textContent = '';
+      if (ballTimerSEl) ballTimerSEl.textContent = '';
+    }
     document.documentElement.dataset.ballTimer = 'off';
   }
   function pulseBall() {

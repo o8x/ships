@@ -419,14 +419,15 @@ input[type='color'].swatch::-webkit-color-swatch {
   width: calc(var(--term-ball-size, 75px) * 0.58);
   height: calc(var(--term-ball-size, 75px) * 0.58);
 }
-/* 悬浮球：跳动的状态 + 悬停时，球内显示本轮累计跳动时长（xxhxxmxxs）；停止跳动即隐藏并清空。 */
+/* 悬浮球：跳动的状态 + 悬停时，球内显示本轮累计跳动时长；停止跳动即隐藏并清空。
+   两行：上行 h/m（仅非 0 才显示，字号为 S 的一半），下行 S（更大）。 */
 .term-ball-timer {
   display: none;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  line-height: 1;
   font-family: var(--font-mono);
-  font-size: calc(var(--term-ball-size, 75px) * 0.15);
-  letter-spacing: -0.02em;
   white-space: nowrap;
   color: var(--color-accent);
   user-select: none;
@@ -437,6 +438,18 @@ input[type='color'].swatch::-webkit-color-swatch {
 }
 [data-ball-timer='on'] .term-ball-icon {
   display: none;
+}
+.term-ball-timer-hm {
+  font-size: calc(var(--term-ball-size, 75px) * 0.15);
+  letter-spacing: -0.02em;
+  opacity: 0.9;
+}
+.term-ball-timer-hm:empty {
+  display: none;
+}
+.term-ball-timer-s {
+  font-size: calc(var(--term-ball-size, 75px) * 0.3);
+  font-weight: 600;
 }
 /* 悬浮球底色：暗色模式开 = 始终暗色；关 = 跟随全局主题（依 data-theme）。均为不透明纯色；图标始终保留原色。 */
 [data-ball-dark='on'] #term-ball,
