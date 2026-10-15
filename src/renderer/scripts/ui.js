@@ -260,7 +260,7 @@ window.ShipsUI = (function createUI() {
 
   /* Custom select (self-drawn, avoids native <select>). */
   function createSelect(config) {
-    const options = { onChange: () => {}, className: '', menuClassName: '', align: 'left', matchTrigger: false };
+    const options = { onChange: () => {}, className: '', menuClassName: '', align: 'left', matchTrigger: false, placeholder: '' };
     Object.assign(options, config || {});
     let items = (options.options || []).slice();
     let current = options.value;
@@ -285,6 +285,9 @@ window.ShipsUI = (function createUI() {
           label.appendChild(iconWrap);
         }
         if (item.label) label.appendChild(el('span', { class: 'truncate' }, item.label));
+      } else if (options.placeholder) {
+        // 没有匹配项（含初始未选择）：在触发器上显示占位文案（占位不出现在下拉列表里）。
+        label.appendChild(el('span', { class: 'truncate' }, options.placeholder));
       }
       if (menu) {
         Array.from(menu.children).forEach((node) => {

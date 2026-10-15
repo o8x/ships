@@ -65,11 +65,17 @@ function registerSshIpc(ipcMain) {
 
   ipcMain.handle(IPC.SSH_GET_DETECTED, () => sshService.getDetected());
 
+  // SSH 主机 / 分组有变更后广播，供终端 / 文件窗口的 SSH 下拉实时刷新（设置页自身会重新读取）。
+  function notifyConfigChanged(hosts) {
+    broadcast(IPC.SSH_CONFIG_CHANGED, { hosts });
+    return hosts;
+  }
+
   ipcMain.handle(IPC.SSH_CONFIG_READ, () => configService.list());
-  ipcMain.handle(IPC.SSH_CONFIG_UPSERT, (_event, host) => configService.upsert(host));
-  ipcMain.handle(IPC.SSH_CONFIG_REMOVE, (_event, alias) => configService.remove(alias));
+  ipcMain.handle(IPC.SSH_CONFIG_UPSERT, (_event, host) => notifyConfigChanged(configService.upsert(host)));
+  ipcMain.handle(IPC.SSH_CONFIG_REMOVE, (_event, alias) => notifyConfigChanged(configService.remove(alias)));
   ipcMain.handle(IPC.SSH_CONFIG_RENAME_GROUP, (_event, payload) =>
-    configService.renameGroup(payload && payload.from, payload && payload.to)
+    notifyConfigChanged(configService.renameGroup(payload && payload.from, payload && payload.to))
   );
 
   ipcMain.handle(IPC.SSH_CONFIG_EXPORT, async (event) => {

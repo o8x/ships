@@ -115,6 +115,8 @@ const IPC = {
   SSH_CONFIG_REMOVE: 'ssh-config:remove',
   SSH_CONFIG_RENAME_GROUP: 'ssh-config:rename-group',
   SSH_CONFIG_EXPORT: 'ssh-config:export',
+  // 主 → 渲染：SSH 主机 / 分组增删改后广播，让各处 SSH 下拉实时刷新。
+  SSH_CONFIG_CHANGED: 'ssh-config:changed',
 };
 
 const WINDOW = Object.assign(

@@ -433,8 +433,9 @@
     if (!actions) return null;
 
     const picker = window.ShipsUI.createSelect({
-      options: [{ value: '', label: i18n.t('terminalWin.sshPlaceholder') }],
+      options: [],
       value: '',
+      placeholder: i18n.t('terminalWin.sshPlaceholder'),
       align: 'right',
       className: 'select-compact shrink-0',
       matchTrigger: true,
@@ -464,19 +465,39 @@
     } catch (err) {
       hosts = [];
     }
-    const options = [{ value: '', label: i18n.t('terminalWin.sshPlaceholder') }];
-    // 多个分组时，在两组之间插入一个分组小标题（唯一分组则不显示标题）。
-    const groups = new Set(hosts.map((host) => host.group || ''));
-    const showHeaders = groups.size > 1;
-    let lastGroup = null;
+    // 占位「SSH」不再作为可选项出现（仅未选择时显示在触发器上）。
+    // 顺序：有分组的主机（按分组出现顺序）在前，未分组的主机排最后。
+    const grouped = [];
+    const byGroup = new Map();
+    const ungrouped = [];
     for (const host of hosts) {
       const group = host.group || '';
-      if (showHeaders && group !== lastGroup) {
-        options.push({ header: true, label: group || i18n.t('terminalWin.ungrouped') });
+      if (!group) {
+        ungrouped.push(host);
+        continue;
       }
-      lastGroup = group;
+      const key = group.toLowerCase();
+      if (!byGroup.has(key)) {
+        const section = { name: group, hosts: [] };
+        byGroup.set(key, section);
+        grouped.push(section);
+      }
+      byGroup.get(key).hosts.push(host);
+    }
+    const sections = grouped.length + (ungrouped.length ? 1 : 0);
+    const showHeaders = sections > 1;
+    const options = [];
+    const pushHost = (host) => {
       const address = host.user ? `${host.user}@${host.hostName}` : String(host.hostName || host.alias || '');
       options.push({ value: host.alias, label: address });
+    };
+    for (const section of grouped) {
+      if (showHeaders) options.push({ header: true, label: section.name });
+      for (const host of section.hosts) pushHost(host);
+    }
+    if (ungrouped.length) {
+      if (showHeaders) options.push({ header: true, label: i18n.t('terminalWin.ungrouped') });
+      for (const host of ungrouped) pushHost(host);
     }
     sshPicker.setOptions(options);
     if (!hosts.some((host) => host.alias === sshPicker.getValue())) sshPicker.setValue('');
@@ -907,6 +928,8 @@
     renderHeader();
     sshPicker = setupSshPicker();
     refreshSshPicker();
+    // 设置页增删改 SSH 主机 / 分组后实时刷新下拉。
+    window.ships.ssh.onConfigChanged(() => refreshSshPicker());
     settingsFontSize = Math.max(FONT_MIN, Math.min(FONT_MAX, (settings && settings.terminalFontSize) || FONT_DEFAULT));
     fontSize = settingsFontSize;
     applyHeaderFontSize(fontSize);

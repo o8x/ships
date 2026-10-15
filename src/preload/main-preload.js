@@ -104,6 +104,7 @@ const api = {
     connect: (payload) => ipcRenderer.invoke(IPC.SSH_CONNECT, payload),
     detect: (payload) => ipcRenderer.invoke(IPC.SSH_DETECT, payload),
     onDetected: (cb) => on(IPC.SSH_DETECTED, cb),
+    onConfigChanged: (cb) => on(IPC.SSH_CONFIG_CHANGED, cb),
   },
 };
 
