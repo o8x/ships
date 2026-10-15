@@ -14,8 +14,8 @@
  *   --ball-bounce-duration  一个完整「上 + 下」循环的时长（越长越舒缓）。
  */
 :root {
-  --ball-bounce-distance: 0.07;
-  --ball-bounce-duration: 1.6s;
+  --ball-bounce-distance: 0.065;
+  --ball-bounce-duration: 1.3s;
 }
 
 @keyframes ball-bounce-sine {
