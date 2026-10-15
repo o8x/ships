@@ -152,7 +152,7 @@
     filesBtn.classList.toggle('loading', Boolean(state.connecting));
   }
 
-  /* 在终端会话里执行 `cd <path>`（文件面板路径行的「在终端 cd 到此目录」）。 */
+  /* 在终端会话里执行 `cd <path>`（文件面板目录树右键「进入该目录」/ cd 历史共用）。 */
   function shellQuote(value) {
     const text = String(value || '');
     if (/^[A-Za-z0-9_@%+=:,./~-]+$/.test(text)) return text;

@@ -37,7 +37,7 @@
         button: '文件',
         home: '家目录',
         refresh: '刷新',
-        cdHere: '在终端 cd 到此目录',
+        cdEnter: '进入该目录',
         popOut: '分离为独立窗口',
         pathPlaceholder: '输入远端路径，回车进入',
         name: '文件名',
@@ -84,7 +84,7 @@
         button: 'Files',
         home: 'Home',
         refresh: 'Refresh',
-        cdHere: 'cd to this directory in the terminal',
+        cdEnter: 'Enter this directory (cd in terminal)',
         popOut: 'Open in a separate window',
         pathPlaceholder: 'Type a remote path, press Enter',
         name: 'Name',
@@ -308,8 +308,9 @@
     wrap.append(main, statusBar);
     root.appendChild(wrap);
 
-    /* path row: [popout][refresh][home][cd][input]
-       分离为独立窗口（仅内嵌面板）放刷新左侧，cd 到目录（仅内嵌面板）放 home 右侧 —— 四个图标排成一排。 */
+    /* path row: [popout][refresh][home][input]
+       分离为独立窗口（仅内嵌面板）放刷新左侧；「在终端 cd 到此目录」已移除，
+       改为目录树右键「进入该目录」（见 makeTreeRow）。 */
     const popBtn = onPopOut
       ? el('button', { class: 'icon-btn fm-path-btn', type: 'button', 'data-tip': i18n.t('filesUi.popOut') })
       : null;
@@ -321,20 +322,8 @@
     refreshBtn.innerHTML = Icons.refresh(14);
     const homeBtn = el('button', { class: 'icon-btn fm-path-btn', type: 'button', 'data-tip': i18n.t('filesUi.home') });
     homeBtn.innerHTML = Icons.home(14);
-    const cdBtn = onCd
-      ? el('button', { class: 'icon-btn fm-path-btn', type: 'button', 'data-tip': i18n.t('filesUi.cdHere') })
-      : null;
-    if (cdBtn) {
-      cdBtn.innerHTML = Icons.terminal(14);
-      cdBtn.addEventListener('click', () => {
-        if (state.connected && state.cwd) {
-          recordCd(state.cwd);
-          onCd(state.cwd);
-        }
-      });
-    }
     const pathInput = el('input', { class: 'fm-path-input', type: 'text', spellcheck: 'false', autocomplete: 'off', placeholder: i18n.t('filesUi.pathPlaceholder') });
-    for (const btn of [popBtn, refreshBtn, homeBtn, cdBtn]) {
+    for (const btn of [popBtn, refreshBtn, homeBtn]) {
       if (btn) pathRow.appendChild(btn);
     }
     pathRow.appendChild(pathInput);
@@ -509,15 +498,18 @@
       label.textContent = name;
       row.append(caret, icon, label);
       row.addEventListener('click', () => navigate(path));
-      // 目录节点也支持右键「复制传输命令」（目录 → scp -r）。
+      // 目录节点右键：进入该目录（仅内嵌面板：在当前终端 cd 过去）/ 上传 / 复制路径 / 复制传输命令。
       row.addEventListener('contextmenu', (event) => {
         event.preventDefault();
         setStatusPath(path);
-        openContextMenu(event.clientX, event.clientY, [
+        const items = [];
+        if (onCd) items.push({ label: i18n.t('filesUi.cdEnter'), run: () => enterDirectory(path) });
+        items.push(
           { label: i18n.t('filesUi.upload'), run: () => chooseAndUpload(path) },
           { label: i18n.t('filesUi.copyPath'), run: () => copyPath([path]) },
-          { label: i18n.t('filesUi.copyTransfer'), run: () => copyTransferCommand([path], true) },
-        ]);
+          { label: i18n.t('filesUi.copyTransfer'), run: () => copyTransferCommand([path], true) }
+        );
+        openContextMenu(event.clientX, event.clientY, items);
       });
       if (state.cwd === path) row.classList.add('selected');
       return row;
@@ -1069,7 +1061,9 @@
         historyMenu = null;
       }
     }
-    async function goToHistory(dir) {
+    /* 进入目录：文件面板导航过去 + 同步 shellCwd + 记录 cd 历史 + 在当前终端 cd（仅内嵌面板有 onCd）。
+       cd 历史下拉与目录树右键「进入该目录」共用。 */
+    async function enterDirectory(dir) {
       const ok = await navigate(dir);
       if (!ok) return;
       state.shellCwd = state.cwd;
@@ -1091,7 +1085,7 @@
           item.addEventListener('mousedown', (event) => event.preventDefault());
           item.addEventListener('click', () => {
             closeHistoryMenu();
-            goToHistory(dir);
+            enterDirectory(dir);
           });
           menu.appendChild(item);
         }
