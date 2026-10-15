@@ -604,7 +604,7 @@ flowchart TD
   - **版本检测**：用 `electron-updater`（读 GitHub Releases 的 `latest-mac.yml`）——**仅检测版本，不需要签名**。**仅打包后**的 macOS / Windows 生效（`app.isPackaged`）；开发模式不检查。启动后**静默检查一次**（延迟 5s，不打扰）。
   - **提示后下载**：`update-available` → 弹窗「发现新版本 vX（当前 vY），现在下载吗？」→ 确认才下载。
   - **下载方式按平台分两种模式**（`dl.mode`）：
-    - **macOS（`mode=dmg`）**：从 GitHub Release 下载 **`.dmg`**（先经 GitHub API `releases/tags/vX.Y.Z` 选出与当前架构匹配的 `.dmg`，失败再按 `Ships-vX.Y.Z-{arch}.dmg` 命名规则拼 URL），用 Electron `net` 流式下载到 `app.getPath('downloads')`，可取消（abort + 删除半成品）。**不依赖 Squirrel / 签名**，因此 ad-hoc 构建也能更新。
+    - **macOS（`mode=dmg`）**：从 GitHub Release 下载 **`.dmg`**——先经 GitHub API `releases/tags/vX.Y.Z` 选出与当前架构匹配的 `.dmg`，失败（限流 / 离线 / 命名变化）再按 `Ships-vX.Y.Z-{arch}.dmg` 命名规则拼 URL；用 Electron `net` 流式下载到 `app.getPath('downloads')`，可取消（abort + 删除半成品）。**`owner` / `repo` 取自 `package.json` 的 `build.publish`，打包后该段会被 electron-builder 裁剪，故回退读 `Resources/app-update.yml`**；产物前缀固定取应用名 `Ships`（`APP_NAME`）。**不依赖 Squirrel / 签名**，因此 ad-hoc 构建也能更新。
     - **Windows（`mode=auto`）**：仍用 `electron-updater` 的 `downloadUpdate()` 自动下载并 `quitAndInstall()`（`autoInstallOnAppQuit=true`；6 秒未退出则 `app.relaunch()` + `app.quit()` 兜底）。
   - **下载窗口**：确认下载后弹出一个**小型、不可关闭（`closable: false` + `frame: false`，无关闭按钮、Cmd-W 无效，仅退出应用时放行）、可最小化、置顶居中的前台窗口** `update.html`（尺寸 `ships.updateWindow` = 380 × 160，见 §8.7）。窗口只有：顶部**自绘红绿灯**（仅「最小化」可用）、**实时进度条**（`update:progress`）、**取消**、**安装按钮**（下载期间禁用）。下载完成后按钮可用并显示 **60 秒倒计时**（常量 `UPDATE_COUNTDOWN_SECONDS`）；**macOS 按钮为「退出并安装」**（`shell`/`open` 挂载 DMG 并打开 Finder，随后退出本程序，由用户手动拖入 Applications；倒计时文案「N 秒后自动退出并挂载安装包」），**Windows 按钮为「重启更新」**（`quitAndInstall()`）。**取消 = 退出本次更新**（下载阶段中止下载并删除半成品；点击安装 / 倒计时到 0 后取消按钮禁用）。
   - **下载失败**：仅在日志记录详细错误，并关闭下载窗口、给一句友好提示。

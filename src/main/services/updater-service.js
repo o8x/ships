@@ -7,7 +7,7 @@ const { app, dialog, net } = require('electron');
 const settings = require('./settings-service');
 const logger = require('../utils/logger');
 const wm = require('../window-manager');
-const { IPC, UPDATE_COUNTDOWN_SECONDS } = require('../../shared/constants');
+const { IPC, UPDATE_COUNTDOWN_SECONDS, APP_NAME } = require('../../shared/constants');
 const pkg = require('../../../package.json');
 
 /* 自动更新：
@@ -168,38 +168,75 @@ function startAutoDownload() {
 
 /* ------------------------- macOS：下载 DMG ------------------------- */
 
+/* owner / repo：
+   1) 优先 package.json 的 build.publish（开发 / 未裁剪时）；
+   2) 打包后 electron-builder 会裁剪 package.json 的 build 段，此时读它生成的
+      Resources/app-update.yml（electron-updater 用它做版本检测，必然存在）。 */
+let publishCache = null;
+
 function publishConfig() {
+  if (publishCache) return publishCache;
+  // 打包后 package.json 的 build 段会被裁剪，产物前缀仍固定是应用名（Ships）。
+  const productName = (pkg.build && pkg.build.productName) || APP_NAME;
+
   const publish = (pkg.build && pkg.build.publish) || [];
   const gh = publish.find((entry) => entry && entry.provider === 'github') || {};
-  return {
-    owner: gh.owner || '',
-    repo: gh.repo || '',
-    productName: (pkg.build && pkg.build.productName) || pkg.name || 'app',
-  };
+  if (gh.owner && gh.repo) {
+    publishCache = { owner: gh.owner, repo: gh.repo, productName };
+    return publishCache;
+  }
+
+  try {
+    const ymlPath = path.join(process.resourcesPath || '', 'app-update.yml');
+    const yml = fs.readFileSync(ymlPath, 'utf8');
+    const pick = (key) => {
+      const match = new RegExp(`^\\s*${key}:\\s*(.+)\\s*$`, 'm').exec(yml);
+      return match ? match[1].trim().replace(/^['"]|['"]$/g, '') : '';
+    };
+    const owner = pick('owner');
+    const repo = pick('repo');
+    if (owner && repo) {
+      publishCache = { owner, repo, productName };
+      return publishCache;
+    }
+  } catch (err) {
+    logger.file('[updater] read app-update.yml failed:', (err && err.message) || err);
+  }
+
+  publishCache = { owner: '', repo: '', productName };
+  return publishCache;
 }
 
-/* GitHub Releases API：挑出与当前架构匹配的 dmg（找不到则回退到按命名规则拼出的 URL）。 */
-async function resolveDmgUrl(version) {
+/* 按产物命名规则拼出 DMG URL（`appname-vx.y.z-arch.dmg`，见 AGENTS「产物文件名规则」）。 */
+function directDmgUrl(version) {
   const { owner, repo, productName } = publishConfig();
-  const arch = process.arch; // 'arm64' | 'x64'
-  const fallbackName = `${productName}-v${version}-${arch}.dmg`;
-  const fallbackUrl =
-    owner && repo
-      ? `https://github.com/${owner}/${repo}/releases/download/v${version}/${fallbackName}`
-      : '';
-  if (owner && repo) {
-    try {
-      const data = await httpGetJson(`https://api.github.com/repos/${owner}/${repo}/releases/tags/v${version}`);
-      const assets = Array.isArray(data && data.assets) ? data.assets : [];
-      const dmgs = assets.filter((a) => a && typeof a.name === 'string' && a.name.toLowerCase().endsWith('.dmg'));
-      const match = dmgs.find((a) => a.name.includes(`-${arch}.dmg`)) || dmgs[0];
-      if (match && match.browser_download_url) return { url: match.browser_download_url, name: match.name };
-    } catch (err) {
-      logger.warn('[updater] resolve dmg via API failed:', (err && err.message) || err);
-    }
-  }
-  if (fallbackUrl) return { url: fallbackUrl, name: fallbackName };
+  if (!owner || !repo) return null;
+  const name = `${productName}-v${version}-${process.arch}.dmg`;
+  return { url: `https://github.com/${owner}/${repo}/releases/download/v${version}/${name}`, name };
+}
+
+/* GitHub Releases API：挑出与当前架构匹配的 dmg（命名规则变化时更稳）。 */
+async function apiDmgUrl(version) {
+  const { owner, repo } = publishConfig();
+  if (!owner || !repo) return null;
+  const data = await httpGetJson(`https://api.github.com/repos/${owner}/${repo}/releases/tags/v${version}`);
+  const assets = Array.isArray(data && data.assets) ? data.assets : [];
+  const dmgs = assets.filter((a) => a && typeof a.name === 'string' && a.name.toLowerCase().endsWith('.dmg'));
+  const match = dmgs.find((a) => a.name.includes(`-${process.arch}.dmg`)) || dmgs[0];
+  if (match && match.browser_download_url) return { url: match.browser_download_url, name: match.name };
   return null;
+}
+
+/* 目标 DMG：优先用 GitHub API 精确匹配，失败（限流 / 离线 / 命名变化）再按命名规则拼 URL。 */
+async function resolveDmgUrl(version) {
+  const direct = directDmgUrl(version);
+  try {
+    const viaApi = await apiDmgUrl(version);
+    if (viaApi) return viaApi;
+  } catch (err) {
+    logger.file('[updater] resolve dmg via API failed:', (err && err.message) || err);
+  }
+  return direct;
 }
 
 function httpGetJson(url) {
