@@ -176,6 +176,8 @@ const DEFAULT_SETTINGS = {
   launchAtLogin: false,
   pinWindow: false,
   vibrancy: false,
+  // 开发者模式：开启后设置页才显示「开发者」工具区，主界面版本号旁显示标记。
+  developerMode: false,
   clipboardLimit: 3,
   clipboardPollMs: 1200,
   // terminal window / network test terminal

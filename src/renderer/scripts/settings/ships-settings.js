@@ -39,6 +39,8 @@
         open: '打开',
         about: '关于',
         version: '版本',
+        developerMode: '开发者模式',
+        developerModeHint: '开启后显示下方的开发者工具，并在主界面版本号旁标记',
         developer: '开发者',
         devPopover: '悬浮界面开发者工具',
         devSettings: '设置界面开发者工具',
@@ -79,6 +81,8 @@
         open: 'Open',
         about: 'About',
         version: 'Version',
+        developerMode: 'Developer mode',
+        developerModeHint: 'Show the developer tools below, and mark it next to the version in the main panel',
         developer: 'Developer',
         devPopover: 'Popover DevTools',
         devSettings: 'Settings DevTools',
@@ -269,6 +273,14 @@
       row(i18n.t('settingsPage.version'), '', el('span', { class: 'font-mono text-[12px] text-fg-muted' }, `v${(info && info.version) || ''}`))
     );
 
+    /* 开发者模式开关：开启后才显示下方的开发者工具区，值持久化到 settings.json。 */
+    const devModeSwitch = switchControl(settings.developerMode === true, (value) =>
+      patch({ developerMode: value })
+    );
+    aboutSection.appendChild(
+      row(i18n.t('settingsPage.developerMode'), i18n.t('settingsPage.developerModeHint'), devModeSwitch.root)
+    );
+
     const devSection = section(i18n.t('settingsPage.developer'));
     function devButton(target) {
       const button = el('button', { class: 'btn shrink-0', type: 'button' }, i18n.t('settingsPage.open'));
@@ -280,7 +292,21 @@
     devSection.appendChild(row(i18n.t('settingsPage.devTerminal'), '', devButton('terminal')));
     devSection.appendChild(row(i18n.t('settingsPage.devFile'), '', devButton('file')));
 
+    function applyDeveloperMode(on) {
+      devModeSwitch.root.classList.toggle('on', on);
+      devSection.style.display = on ? '' : 'none';
+    }
+    applyDeveloperMode(settings.developerMode === true);
+
+    const offSettings = window.ships.onSettingsChanged((next) =>
+      applyDeveloperMode(next && next.developerMode === true)
+    );
+
     pane.append(languageSection, appearanceSection, generalSection, aboutSection, devSection);
+
+    return () => {
+      if (typeof offSettings === 'function') offSettings();
+    };
   }
 
   window.ShipsSettingsRegistry.register({

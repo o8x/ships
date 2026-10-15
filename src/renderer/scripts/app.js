@@ -11,6 +11,7 @@
     brandName: document.getElementById('brand-name'),
     content: document.getElementById('content'),
     version: document.getElementById('footer-version'),
+    dev: document.getElementById('footer-dev'),
     terminal: document.getElementById('btn-terminal'),
     files: document.getElementById('btn-files'),
     networkTest: document.getElementById('btn-network-test'),
@@ -131,8 +132,16 @@
     window.ships.setSettings({ theme: next });
   }
 
+  function renderDevBadge() {
+    if (!dom.dev) return;
+    const on = Boolean(state.settings.developerMode);
+    dom.dev.textContent = on ? i18n.t('developerMode') : '';
+    dom.dev.classList.toggle('hidden', !on);
+  }
+
   function renderFooter() {
     dom.version.textContent = `v${state.version}`;
+    renderDevBadge();
     dom.settings.innerHTML = Icons.gear(18);
     dom.settings.setAttribute('data-tip', i18n.t('settings'));
     dom.networkTest.innerHTML = Icons.wifi(15);
@@ -151,6 +160,7 @@
     // Glass is macOS-only; on other platforms keep the opaque surfaces.
     const glass = Boolean(state.settings.vibrancy) && state.platform === 'darwin';
     document.documentElement.setAttribute('data-vibrancy', glass ? 'on' : 'off');
+    renderDevBadge();
   }
 
   async function boot() {
