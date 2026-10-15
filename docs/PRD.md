@@ -136,10 +136,10 @@ Ships/
 **窗口模式（默认，`floatMode = false`）**
 
 1. 点击托盘图标 → 若窗口未创建则创建；显示并聚焦（`app.focus({ steal: true })` + `win.show()`/`focus()`/`moveTop()`）。
-2. 首次（无 `main-window.json` 记忆）在**鼠标所在屏幕工作区居中**；有记忆则**还原记录的位置 / 尺寸**（越界夹回、换屏或无记录则居中）。
+2. **不记桌面、只在当前桌面 / 屏幕显示**：首次（无 `main-window.json` 记忆）在**鼠标所在屏幕工作区居中**；有记忆则沿用记录的**位置**（夹回当前屏幕工作区）。
 3. 窗口是**独立的标准窗口**（`titleBarStyle: hiddenInset` + 系统红绿灯），但行为像终端窗口的**置顶悬浮 panel**：`alwaysOnTop` 且 `setAlwaysOnTop(true, 'screen-saver')`（可浮在**全屏应用之上**），并用 `setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true })` **固定在自己的桌面、不跨桌面跟随**（切换桌面时留在原桌面）。
 4. **再次点击**托盘（窗口已存在）→ 显示 / 带到前台；若它在别的桌面，聚焦 / 激活会让系统**切到它所在的桌面**（不做隐藏切换）。
-5. 关闭按钮（系统红绿灯）= **隐藏**（应用常驻托盘）；`Escape` 亦隐藏。位置 / 尺寸在拖动 / 缩放后写入 `main-window.json`（单槽，见 §5.1）。
+5. 关闭按钮（系统红绿灯）= **隐藏**（应用常驻托盘）；`Escape` 亦隐藏。**位置**（不记桌面 / 屏幕）在拖动后写入 `main-window.json`（单槽，见 §5.1）。
 6. 尺寸：**固定 640 × 480、不可缩放**（`package.json` 的 `ships.mainWindow`；仅位置可拖动 / 记忆）。
 
 **悬浮模式（`floatMode = true`）**
@@ -315,7 +315,7 @@ Ships/
 | `ssh-detected.json` | 同上目录 | `{ [alias]: { os, family, label, at } }` | 持久；缓存探测结果 |
 | `ssh-credentials.json` | 同上目录 | `{ entries: { [别名]: { iv, tag, data } } }`（**AES-256-GCM 密文**，全 base64） | 持久；在设置里保存 / 清除 SSH 密码时更新。密钥随机生成、存 `ssh-credentials.key`（0600）；密码明文不落盘，连接时主进程解密后交给内置终端自动输入（见 §3.4） |
 | `ssh-credentials.key` | 同上目录 | base64 的 32 字节随机密钥（0600） | 持久；首次存密码时生成，用于加解密 `ssh-credentials.json` |
-| `main-window.json` | 同上目录 | `{ display: { id, scaleFactor, bounds: { x, y, width, height } }, bounds: { x, y, width, height } }`（**窗口模式**主窗口最近一次的所在屏幕 + 位置；尺寸固定 640×480） | 持久；窗口模式下拖动主窗口时写入；同屏再次打开沿用位置，换屏 / 无记录则在鼠标所在屏幕居中；「清理数据」可删除 |
+| `main-window.json` | 同上目录 | `{ bounds: { x, y, width, height } }`（**窗口模式**主窗口最近一次的**位置**；尺寸固定 640×480，**不记录桌面 / 屏幕**） | 持久；窗口模式下拖动主窗口时写入；**每次都在当前桌面 / 当前屏幕显示**，有位置记忆则沿用它（夹回当前屏幕工作区），无记忆则居中；「清理数据」可删除 |
 | `terminal-window.json` | 同上目录 | `{ display: { id, scaleFactor, bounds: { x, y, width, height } }, bounds: { x, y, width, height } }`（置顶终端窗口最近一次的所在屏幕 + 位置 + 尺寸） | 持久；打开 / 拖动 / 缩放 / 关闭时写入（含「实际生效」的几何，恢复时被夹取过也记夹取后的值）；同一块屏幕再次打开即沿用，换屏 / 拔屏 / 无记录则改用默认尺寸居中 |
 | `file-window.json` | 同上目录 | 同 `terminal-window.json` 的结构（独立文件窗口的屏幕 + 位置 + 尺寸） | 持久；记忆方式与终端窗口一致 |
 | `file-layout.json` | 同上目录 | `{ treeWidth, name, size, perm, time, panelHeight, sortKey, sortDir }`（**内嵌面板**的目录树宽、文件名 / 体积 / 权限 / 时间列宽、面板高度，单位 px；默认 `300 / 160 / 60 / 90 / 130 / 260`；`time` 默认 130 是**默认值**，最小可拖到 60；`sortKey` ∈ `''`（不排序）/`name`/`size`/`time`、`sortDir` ∈ `asc`/`desc`） | 持久；拖动分隔线 / 列宽、点击列头排序时写入；**有记录时不再套用首次的最小布局**（§3.9-10） |
@@ -635,7 +635,7 @@ flowchart TD
 
 - **标准窗口 + 置顶悬浮 panel**：`titleBarStyle: 'hiddenInset'` + **系统红绿灯**（`trafficLightPosition {14,16}`）、不占 Dock；**置顶**（`alwaysOnTop` + `setAlwaysOnTop(true, 'screen-saver')`，可浮在全屏应用之上）；**固定 640 × 480、不可缩放**（`resizable: false`，`ships.mainWindow`），仅位置可拖动。
 - **桌面归属**：`setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true })` —— **固定在自己的桌面、不跨桌面跟随**；点托盘显示 / 带到前台（聚焦让系统切到它所在的桌面）。
-- **几何记忆**：位置 / 尺寸写入 `main-window.json`（单槽，见 §5.1）；无记录时在鼠标所在屏幕居中。**拖动时纵向磁性吸附**：窗口纵向中心与屏幕工作区纵向中心对齐（±10px）时吸附到正中并轻微「卡」一下，拖动超过 26px 才脱开（`CENTER_SNAP`；与终端窗口同一行为）。
+- **几何记忆**：**只记位置（不记桌面 / 屏幕）**写入 `main-window.json`（单槽，见 §5.1）；每次都在**当前桌面 / 当前屏幕**显示，有记忆则沿用它（夹回当前屏幕），无记录则居中。**拖动时纵向磁性吸附**：窗口纵向中心与屏幕工作区纵向中心对齐（±10px）时吸附到正中并轻微「卡」一下，拖动超过 26px 才脱开（`CENTER_SNAP`；与终端窗口同一行为）。
 - **布局适配**：顶部栏 `#tabbar` 左侧留出 **80px** 给系统红绿灯；**整条顶部栏可拖动窗口**——`#tabbar` / `#brand` / `#tablist` 均为 `-webkit-app-region: drag`（TAB 区虽铺满右侧，但其空白处也可拖动），仅真正的 **TAB 按钮**（`#tablist .tab`）为 `no-drag` 保证可点击，品牌图标禁用原生图片拖拽以免抢走窗口拖动；内容区加宽（`padding: 16px 20px`），工具内容 `#content > .tool-body` 用 `repeat(auto-fit, minmax(320px, 1fr))` 网格（固定 640 宽下为单列，窗口更宽时自动分栏）；面板圆角取消（`#panel border-radius:0`）。**图钉（固定悬浮）按钮隐藏**（仅悬浮模式有意义），毛玻璃不启用（普通不透明窗口）。
 
 **悬浮模式（`floatMode = true`，原主面板行为）**

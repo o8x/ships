@@ -646,13 +646,13 @@ function mainWindowSize() {
   return { width: MAIN_WINDOW.width, height: MAIN_WINDOW.height };
 }
 
-/* 尺寸固定；有位置记忆且记忆的屏幕还在 → 沿用位置（夹回工作区），否则在新屏幕居中。 */
+/* 尺寸固定；**只记位置、不记桌面**：有位置记忆就沿用它（夹回当前屏幕工作区），
+   否则在当前屏幕（鼠标所在）居中。每次都在**当前桌面 / 当前屏幕**显示。 */
 function mainWindowBoundsForOpen() {
   const size = mainWindowSize();
-  const saved = mainWindowState && mainWindowState.bounds ? mainWindowState : null;
-  const matched = saved ? displayBySignature(screen.getAllDisplays(), saved.display) : null;
-  const display = matched || anchorDisplay();
-  const position = saved ? { x: saved.bounds.x, y: saved.bounds.y } : null;
+  const display = anchorDisplay();
+  const saved = mainWindowState && mainWindowState.bounds ? mainWindowState.bounds : null;
+  const position = saved ? { x: saved.x, y: saved.y } : null;
   return clampBounds(position, display, size, size);
 }
 
@@ -660,12 +660,8 @@ function saveMainWindowGeometry() {
   if (!isWindowMode()) return;
   const win = getMainWindow();
   if (!win || win.isDestroyed() || win.isMinimized() || win.isFullScreen()) return;
-  const bounds = win.getBounds();
-  const next = {
-    display: displaySignature(screen.getDisplayMatching(bounds)),
-    bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
-  };
-  if (!next.display) return;
+  const b = win.getBounds();
+  const next = { bounds: { x: b.x, y: b.y, width: b.width, height: b.height } };
   if (JSON.stringify(next) === JSON.stringify(mainWindowState)) return;
   mainWindowState = next;
   writeJson(MAIN_WINDOW_FILE, mainWindowState);
