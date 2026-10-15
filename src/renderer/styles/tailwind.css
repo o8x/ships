@@ -1541,27 +1541,23 @@ body.file-window {
   animation: ships-fade 0.16s ease both;
 }
 
-/* 自动更新下载窗口（body = update.html）：小型、不可关闭的前台窗口。 */
+/* 自动更新下载窗口（body = update.html）：小型、不可关闭的前台窗口，系统红绿灯（hiddenInset）。 */
 .update-shell {
   position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
   box-sizing: border-box;
-  padding: 12px 16px 14px;
+  padding: 0 16px 14px;
   gap: 8px;
+}
+/* 标题与系统红绿灯同一行：整行可拖动，左侧留白避开红绿灯。 */
+.update-titlebar {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding-left: 74px;
   -webkit-app-region: drag;
-}
-.update-head {
-  display: flex;
-  align-items: center;
-  height: 14px;
-  -webkit-app-region: no-drag;
-}
-#update-lights {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 .update-title {
   margin: 0;

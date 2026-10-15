@@ -606,7 +606,7 @@ flowchart TD
   - **下载方式按平台分两种模式**（`dl.mode`）：
     - **macOS（`mode=dmg`）**：从 GitHub Release 下载 **`.dmg`**——先经 GitHub API `releases/tags/vX.Y.Z` 选出与当前架构匹配的 `.dmg`，失败（限流 / 离线 / 命名变化）再按 `Ships-vX.Y.Z-{arch}.dmg` 命名规则拼 URL；用 Electron `net` 流式下载到 `app.getPath('downloads')`，可取消（abort + 删除半成品）。**`owner` / `repo` 取自 `package.json` 的 `build.publish`，打包后该段会被 electron-builder 裁剪，故回退读 `Resources/app-update.yml`**；产物前缀固定取应用名 `Ships`（`APP_NAME`）。**不依赖 Squirrel / 签名**，因此 ad-hoc 构建也能更新。
     - **Windows（`mode=auto`）**：仍用 `electron-updater` 的 `downloadUpdate()` 自动下载并 `quitAndInstall()`（`autoInstallOnAppQuit=true`；6 秒未退出则 `app.relaunch()` + `app.quit()` 兜底）。
-  - **下载窗口**：确认下载后弹出一个**小型、不可关闭（`closable: false` + `frame: false`，无关闭按钮、Cmd-W 无效，仅退出应用时放行）、可最小化、置顶居中的前台窗口** `update.html`（尺寸 `ships.updateWindow` = 380 × 160，见 §8.7）。窗口只有：顶部**自绘红绿灯**（仅「最小化」可用）、**实时进度条**（`update:progress`）、**取消**、**安装按钮**（下载期间禁用）。下载完成后按钮可用并显示 **60 秒倒计时**（常量 `UPDATE_COUNTDOWN_SECONDS`）；**macOS 按钮为「退出并安装」**（`shell`/`open` 挂载 DMG 并打开 Finder，随后退出本程序，由用户手动拖入 Applications；倒计时文案「N 秒后自动退出并挂载安装包」），**Windows 按钮为「重启更新」**（`quitAndInstall()`）。**取消 = 退出本次更新**（下载阶段中止下载并删除半成品；点击安装 / 倒计时到 0 后取消按钮禁用）。
+  - **下载窗口**：确认下载后弹出一个**小型、不可关闭（`closable: false` + 系统关闭按钮禁用，仅退出应用时放行）、可最小化、置顶居中的前台窗口** `update.html`（尺寸 `ships.updateWindow` = 380 × 150，见 §8.7）。窗口采用 **`titleBarStyle: 'hiddenInset'`**：**真正的系统红绿灯**与标题同一行，**只有「最小化」可用**（关闭 / 缩放禁用）。窗口还有：**实时进度条**（`update:progress`）、**取消**、**安装按钮**（下载期间禁用）。下载完成后按钮可用并显示 **60 秒倒计时**（常量 `UPDATE_COUNTDOWN_SECONDS`）；**macOS 按钮为「退出并安装」**（`open` 挂载 DMG 并打开 Finder，随后退出本程序，由用户手动拖入 Applications；倒计时文案「N 秒后自动退出并挂载安装包」），**Windows 按钮为「重启更新」**（`quitAndInstall()`）。**取消 = 退出本次更新**（下载阶段中止下载并删除半成品；点击安装 / 倒计时到 0 后取消按钮禁用）。**注意**：macOS 上 `closable: false` 的窗口会让 `app.quit()` 卡住（窗口永不被关闭），因此退出时（`before-quit`）会对更新窗口 `setClosable(true)` 放行，保证能真正退出。
   - **下载失败**：仅在日志记录详细错误，并关闭下载窗口、给一句友好提示。
   - **手动检查**：设置 → Ships → 关于「检查更新」（`app:check-updates`）触发，会提示「已是最新 / 暂时无法检查」；**每次点击都必须有反馈**（有新版本同样会重新弹窗，反复点击不会静默无响应）；检查进行中再次点击返回 `{ ok: true, checking: true }`，界面就地提示「正在检查…」。**出错时不报技术错误**：手动检查给一句友好提示（详情写日志），启动时的静默检查出错则完全不提示。
   - **说明**：macOS 的 Squirrel 自动安装需要稳定 **Developer ID 签名**，本项目默认 ad-hoc 签名，故改用 DMG 手动安装；发布时仍同时产出 `*.zip` / `latest-mac.yml`（`electron-updater` 版本检测依赖 `latest-mac.yml` / `*.blockmap`）。
@@ -692,8 +692,8 @@ flowchart TD
 
 ### 8.7 更新下载窗口
 
-- 尺寸 **380 × 160**（`package.json` 的 `ships.updateWindow` → `constants.js` 的 `UPDATE_WINDOW`）；无边框（`frame: false`）、不可缩放、**不可关闭**（`closable: false`，无关闭按钮、Cmd-W 无效，仅应用退出 / `quitAndInstall` 时放行）、置顶（`alwaysOnTop`）并**居中**显示。**可最小化**（`minimizable: true`）。
-- 顶部**自绘红绿灯**（`#update-lights`，9px 圆点，与终端窗口同一套 `.traffic-light` 样式 / 失焦变灰）：**只保留「最小化」可用**，关闭 / 缩放用 `.traffic-disabled` 置灰且不可点；最小化经 `window:control` 生效。
+- 尺寸 **380 × 150**（`package.json` 的 `ships.updateWindow` → `constants.js` 的 `UPDATE_WINDOW`）；**标准窗口 + `titleBarStyle: 'hiddenInset'`**（真正的系统红绿灯，`trafficLightPosition {14,13}`）、不可缩放、**不可关闭**（`closable: false`，系统关闭按钮禁用、Cmd-W 无效，仅应用退出 / `quitAndInstall` 时放行；`close` 事件另有 `preventDefault` 兜底）、置顶（`alwaysOnTop`）并**居中**显示。**可最小化**（`minimizable: true`，系统黄灯生效）；**缩放禁用**（`maximizable: false`）。
+- **标题与红绿灯同一行**：`.update-titlebar`（高 40px、`padding-left: 74px` 避开红绿灯、整行为拖动区）内放标题 `#update-title`。
 - 结构（`update.html`）：红绿灯 → 标题（下载中「正在下载更新 vX」/ 完成「下载完成 vX」）→ **进度条** `update-progress`（宽 = `percent`）→ 状态行（`已下载 / 总量 · 速度`；完成时 macOS 显示「N 秒后自动退出并挂载安装包」、Windows 显示「N 秒后自动重启更新」）→ 底部按钮「取消」与**安装按钮**（macOS =「**退出并安装**」/ Windows =「**重启更新**」，文案随状态里的 `mode` 切换；下载期间禁用；**一旦触发安装——点按钮或倒计时到 0——「取消」与安装按钮一并禁用**；两者紧贴状态行、无多余留白）。整窗为拖拽区、红绿灯与按钮为 `no-drag`。
 - 行为见 §6.6 / §7：进度实时回填；下载完成后安装按钮可用并显示 60 秒倒计时。**macOS**：点安装 / 倒计时到 0 → `open` 挂载 DMG（并打开 Finder）后退出本程序，用户手动拖入 Applications。**Windows**：调用 `quitAndInstall()`，6 秒未退出则 `app.relaunch()` + `app.quit()` 兜底。
 
@@ -751,7 +751,7 @@ flowchart TD
 | 悬浮面板尺寸 | 400 × 500 |
 | 窗口模式主窗口尺寸 | 固定 640 × 480（不可缩放；`ships.mainWindow`） |
 | 设置窗口尺寸 | 800 × 600 |
-| 更新下载窗口尺寸 | 380 × 160（`ships.updateWindow`） |
+| 更新下载窗口尺寸 | 380 × 150（`ships.updateWindow`） |
 | `--tabbar-height` | 46px |
 | `--footer-height` | 34px |
 | `--term-header-height` | 22px（终端窗口头栏最小高度，刚好放下自绘小红绿灯；实际为 `max(22px, --term-header-font-size + 6px)`） |

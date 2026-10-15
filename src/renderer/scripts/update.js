@@ -47,19 +47,7 @@
     status: document.getElementById('update-status'),
     cancel: document.getElementById('update-cancel'),
     install: document.getElementById('update-install'),
-    lightMinimize: document.getElementById('light-minimize'),
   };
-
-  // 自绘红绿灯：仅「最小化」生效（关闭 / 缩放已禁用）；窗口失焦时整体变灰。
-  if (dom.lightMinimize) {
-    dom.lightMinimize.addEventListener('click', () => window.ships.windowControl('minimize'));
-  }
-  function syncWindowFocus() {
-    document.documentElement.dataset.windowFocus = document.hasFocus() ? 'on' : 'off';
-  }
-  window.addEventListener('focus', syncWindowFocus);
-  window.addEventListener('blur', syncWindowFocus);
-  syncWindowFocus();
 
   dom.cancel.textContent = i18n.t('updateWin.cancel');
   dom.install.textContent = i18n.t('updateWin.install');

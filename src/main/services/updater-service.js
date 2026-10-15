@@ -412,6 +412,14 @@ function installDmg() {
     }
   }
   app.quit();
+  // 兜底：万一 quit 未生效（例如窗口拦截），数秒后强制退出。
+  setTimeout(() => {
+    try {
+      app.exit(0);
+    } catch (err) {
+      /* ignore */
+    }
+  }, 5000);
 }
 
 function installAuto() {

@@ -56,6 +56,12 @@ let fileWindowGeometryTimer = null;
 let isQuitting = false;
 app.on('before-quit', () => {
   isQuitting = true;
+  // macOS：`closable: false` 的窗口会让 app.quit() 卡住（窗口永不被关闭）。
+  // 退出时临时放开可关闭，保证更新窗口 / 托盘退出都能真正退掉。
+  const win = updateWindow;
+  if (win && !win.isDestroyed() && typeof win.setClosable === 'function') {
+    win.setClosable(true);
+  }
 });
 
 /* 每个终端窗口各自的拖动 / 对齐状态：will-resize 每帧触发，连续 350ms 没再收到即松手；
@@ -1363,10 +1369,12 @@ function openUpdateWindow() {
     width: UPDATE_WINDOW.width,
     height: UPDATE_WINDOW.height,
     show: false,
-    frame: false,
+    // 真正的系统红绿灯（hiddenInset）：与标题同一行；只保留「最小化」，
+    // 关闭 / 缩放禁用（closable:false + maximizable:false），另见下方的 close 拦截。
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 14, y: 13 },
     resizable: false,
     movable: true,
-    // 自绘红绿灯：只保留「最小化」，关闭 / 缩放禁用（另见 update.html 的禁用样式）。
     minimizable: true,
     maximizable: false,
     closable: false,

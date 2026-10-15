@@ -180,7 +180,7 @@ const FILE_WINDOW = Object.assign(
 const UPDATE_WINDOW = Object.assign(
   {
     width: 380,
-    height: 160,
+    height: 150,
   },
   ships.updateWindow || {}
 );
