@@ -9,13 +9,25 @@
  */
 
 /* 可调参数：
- *   --ball-bounce-distance  幅度（相对球尺寸的比例，范围 0 ~ 0.21）：
- *                           越大跳得越高；超过约 0.21 图标会被窗口裁切。
+ *   --ball-bounce-distance  幅度（相对球尺寸的比例）：
+ *                           越大跳得越高；下面的图标缩放会随之自动缩小以避免裁切
+ *                           （幅度超过约 0.25 时到达图标下限 0.5 仍可能被裁切）。
  *   --ball-bounce-duration  一个完整「上 + 下」循环的时长（越长越舒缓）。
  */
 :root {
   --ball-bounce-distance: 0.065;
   --ball-bounce-duration: 1.3s;
+
+  /* 悬浮球图标占「球直径」的比例（改这里即可测试，保存即生效、无需重建）：
+     - --term-ball-icon-scale      期望比例（你想让图标占多大）；
+     - --term-ball-icon-scale-min  下限（默认 0.5）；
+     - --term-ball-icon-scale-max  上限（默认 0.8）。
+     实际比例 = clamp(min, scale, min(max, 弹跳上限))，
+     其中「弹跳上限 = 1 - 2 × --ball-bounce-distance」保证图标上移到最高点时仍在圆内、
+     不会被窗口裁切（弹跳幅度越大，允许的图标比例越小）。 */
+  --term-ball-icon-scale: 0.7;
+  --term-ball-icon-scale-min: 0.5;
+  --term-ball-icon-scale-max: 0.8;
 }
 
 @keyframes ball-bounce-sine {

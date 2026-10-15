@@ -484,11 +484,19 @@ input[type='color'].swatch::-webkit-color-swatch {
   align-items: center;
   justify-content: center;
   color: var(--color-accent);
+  /* 图标比例按球大小自动调整，并保证「弹跳不越界」；可调变量见 styles/ball-animations.css。
+     实际比例 = clamp(min, 期望, min(上限, 1 - 2 × 弹跳幅度))。 */
+  --term-ball-icon-bounce-max: calc(1 - var(--ball-bounce-distance, 0.065) * 2);
+  --term-ball-icon-effective-scale: clamp(
+    var(--term-ball-icon-scale-min, 0.5),
+    var(--term-ball-icon-scale, 0.7),
+    min(var(--term-ball-icon-scale-max, 0.8), var(--term-ball-icon-bounce-max))
+  );
   /* 输出时的「正弦平滑弹跳」见 styles/ball-animations.css（独立文件，便于调整）。 */
 }
 .term-ball-icon svg {
-  width: calc(var(--term-ball-size, 75px) * 0.58);
-  height: calc(var(--term-ball-size, 75px) * 0.58);
+  width: calc(var(--term-ball-size, 75px) * var(--term-ball-icon-effective-scale));
+  height: calc(var(--term-ball-size, 75px) * var(--term-ball-icon-effective-scale));
 }
 /* 悬浮球：跳动的状态 + 悬停时，球内显示本轮累计跳动时长；停止跳动即隐藏并清空。
    两行：上行 h/m（仅非 0 才显示，字号为 S 的一半），下行 S（更大）。 */
