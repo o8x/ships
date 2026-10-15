@@ -11,6 +11,9 @@ try {
 }
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const SSH_DETECTED_FILE = path.join(DATA_DIR, 'ssh-detected.json');
+// SSH 密码加密存储：数据（AES-256-GCM，仅密文）+ 加密密钥（随机 32 字节、0600）。
+const SSH_CREDENTIALS_FILE = path.join(DATA_DIR, 'ssh-credentials.json');
+const SSH_CREDENTIALS_KEY_FILE = path.join(DATA_DIR, 'ssh-credentials.key');
 const MAIN_WINDOW_FILE = path.join(DATA_DIR, 'main-window.json');
 const TERMINAL_WINDOW_FILE = path.join(DATA_DIR, 'terminal-window.json');
 const FILE_WINDOW_FILE = path.join(DATA_DIR, 'file-window.json');
@@ -43,6 +46,8 @@ function todayLogFile() {
 const DATA_FILES = [
   SETTINGS_FILE,
   SSH_DETECTED_FILE,
+  SSH_CREDENTIALS_FILE,
+  SSH_CREDENTIALS_KEY_FILE,
   MAIN_WINDOW_FILE,
   TERMINAL_WINDOW_FILE,
   FILE_WINDOW_FILE,
@@ -60,6 +65,8 @@ module.exports = {
   DATA_DIR,
   SETTINGS_FILE,
   SSH_DETECTED_FILE,
+  SSH_CREDENTIALS_FILE,
+  SSH_CREDENTIALS_KEY_FILE,
   MAIN_WINDOW_FILE,
   TERMINAL_WINDOW_FILE,
   FILE_WINDOW_FILE,

@@ -63,7 +63,7 @@ function emitTo(sender) {
 
 /* Runs `command` in a terminal window: the focused one if any, otherwise a new one
    (windows never move across desktops — we never pull an existing one over). */
-function runInTerminal(command) {
+function runInTerminal(command, secret) {
   if (!command) return false;
   let win = wm.getFocusedTerminalWindow();
   if (!win) {
@@ -81,9 +81,9 @@ function runInTerminal(command) {
   const ownerId = win.webContents.id;
   const sessionId = sessionByOwner.get(ownerId);
   if (sessionId && terminal.get(sessionId)) {
-    terminal.inject(sessionId, command);
+    terminal.inject(sessionId, command, secret);
   } else {
-    pendingByOwner.set(ownerId, command); // flushed once the window's session reports in
+    pendingByOwner.set(ownerId, { command, secret }); // flushed once the window's session reports in
   }
   return true;
 }
@@ -106,7 +106,7 @@ function registerTerminalIpc(ipcMain) {
       const pending = pendingByOwner.get(ownerId);
       if (pending) {
         pendingByOwner.delete(ownerId);
-        terminal.inject(started.id, pending);
+        terminal.inject(started.id, pending.command, pending.secret);
       }
     }
     return started;

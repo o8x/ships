@@ -5,6 +5,7 @@ const { IPC } = require('../../shared/constants');
 const { Notification, dialog, BrowserWindow } = require('electron');
 const configService = require('../services/ssh-config-service');
 const sshService = require('../services/ssh-service');
+const credentials = require('../services/ssh-credentials-service');
 const { broadcast, getMainWindow } = require('../window-manager');
 const { runInTerminal } = require('./terminal-ipc');
 const logger = require('../utils/logger');
@@ -14,9 +15,14 @@ function findHost(alias) {
   return configService.list().find((host) => host.alias === alias) || null;
 }
 
+/* 给主机列表附上「是否已存密码」（非机密标记；密码本体加密存本地）。 */
+function withPassword(hosts) {
+  return hosts.map((host) => Object.assign({}, host, { hasPassword: credentials.has(host.alias) }));
+}
+
 function registerSshIpc(ipcMain) {
   ipcMain.handle(IPC.SSH_LIST, () => ({
-    hosts: configService.list(),
+    hosts: withPassword(configService.list()),
     detected: sshService.getDetected(),
   }));
 
@@ -31,11 +37,14 @@ function registerSshIpc(ipcMain) {
     const settingsService = require('../services/settings-service');
     const inTerminal = Boolean(payload && payload.inTerminal);
     if (!inTerminal && settingsService.get('sshBuiltinTerminal') === false) {
+      // iTerm：不自动输入密码（在 iTerm 里手动输入）。
       logger.file(`[ssh] connect(alias=${host.alias}) -> iTerm: ${command}`);
       return sshService.connect(host);
     }
-    logger.file(`[ssh] connect(alias=${host.alias}) -> terminal: ${command}`);
-    if (!runInTerminal(command)) return { ok: false, error: 'terminal unavailable', command };
+    // 内置终端：若有存储密码，ssh 提示输入密码时由终端自动注入（见 terminal-service）。
+    const secret = credentials.has(host.alias) ? credentials.get(host.alias) : '';
+    logger.file(`[ssh] connect(alias=${host.alias}) -> terminal: ${command}${secret ? ' (+password)' : ''}`);
+    if (!runInTerminal(command, secret)) return { ok: false, error: 'terminal unavailable', command };
     return { ok: true, command };
   });
 
@@ -71,7 +80,11 @@ function registerSshIpc(ipcMain) {
     return hosts;
   }
 
-  ipcMain.handle(IPC.SSH_CONFIG_READ, () => configService.list());
+  ipcMain.handle(IPC.SSH_CONFIG_READ, () => withPassword(configService.list()));
+  ipcMain.handle(IPC.SSH_PASSWORD_SAVE, (_event, payload) =>
+    credentials.save(payload && payload.alias, payload && payload.password)
+  );
+  ipcMain.handle(IPC.SSH_PASSWORD_REMOVE, (_event, payload) => credentials.remove(payload && payload.alias));
   ipcMain.handle(IPC.SSH_CONFIG_UPSERT, (_event, host) => notifyConfigChanged(configService.upsert(host)));
   ipcMain.handle(IPC.SSH_CONFIG_REMOVE, (_event, alias) => notifyConfigChanged(configService.remove(alias)));
   ipcMain.handle(IPC.SSH_CONFIG_RENAME_GROUP, (_event, payload) =>

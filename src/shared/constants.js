@@ -115,6 +115,11 @@ const IPC = {
   SSH_CONFIG_REMOVE: 'ssh-config:remove',
   SSH_CONFIG_RENAME_GROUP: 'ssh-config:rename-group',
   SSH_CONFIG_EXPORT: 'ssh-config:export',
+  SSH_PASSWORD_SAVE: 'ssh-password:save',
+  SSH_PASSWORD_REMOVE: 'ssh-password:remove',
+
+  BACKUP_EXPORT: 'backup:export',
+  BACKUP_IMPORT: 'backup:import',
   // 主 → 渲染：SSH 主机 / 分组增删改后广播，让各处 SSH 下拉实时刷新。
   SSH_CONFIG_CHANGED: 'ssh-config:changed',
 };

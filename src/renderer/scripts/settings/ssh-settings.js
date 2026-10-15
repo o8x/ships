@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerSshSettings() {
-  const { Icons, el, field, inputField, osIconInfo, createSelect } = window.ShipsUI;
+  const { Icons, el, field, inputField, osIconInfo, segmented } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   const DEFAULT_IDENTITY = '~/.ssh/id_ed25519';
@@ -36,10 +36,14 @@
         exportFailed: '导出失败：{error}',
         group: '分组',
         ungrouped: '未分组',
-        newGroup: '新建分组…',
+        newGroup: '新增分组',
         groupPlaceholder: '输入新分组名称',
         renameGroup: '重命名分组',
         groupExists: '同名分组已存在',
+        password: '密码',
+        passwordPlaceholder: '（可选）登录密码，仅 macOS',
+        passwordSaved: '已保存（留空则不修改）',
+        clearPassword: '清除已保存的密码',
       },
     },
     en: {
@@ -71,10 +75,14 @@
         exportFailed: 'Export failed: {error}',
         group: 'Group',
         ungrouped: 'Ungrouped',
-        newGroup: 'New group…',
+        newGroup: 'New group',
         groupPlaceholder: 'New group name',
         renameGroup: 'Rename group',
         groupExists: 'A group with this name already exists',
+        password: 'Password',
+        passwordPlaceholder: 'Login password (optional, macOS)',
+        passwordSaved: 'Saved (leave empty to keep)',
+        clearPassword: 'Clear saved password',
       },
     },
   });
@@ -97,6 +105,8 @@
       renamingGroup: null,
       renameValue: '',
       renameError: '',
+      // 表单里的「密码」控件（仅 macOS）：{ input, isClear(), hadPassword } 或 null。
+      passwordControl: null,
     };
     const root = el('div', {});
     pane.appendChild(root);
@@ -420,41 +430,121 @@
         form.appendChild(built.wrapper);
       }
 
-      // 分组：从已有分组中选，或选「新建分组…」后输入新名称（写回 config 注释 `# group: <名>`）。
-      const NEW_GROUP = '__new__';
+      // 分组：TAB 式 Switch 展示已有分组（默认「未分组」）+ 最右侧「新增分组」按钮。
+      // 选中值存 state.editing.group，保存时写回 config 注释 `# group: <名>`。
       const existingGroups = namedGroups();
       const currentGroup = editing.group || '';
-      const matchedExisting = existingGroups.find((g) => g.toLowerCase() === currentGroup.toLowerCase());
-      const groupInput = el('input', {
-        class: 'field min-w-0 flex-1',
+      let groupList = [
+        { value: '', label: i18n.t('sshSettings.ungrouped') },
+        ...existingGroups.map((g) => ({ value: g, label: g })),
+      ];
+      if (currentGroup && !existingGroups.some((g) => g.toLowerCase() === currentGroup.toLowerCase())) {
+        groupList.push({ value: currentGroup, label: currentGroup });
+      }
+      state.editing.group = currentGroup;
+
+      const groupError = el('div', { class: 'hidden text-[11px] text-danger' }, '');
+      const newGroupInput = el('input', {
+        class: 'field min-w-0 flex-1 px-2 py-1 text-[12px]',
+        type: 'text',
         spellcheck: 'false',
         placeholder: i18n.t('sshSettings.groupPlaceholder'),
       });
-      groupInput.dataset.key = 'group';
-      groupInput.value = currentGroup;
-      groupInput.style.display = currentGroup && !matchedExisting ? '' : 'none';
-      const groupSelect = createSelect({
-        options: [
-          { value: '', label: i18n.t('sshSettings.ungrouped') },
-          ...existingGroups.map((g) => ({ value: g, label: g })),
-          { value: NEW_GROUP, label: i18n.t('sshSettings.newGroup') },
-        ],
-        value: matchedExisting || (currentGroup ? NEW_GROUP : ''),
-        className: 'shrink-0',
-        onChange: (value) => {
-          if (value === NEW_GROUP) {
-            groupInput.style.display = '';
-            groupInput.value = '';
-            groupInput.focus();
-          } else {
-            groupInput.style.display = 'none';
-            groupInput.value = value;
-          }
-        },
+      const newGroupRow = el('div', { class: 'hidden flex items-center gap-2' });
+      function hideNewGroup() {
+        newGroupRow.classList.add('hidden');
+        groupError.classList.add('hidden');
+        newGroupInput.value = '';
+      }
+      function confirmNewGroup() {
+        const name = newGroupInput.value.trim();
+        if (!name) return;
+        if (groupList.some((option) => option.value && option.value.toLowerCase() === name.toLowerCase())) {
+          groupError.textContent = i18n.t('sshSettings.groupExists');
+          groupError.classList.remove('hidden');
+          return;
+        }
+        groupList = groupList.concat([{ value: name, label: name }]);
+        groupSwitch.setOptions(groupList);
+        groupSwitch.set(name);
+        state.editing.group = name;
+        hideNewGroup();
+      }
+      const newGroupOk = el('button', { class: 'icon-btn h-7 w-7 shrink-0', type: 'button' });
+      newGroupOk.innerHTML = Icons.check(15);
+      newGroupOk.style.color = 'var(--color-success)';
+      newGroupOk.addEventListener('click', confirmNewGroup);
+      const newGroupCancel = el('button', { class: 'icon-btn h-7 w-7 shrink-0', type: 'button' });
+      newGroupCancel.innerHTML = Icons.x(15);
+      newGroupCancel.addEventListener('click', hideNewGroup);
+      newGroupInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          confirmNewGroup();
+        } else if (event.key === 'Escape') {
+          hideNewGroup();
+        }
       });
+      newGroupRow.append(newGroupInput, newGroupOk, newGroupCancel);
+
+      const groupSwitch = segmented(
+        groupList,
+        currentGroup,
+        (value) => {
+          state.editing.group = value;
+          hideNewGroup();
+        },
+        {}
+      );
+
+      const newGroupBtn = el('button', { class: 'btn shrink-0', type: 'button' });
+      newGroupBtn.append(
+        el('span', { class: 'inline-flex' }, Icons.plus(14)),
+        el('span', {}, i18n.t('sshSettings.newGroup'))
+      );
+      newGroupBtn.addEventListener('click', () => {
+        newGroupRow.classList.remove('hidden');
+        groupError.classList.add('hidden');
+        newGroupInput.value = '';
+        newGroupInput.focus();
+      });
+
+      const groupScroll = el('div', { class: 'min-w-0 flex-1 overflow-x-auto' });
+      groupScroll.appendChild(groupSwitch.root);
       const groupRow = el('div', { class: 'flex items-center gap-2' });
-      groupRow.append(groupSelect.el, groupInput);
+      groupRow.append(groupScroll, newGroupBtn);
       form.appendChild(inputField(i18n.t('sshSettings.group'), groupRow));
+      form.appendChild(newGroupRow);
+      form.appendChild(groupError);
+
+      // 登录密码（仅 macOS）：AES-256-GCM 加密保存在本地，连接时在内置终端自动输入。
+      state.passwordControl = null;
+      if (ctx && ctx.info && ctx.info.platform === 'darwin') {
+        const hasPw = Boolean(editing.hasPassword);
+        let clearPassword = false;
+        const pwInput = el('input', {
+          class: 'field font-mono',
+          type: 'password',
+          spellcheck: 'false',
+          autocomplete: 'new-password',
+          placeholder: hasPw ? i18n.t('sshSettings.passwordSaved') : i18n.t('sshSettings.passwordPlaceholder'),
+        });
+        const clearBtn = el('button', {
+          class: 'icon-btn h-8 w-8 shrink-0',
+          type: 'button',
+          'data-tip': i18n.t('sshSettings.clearPassword'),
+        });
+        clearBtn.innerHTML = Icons.trash(15);
+        if (!hasPw) clearBtn.classList.add('hidden');
+        clearBtn.addEventListener('click', () => {
+          clearPassword = !clearPassword;
+          clearBtn.style.color = clearPassword ? 'var(--color-danger)' : '';
+        });
+        const pwRow = el('div', { class: 'flex items-center gap-2' });
+        pwRow.append(pwInput, clearBtn);
+        form.appendChild(inputField(i18n.t('sshSettings.password'), pwRow));
+        state.passwordControl = { input: pwInput, isClear: () => clearPassword, hadPassword: hasPw };
+      }
 
       if (state.error) {
         form.appendChild(el('div', { class: 'text-[11px] text-danger' }, state.error));
@@ -556,19 +646,36 @@
         render();
         return;
       }
+      const originalAlias = state.editing.originalAlias || alias;
+      const hadPassword = Boolean(state.editing.hasPassword);
+      const password = state.passwordControl ? state.passwordControl.input.value : '';
+      const clearPassword = state.passwordControl ? state.passwordControl.isClear() : false;
+
       await window.ships.sshConfig.upsert({
-        originalAlias: state.editing.originalAlias || alias,
+        originalAlias,
         alias,
         hostName,
         user: value.user || 'root',
         port: Number(value.port) || 22,
         identityFile: value.identityFile,
         proxyJump: value.proxyJump,
-        group: (value.group || '').trim(),
+        group: (state.editing.group || '').trim(),
       });
+
+      // 密码（加密本地存储）：改了别名则迁移（先清旧）；输入了新密码则保存；否则按「清除」处理。
+      if (hadPassword && originalAlias !== alias) {
+        await window.ships.sshConfig.removePassword(originalAlias);
+      }
+      if (password) {
+        await window.ships.sshConfig.savePassword({ alias, password });
+      } else if (clearPassword) {
+        await window.ships.sshConfig.removePassword(alias);
+      }
+
       state.editing = null;
       state.detected = null;
       state.detectError = '';
+      state.passwordControl = null;
       await reload();
     }
 

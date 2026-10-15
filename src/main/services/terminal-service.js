@@ -29,6 +29,9 @@ const DEFAULT_ROWS = 24;
 // How often each session's process subtree is scanned for an open `ssh` connection.
 const SESSION_POLL_MS = 1000;
 const PS_MAX_BUFFER = 8 * 1024 * 1024;
+// 注入 ssh 命令后，若带密码，则在一段时间内监听输出、出现「password:」提示就自动输入。
+const SECRET_TTL_MS = 60000;
+const SECRET_PROMPT_RE = /password[^\n\r]*:\s*$/i;
 
 /* GUI apps inherit a minimal PATH, so probe the usual absolute locations before
    falling back to `python3` from PATH. */
@@ -167,8 +170,14 @@ function start(payload, emit) {
   const send = (message) => {
     if (emit) emit(Object.assign({ id }, message));
   };
-  child.stdout.on('data', (chunk) => send({ type: 'data', data: chunk.toString('utf8') }));
-  child.stderr.on('data', (chunk) => send({ type: 'data', data: chunk.toString('utf8') }));
+  const onData = (chunk) => {
+    const text = chunk.toString('utf8');
+    send({ type: 'data', data: text });
+    const entry = sessions.get(id);
+    if (entry) maybeAutoPassword(entry, text);
+  };
+  child.stdout.on('data', onData);
+  child.stderr.on('data', onData);
   child.on('error', (err) => {
     logger.error(`[terminal] session ${id} failed: ${err.message}`);
     sessions.delete(id);
@@ -180,9 +189,49 @@ function start(payload, emit) {
     send({ type: 'exit', code, signal });
   });
 
-  sessions.set(id, { id, child, emit, cols, rows, pid: child.pid, sshLabel: '', sshTarget: '' });
+  sessions.set(id, {
+    id,
+    child,
+    emit,
+    cols,
+    rows,
+    pid: child.pid,
+    sshLabel: '',
+    sshTarget: '',
+    pendingSecret: '',
+    secretTimer: null,
+    tail: '',
+  });
   startSessionPoll();
   return { ok: true, id, cols, rows, shell };
+}
+
+/* 给会话预置一个密码：接下来 ssh 出现「password:」提示时自动输入一次（TTL 后作废）。 */
+function armSecret(id, secret) {
+  const entry = sessions.get(id);
+  if (!entry || !secret) return;
+  entry.pendingSecret = String(secret);
+  entry.tail = '';
+  if (entry.secretTimer) clearTimeout(entry.secretTimer);
+  entry.secretTimer = setTimeout(() => {
+    entry.pendingSecret = '';
+    entry.secretTimer = null;
+  }, SECRET_TTL_MS);
+}
+
+/* 命中密码提示就写入密码（一次），随后清掉。 */
+function maybeAutoPassword(entry, text) {
+  if (!entry.pendingSecret) return;
+  entry.tail = (entry.tail + text).slice(-200);
+  if (!SECRET_PROMPT_RE.test(entry.tail)) return;
+  const secret = entry.pendingSecret;
+  entry.pendingSecret = '';
+  entry.tail = '';
+  if (entry.secretTimer) {
+    clearTimeout(entry.secretTimer);
+    entry.secretTimer = null;
+  }
+  write(entry.id, `${secret}\r`);
 }
 
 function get(id) {
@@ -222,14 +271,17 @@ function interrupt(id) {
 
 /* Type a command into a session: Ctrl-U clears the input line, CR accepts it so a
    previous command's unfinished output line cannot be overwritten. */
-function inject(id, line) {
+function inject(id, line, secret) {
   if (!line) return false;
-  return write(id, `\u0015\r${line}\r`);
+  const ok = write(id, `\u0015\r${line}\r`);
+  if (ok && secret) armSecret(id, secret);
+  return ok;
 }
 
 function kill(id) {
   const entry = sessions.get(id);
   if (!entry) return false;
+  if (entry.secretTimer) clearTimeout(entry.secretTimer);
   sessions.delete(id);
   try {
     entry.child.kill();

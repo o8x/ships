@@ -22,6 +22,10 @@ const api = {
   openConsole: () => ipcRenderer.invoke(IPC.OPEN_CONSOLE),
   clearData: () => ipcRenderer.invoke(IPC.CLEAR_DATA),
   checkUpdates: () => ipcRenderer.invoke(IPC.UPDATER_CHECK),
+  backup: {
+    exportAll: () => ipcRenderer.invoke(IPC.BACKUP_EXPORT),
+    importAll: () => ipcRenderer.invoke(IPC.BACKUP_IMPORT),
+  },
   openExternal: (url) => ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url),
   closeSettings: () => ipcRenderer.send(IPC.WINDOW_CLOSE_SETTINGS),
   openDevTools: (target) => ipcRenderer.invoke(IPC.DEVTOOLS_OPEN, target),
@@ -48,6 +52,8 @@ const api = {
     upsert: (host) => ipcRenderer.invoke(IPC.SSH_CONFIG_UPSERT, host),
     remove: (alias) => ipcRenderer.invoke(IPC.SSH_CONFIG_REMOVE, alias),
     renameGroup: (payload) => ipcRenderer.invoke(IPC.SSH_CONFIG_RENAME_GROUP, payload),
+    savePassword: (payload) => ipcRenderer.invoke(IPC.SSH_PASSWORD_SAVE, payload),
+    removePassword: (alias) => ipcRenderer.invoke(IPC.SSH_PASSWORD_REMOVE, { alias }),
     export: () => ipcRenderer.invoke(IPC.SSH_CONFIG_EXPORT),
   },
 };
