@@ -73,8 +73,10 @@
   --traffic-inactive: rgba(0, 0, 0, 0.18);
 }
 
-/* 黑暗模式 */
-[data-theme='dark'] {
+/* 黑暗模式（终端窗口「终端暗色模式」开启时，terminal.js 在 <html> 上置
+   data-terminal-dark="on"：此时该窗口整体强制暗色，与全局主题无关） */
+[data-theme='dark'],
+[data-terminal-dark='on'] {
   color-scheme: dark;
   --color-bg: #1c1c1e;
   --color-surface: #2a2a2c;

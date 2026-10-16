@@ -97,7 +97,9 @@
 
   function themeColors() {
     // macOS-like overlay scrollbar (only a safety net: the scrollbar is hidden below)
-    const dark = document.documentElement.dataset.theme === 'dark';
+    // 终端暗色模式开启时该窗口整体强制暗色（constants.css 覆盖主题变量），故这里也要算作 dark。
+    const root = document.documentElement;
+    const dark = root.dataset.terminalDark === 'on' || root.dataset.theme === 'dark';
 
     const css = getComputedStyle(document.documentElement);
     const read = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
@@ -694,9 +696,10 @@
     ballIconEl.innerHTML = svg;
   }
   applyBallIcon(ballIconName);
-  // 悬浮球底色：暗色模式开启 = 始终暗色；关闭 = 跟随全局主题（由 CSS 依 data-theme 推导）。图标始终保留原色。
-  function applyBallDark(forceDark) {
-    document.documentElement.dataset.ballDark = forceDark ? 'on' : 'auto';
+  // 终端暗色模式：开启 = 终端窗口（含 xterm 与悬浮球）始终暗色；关闭 = 跟随全局主题。
+  // 置 data-terminal-dark：constants.css 覆盖该窗口的主题变量、tailwind.css 决定悬浮球底色。
+  function applyTerminalDark(forceDark) {
+    document.documentElement.dataset.terminalDark = forceDark ? 'on' : 'auto';
   }
   // 终端持续有输出时，悬浮球图标做流畅的上下弹跳；2s 内无输出则停止。
   const BALL_IDLE_STOP_MS = 2000;
@@ -924,7 +927,7 @@
     i18n.setLocale((settings && settings.locale) || 'zh');
     window.ShipsTheme.set(settings || {});
     applyBallIcon(settings && settings.terminalBallIcon);
-    applyBallDark((settings && settings.terminalBallDark) !== false);
+    applyTerminalDark((settings && settings.terminalBallDark) !== false);
     renderHeader();
     sshPicker = setupSshPicker();
     refreshSshPicker();
@@ -942,7 +945,7 @@
       i18n.setLocale((next && next.locale) || 'zh');
       window.ShipsTheme.set(next || {});
       applyBallIcon(next && next.terminalBallIcon);
-      applyBallDark((next && next.terminalBallDark) !== false);
+      applyTerminalDark((next && next.terminalBallDark) !== false);
       renderHeader();
       refreshSshPicker();
       if (term) term.options.theme = themeColors();

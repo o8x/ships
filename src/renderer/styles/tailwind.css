@@ -576,12 +576,13 @@ input[type='color'].swatch::-webkit-color-swatch {
   font-size: calc(var(--term-ball-size, 75px) * 0.3);
   font-weight: 600;
 }
-/* 悬浮球底色：暗色模式开 = 始终暗色；关 = 跟随全局主题（依 data-theme）。均为不透明纯色；图标始终保留原色。 */
-[data-ball-dark='on'] #term-ball,
-[data-ball-dark='auto'][data-theme='dark'] #term-ball {
+/* 悬浮球底色：终端暗色模式开 = 始终暗色；关 = 跟随全局主题（依 data-theme）。
+   均为不透明纯色；图标始终保留原色。（同一开关也把整个终端窗口强制暗色，见 constants.css） */
+[data-terminal-dark='on'] #term-ball,
+[data-terminal-dark='auto'][data-theme='dark'] #term-ball {
   background: #2a2a2c;
 }
-[data-ball-dark='auto'][data-theme='light'] #term-ball {
+[data-terminal-dark='auto'][data-theme='light'] #term-ball {
   background: #ffffff;
 }
 /* 设置 → 终端：悬浮球图标选择器的预览框。 */
