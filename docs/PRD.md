@@ -6,7 +6,7 @@
 | 产品定位 | 面向开发者的 macOS 菜单栏（Tray）工具箱，点击托盘图标在下方展开轻量面板 |
 | 技术栈 | Electron 44（主进程）+ Tailwind CSS 3（界面样式）+ 原生 JavaScript（渲染层，无打包器）+ ssh2（SSH 探测）+ qrcode-generator（二维码生成）+ electron-liquid-glass（macOS 26+ 原生 Liquid Glass，可选）+ electron-updater（自动更新）+ @xterm/xterm 与 @xterm/addon-fit（设置页内嵌终端）+ python3（PTY 桥接脚本）+ 本地 geoip.json（IP 归属地） |
 | 支持平台 | macOS（arm64 / x64；当前主要面向 arm64） |
-| 当前版本 | 3.25.2 |
+| 当前版本 | 3.26.0 |
 | 发布方式 | 本地/CI 通过 `electron-builder` 打包 macOS arm64 **DMG + ZIP**（`pnpm dist:mac`）；打 `v*` tag 时发布到 GitHub Releases；更新用 `electron-updater` 做版本检测，**macOS 下载 DMG 手动安装**（挂载 DMG 后拖入 Applications）、Windows 走 `electron-updater` 自动安装（见 §7）；暂未签名 / 公证 |
 
 **核心设计**：应用常驻系统托盘、不占用 Dock。主界面有**两种模式**（设置 → 应用设置 → 悬浮模式切换）：**窗口模式（默认）**为**固定 640×480（不可缩放）**的独立标准窗口，点托盘在当前桌面居中显示 / 带到前台、不跨桌面切换、记忆位置；**悬浮模式**为托盘图标正下方弹出的 400×500 圆角面板。两种模式都以顶部 TAB 切换工具、底部显示版本与设置入口；所有输入实时反馈，无需点击“计算”按钮。
@@ -43,7 +43,7 @@
 - **技术栈**：Electron 44；界面使用 Tailwind CSS 3 编译产物 + 原生 JS（`window.Ships*` 命名空间）；SSH 探测使用 `ssh2`；原生玻璃使用 `electron-liquid-glass`（N-API 原生插件，macOS 26+ 生效，旧系统 / 非 macOS 由主进程回退，见 §8.1）。
   - 说明：AGENTS 建议界面优先 Vue 3；当前实现选用**无打包器的原生 JS + Tailwind**，以减小体积、避免引入前端构建链，后续如需可平滑替换为 Vue 3。
 - **支持平台**：macOS（Darwin）。代码通过 `process.platform` 判断，非 macOS 下托盘行为与登录项设置自动降级。
-- **当前版本**：3.25.2。
+- **当前版本**：3.26.0。
 - **发布方式**：通过 `electron-builder` 打包 macOS arm64 DMG，见 §7。
 
 ### 2.1 架构原理
