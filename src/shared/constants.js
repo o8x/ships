@@ -48,6 +48,12 @@ const IPC = {
   HASH_FILE: 'hash:file',
   DIALOG_OPEN_FILE: 'dialog:open-file',
 
+  // 2FA（TOTP）动态验证码：列账号 / 解析并添加 / 删除 / 取当前验证码。
+  TOTP_LIST: 'totp:list',
+  TOTP_ADD: 'totp:add',
+  TOTP_REMOVE: 'totp:remove',
+  TOTP_CODES: 'totp:codes',
+
   NET_TEST_COMMAND: 'net-test:command',
 
   TERMINAL_OPEN: 'terminal:open',

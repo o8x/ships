@@ -14,6 +14,9 @@ const SSH_DETECTED_FILE = path.join(DATA_DIR, 'ssh-detected.json');
 // SSH 密码加密存储：数据（AES-256-GCM，仅密文）+ 加密密钥（随机 32 字节、0600）。
 const SSH_CREDENTIALS_FILE = path.join(DATA_DIR, 'ssh-credentials.json');
 const SSH_CREDENTIALS_KEY_FILE = path.join(DATA_DIR, 'ssh-credentials.key');
+// 2FA（TOTP）账号：密钥以 AES-256-GCM 加密存储（数据 + 随机密钥，均 0600）。
+const TOTP_ACCOUNTS_FILE = path.join(DATA_DIR, 'totp-accounts.json');
+const TOTP_ACCOUNTS_KEY_FILE = path.join(DATA_DIR, 'totp-accounts.key');
 const MAIN_WINDOW_FILE = path.join(DATA_DIR, 'main-window.json');
 const TERMINAL_WINDOW_FILE = path.join(DATA_DIR, 'terminal-window.json');
 const FILE_WINDOW_FILE = path.join(DATA_DIR, 'file-window.json');
@@ -48,6 +51,8 @@ const DATA_FILES = [
   SSH_DETECTED_FILE,
   SSH_CREDENTIALS_FILE,
   SSH_CREDENTIALS_KEY_FILE,
+  TOTP_ACCOUNTS_FILE,
+  TOTP_ACCOUNTS_KEY_FILE,
   MAIN_WINDOW_FILE,
   TERMINAL_WINDOW_FILE,
   FILE_WINDOW_FILE,
@@ -67,6 +72,8 @@ module.exports = {
   SSH_DETECTED_FILE,
   SSH_CREDENTIALS_FILE,
   SSH_CREDENTIALS_KEY_FILE,
+  TOTP_ACCOUNTS_FILE,
+  TOTP_ACCOUNTS_KEY_FILE,
   MAIN_WINDOW_FILE,
   TERMINAL_WINDOW_FILE,
   FILE_WINDOW_FILE,

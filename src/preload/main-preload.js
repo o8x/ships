@@ -34,6 +34,12 @@ const api = {
   },
   hashText: (text) => ipcRenderer.invoke(IPC.HASH_TEXT, text),
   hashFile: (file) => ipcRenderer.invoke(IPC.HASH_FILE, file),
+  totp: {
+    list: () => ipcRenderer.invoke(IPC.TOTP_LIST),
+    add: (input) => ipcRenderer.invoke(IPC.TOTP_ADD, input),
+    remove: (id) => ipcRenderer.invoke(IPC.TOTP_REMOVE, id),
+    codes: () => ipcRenderer.invoke(IPC.TOTP_CODES),
+  },
   openFile: () => ipcRenderer.invoke(IPC.DIALOG_OPEN_FILE),
   openDirectory: (options) => ipcRenderer.invoke(IPC.DIALOG_OPEN_DIR, options),
   openFiles: () => ipcRenderer.invoke(IPC.DIALOG_OPEN_FILES),

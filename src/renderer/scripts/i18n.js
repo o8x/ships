@@ -41,6 +41,7 @@ window.ShipsI18n = (function createI18n() {
         encode: '编码转换',
         hash: '哈希计算',
         nutrient: '营养成分',
+        twofa: '2FA 验证码',
       },
       toolDesc: {
         timestamp: '秒 / 毫秒 / 纳秒与日期互转',
@@ -52,6 +53,7 @@ window.ShipsI18n = (function createI18n() {
         encode: '字符串与 Base64 / 十六进制 / URL / ASCII 互转',
         hash: '计算文本或文件的 MD5 / SHA1 / SHA256',
         nutrient: '营养成分换算为能量与运动消耗',
+        twofa: '解析 otpauth:// 链接或密钥，实时生成 TOTP 动态验证码',
       },
     },
     en: {
@@ -93,6 +95,7 @@ window.ShipsI18n = (function createI18n() {
         encode: 'Encode',
         hash: 'Hash',
         nutrient: 'Nutrition',
+        twofa: '2FA codes',
       },
       toolDesc: {
         timestamp: 'Convert between s / ms / ns and dates',
@@ -104,6 +107,7 @@ window.ShipsI18n = (function createI18n() {
         encode: 'Text ↔ Base64 / Hex / URL / ASCII',
         hash: 'MD5 / SHA1 / SHA256 of text or a file',
         nutrient: 'Convert nutrition into energy and exercise',
+        twofa: 'Parse an otpauth:// link or secret and generate live TOTP codes',
       },
     },
   };

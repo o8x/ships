@@ -10,6 +10,7 @@ const { registerSshIpc } = require('./ipc/ssh-ipc');
 const { registerGeoIpc } = require('./ipc/geo-ipc');
 const { registerClipboardIpc } = require('./ipc/clipboard-ipc');
 const { registerHashIpc } = require('./ipc/hash-ipc');
+const { registerTotpIpc } = require('./ipc/twofa-ipc');
 const { registerNetTestIpc } = require('./ipc/net-test-ipc');
 const { registerTerminalIpc } = require('./ipc/terminal-ipc');
 const { registerSftpIpc } = require('./ipc/sftp-ipc');
@@ -41,6 +42,7 @@ function onReady() {
   registerGeoIpc(ipcMain);
   registerClipboardIpc(ipcMain);
   registerHashIpc(ipcMain);
+  registerTotpIpc(ipcMain);
   registerNetTestIpc(ipcMain);
   registerTerminalIpc(ipcMain);
   registerSftpIpc(ipcMain);

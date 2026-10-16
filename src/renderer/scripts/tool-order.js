@@ -4,6 +4,7 @@
 // 未在此列出的工具会按注册顺序追加到末尾。id 对应各工具注册时的 id。
 window.ShipsToolOrder = [
     "ssh", // SSH 管理
+    "twofa", // 2FA 动态验证码（TOTP）
     "timestamp", // 时间戳转换
     "subnet", // IP / 网段与掩码计算
     "encode", // 编码转换（字符串 / Base64 / 十六进制 / URL / ASCII）
