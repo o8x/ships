@@ -56,18 +56,26 @@ function registerSshIpc(ipcMain) {
   });
 
   // Detect an arbitrary host (used by the settings form before the host exists).
+  // 支持密码认证：优先用表单里填的密码；留空则回退到该别名已保存的密码（除非表单点了「清除密码」）。
   ipcMain.handle(IPC.SSH_DETECT_HOST, async (_event, payload) => {
     const host = payload || {};
     if (!host.hostName) return { ok: false, error: 'hostName required' };
     const alias = host.alias || host.hostName;
-    const info = await sshService.runDetect({
-      alias,
-      hostName: host.hostName,
-      port: host.port,
-      user: host.user,
-      identityFile: host.identityFile,
-      proxyJump: host.proxyJump,
-    });
+    const typedPassword = String(host.password || '');
+    const storedPassword =
+      host.useStoredPassword !== false && credentials.has(alias) ? credentials.get(alias) : '';
+    const password = typedPassword || storedPassword;
+    const info = await sshService.runDetect(
+      {
+        alias,
+        hostName: host.hostName,
+        port: host.port,
+        user: host.user,
+        identityFile: host.identityFile,
+        proxyJump: host.proxyJump,
+      },
+      password ? { password } : null
+    );
     sshService.setDetected(alias, info);
     return { ok: true, alias, info };
   });

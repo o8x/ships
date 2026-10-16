@@ -29,7 +29,7 @@
         detect: '探测系统',
         detecting: '探测中…',
         detected: '已识别：{os}',
-        detectFailed: '探测失败，请检查地址/端口/私钥',
+        detectFailed: '探测失败，请检查地址 / 端口 / 私钥 / 密码',
         detectFirst: '探测成功后才能保存',
         export: '导出',
         exportDone: '已导出到 {path}',
@@ -44,6 +44,8 @@
         passwordPlaceholder: '（可选）登录密码，仅 macOS',
         passwordSaved: '已保存（留空则不修改）',
         clearPassword: '清除已保存的密码',
+        showPassword: '查看密码',
+        hidePassword: '隐藏密码',
       },
     },
     en: {
@@ -68,7 +70,7 @@
         detect: 'Detect OS',
         detecting: 'Detecting…',
         detected: 'Detected: {os}',
-        detectFailed: 'Detection failed. Check address/port/key',
+        detectFailed: 'Detection failed. Check address / port / key / password',
         detectFirst: 'Detect successfully before saving',
         export: 'Export',
         exportDone: 'Exported to {path}',
@@ -83,6 +85,8 @@
         passwordPlaceholder: 'Login password (optional, macOS)',
         passwordSaved: 'Saved (leave empty to keep)',
         clearPassword: 'Clear saved password',
+        showPassword: 'Show password',
+        hidePassword: 'Hide password',
       },
     },
   });
@@ -107,6 +111,10 @@
       renameError: '',
       // 表单里的「密码」控件（仅 macOS）：{ input, isClear(), hadPassword } 或 null。
       passwordControl: null,
+      // 表单里已输入的密码草稿（内存，供失败后重探测时保留；不落盘）。
+      passwordDraft: '',
+      // 表单里「清除已保存密码」的开关状态（同样跨重渲染保留）。
+      passwordClear: false,
     };
     const root = el('div', {});
     pane.appendChild(root);
@@ -169,6 +177,8 @@
         state.error = '';
         state.detected = null;
         state.detectError = '';
+        state.passwordDraft = '';
+        state.passwordClear = false;
         render();
       });
       actions.append(exportBtn, addBtn);
@@ -370,6 +380,8 @@
         state.error = '';
         state.detectError = '';
         state.detected = state.detectedMap[host.alias] || null;
+        state.passwordDraft = '';
+        state.passwordClear = false;
         render();
       });
       const delBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', 'data-tip': i18n.t('sshSettings.delete') });
@@ -521,13 +533,34 @@
       state.passwordControl = null;
       if (ctx && ctx.info && ctx.info.platform === 'darwin') {
         const hasPw = Boolean(editing.hasPassword);
-        let clearPassword = false;
+        let clearPassword = Boolean(state.passwordClear && hasPw);
         const pwInput = el('input', {
           class: 'field font-mono',
           type: 'password',
           spellcheck: 'false',
           autocomplete: 'new-password',
           placeholder: hasPw ? i18n.t('sshSettings.passwordSaved') : i18n.t('sshSettings.passwordPlaceholder'),
+        });
+        // 保留已输入的密码草稿（失败重探测 / 表单重渲染时不丢）。
+        pwInput.value = state.passwordDraft || '';
+        pwInput.addEventListener('input', () => {
+          state.passwordDraft = pwInput.value;
+        });
+        // 查看 / 隐藏密码：在明文与密文之间切换。
+        const viewBtn = el('button', {
+          class: 'icon-btn h-8 w-8 shrink-0',
+          type: 'button',
+          'data-tip': i18n.t('sshSettings.showPassword'),
+        });
+        viewBtn.innerHTML = Icons.eye(15);
+        viewBtn.addEventListener('click', () => {
+          const show = pwInput.type === 'password';
+          pwInput.type = show ? 'text' : 'password';
+          viewBtn.innerHTML = show ? Icons.eyeOff(15) : Icons.eye(15);
+          viewBtn.setAttribute(
+            'data-tip',
+            i18n.t(show ? 'sshSettings.hidePassword' : 'sshSettings.showPassword')
+          );
         });
         const clearBtn = el('button', {
           class: 'icon-btn h-8 w-8 shrink-0',
@@ -536,14 +569,20 @@
         });
         clearBtn.innerHTML = Icons.trash(15);
         if (!hasPw) clearBtn.classList.add('hidden');
+        clearBtn.style.color = clearPassword ? 'var(--color-danger)' : '';
         clearBtn.addEventListener('click', () => {
           clearPassword = !clearPassword;
+          state.passwordClear = clearPassword;
           clearBtn.style.color = clearPassword ? 'var(--color-danger)' : '';
         });
         const pwRow = el('div', { class: 'flex items-center gap-2' });
-        pwRow.append(pwInput, clearBtn);
+        pwRow.append(pwInput, viewBtn, clearBtn);
         form.appendChild(inputField(i18n.t('sshSettings.password'), pwRow));
-        state.passwordControl = { input: pwInput, isClear: () => clearPassword, hadPassword: hasPw };
+        state.passwordControl = {
+          input: pwInput,
+          isClear: () => clearPassword,
+          hadPassword: hasPw,
+        };
       }
 
       if (state.error) {
@@ -578,6 +617,8 @@
         state.editing = null;
         state.detected = null;
         state.detectError = '';
+        state.passwordDraft = '';
+        state.passwordClear = false;
         render();
       });
       actions.append(detectBtn, saveBtn, cancelBtn);
@@ -600,8 +641,12 @@
       if (!value.identityFile) inputs.identityFile.value = DEFAULT_IDENTITY;
 
       const current = readInputs(inputs);
-      // Keep the form values so a failed detection does not clear them.
+      // Keep the form values (含密码草稿) so a failed detection does not clear them —
+      // 用户可修改后直接重新探测。
       Object.assign(state.editing, current);
+      const password = state.passwordControl ? state.passwordControl.input.value : '';
+      const useStoredPassword = state.passwordControl ? !state.passwordControl.isClear() : true;
+      state.passwordDraft = password;
       if (!current.hostName) {
         state.detected = null;
         state.detectError = i18n.t('sshSettings.requiredAlias');
@@ -621,6 +666,8 @@
         port: Number(current.port) || 22,
         identityFile: current.identityFile,
         proxyJump: current.proxyJump,
+        password,
+        useStoredPassword,
       });
 
       state.detecting = false;
@@ -676,6 +723,8 @@
       state.detected = null;
       state.detectError = '';
       state.passwordControl = null;
+      state.passwordDraft = '';
+      state.passwordClear = false;
       await reload();
     }
 

@@ -199,15 +199,19 @@ class SshService extends EventEmitter {
       });
   }
 
-  runDetect(host) {
+  runDetect(host, auth) {
     return new Promise((resolve) => {
       const client = new Client();
-      const options = connectionOptions(host);
+      // 可选密码认证：设置里填了密码（或该主机已存密码）时，用它探测；
+      // 同时开 tryKeyboard 以兼容用 keyboard-interactive 提交密码的服务器。
+      const password = auth && auth.password ? String(auth.password) : '';
+      const overrides = password ? { password, tryKeyboard: true } : null;
+      const options = connectionOptions(host, overrides);
 
       logger.file(
         `[ssh] connecting ${host.alias} -> ${options.host}:${options.port} ` +
           `user=${options.username || '-'} agent=${options.agent || '-'} ` +
-          `privateKey=${options.privateKey ? 'yes' : 'no'}`
+          `privateKey=${options.privateKey ? 'yes' : 'no'} password=${password ? 'yes' : 'no'}`
       );
 
       let settled = false;
@@ -261,6 +265,13 @@ class SshService extends EventEmitter {
           });
         });
       });
+
+      // keyboard-interactive 认证（部分服务器）：对每个提示都回填密码。
+      if (password) {
+        client.on('keyboard-interactive', (_name, _instructions, _lang, prompts, finishPrompt) => {
+          finishPrompt((prompts || []).map(() => password));
+        });
+      }
 
       client.on('error', (err) => {
         logger.error(`[ssh] connection error (${host.alias} ${options.host}:${options.port}): ${err.message}`);
