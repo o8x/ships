@@ -135,10 +135,10 @@ Ships/
 
 **窗口模式（默认，`floatMode = false`）**
 
-1. 点击托盘图标 → 若窗口未创建则创建；显示并聚焦（`app.focus({ steal: true })` + `win.show()`/`focus()`/`moveTop()`）。
-2. **不记桌面、只在当前桌面 / 屏幕显示**：首次（无 `main-window.json` 记忆）在**鼠标所在屏幕工作区居中**；有记忆则沿用记录的**位置**（夹回当前屏幕工作区）。
-3. 窗口是**独立的标准窗口**（`titleBarStyle: hiddenInset` + 系统红绿灯），但行为像终端窗口的**置顶悬浮 panel**：`alwaysOnTop` 且 `setAlwaysOnTop(true, 'screen-saver')`（可浮在**全屏应用之上**），并用 `setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true })` **固定在自己的桌面、不跨桌面跟随**（切换桌面时留在原桌面）。
-4. **再次点击**托盘（窗口已存在）→ 显示 / 带到前台；若它在别的桌面，聚焦 / 激活会让系统**切到它所在的桌面**（不做隐藏切换）。
+1. 点击托盘图标 → 若窗口未创建则创建；每次显示都 `app.focus({ steal: true })` + `win.show()`/`focus()`/`moveTop()`。
+2. **不记桌面 / 屏幕；每次都在当前鼠标所在屏幕显示**：`setBounds(mainWindowBoundsForOpen())` —— 无 `main-window.json` 记忆时在**鼠标所在屏幕工作区居中**，有记忆则沿用记录的**位置**（夹回当前屏幕工作区）。
+3. 窗口是**独立的标准窗口**（`titleBarStyle: hiddenInset` + 系统红绿灯），行为像终端窗口的**置顶悬浮 panel**：`alwaysOnTop` 且 `setAlwaysOnTop(true, 'screen-saver')`（可浮在**全屏应用之上**）。
+4. **每次点托盘都把窗口带到当前桌面 / 空间**：`setVisibleOnAllWorkspaces(true)` 再 `setVisibleOnAllWorkspaces(false, …)`（与独立文件窗口同一技巧）；窗口打开后切换桌面不跟随，需再次点托盘带回。
 5. 关闭按钮（系统红绿灯）= **隐藏**（应用常驻托盘）；`Escape` 亦隐藏。**位置**（不记桌面 / 屏幕）在拖动后写入 `main-window.json`（单槽，见 §5.1）。
 6. 尺寸：**固定 640 × 480、不可缩放**（`package.json` 的 `ships.mainWindow`；仅位置可拖动 / 记忆）。
 
@@ -293,7 +293,7 @@ Ships/
 | 编码转换 | 字符串 / Base64 / 十六进制 / URL 编码 / ASCII 十进制 五个字段双向实时同步（UTF-8） | 输入非法时标红不联动 |
 | 哈希计算 | 计算 **MD5 / SHA1 / SHA256**；支持输入字符串或**选择本地文件**（流式计算，适合大文件）；切换类型时清空结果 | 字符串输入防抖 200ms；文件经系统对话框选择 |
 | 营养成分 | 输入商品名与每 100g 的能量(kJ)/蛋白质/脂肪/碳水/钠及商品总重，实时换算：盐、千卡、千焦（含每日推荐 2250kcal / 9410kJ 对比与超出量）、慢跑与步行消耗（公里 / 分钟 / 步数）；底部提供**清空（图标）**与**一个复制按钮（复制输入与结果）** | 输入不做历史记录、不落盘，每次打开为默认值；不做历史列表与商品保存 |
-| 设置 · 应用设置 | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、**悬浮模式（开关，默认关 = 窗口模式；开 = 托盘弹出面板）**、固定悬浮（置顶常驻、失焦不隐藏，仅悬浮模式）、**Liquid Glass**（主界面启用系统玻璃背景：macOS 26+ 用原生 Liquid Glass，旧系统回退 hud 毛玻璃，见 §8.1）、剪贴板条数、剪贴板轮询间隔、打开数据文件夹、**清理数据**（二次确认后删除窗口位置 / 大小、列宽 / 面板高度、cd 历史等**非业务数据**）、关于（版本号 + **检查更新**按钮（`app:check-updates`，见 §7）+ **开发者模式开关** `settings.developerMode`，默认关，值持久化）、开发者（**仅开发者模式开启时显示**；打开悬浮界面 / 设置界面 / **终端界面** / 文件界面 DevTools，`devtools:open` 的 `main` / `settings` / `terminal` / `file`） | 见 §5.1 |
+| 设置 · 应用设置 | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、**悬浮模式（开关，默认关 = 窗口模式；开 = 托盘弹出面板）**、固定悬浮（置顶常驻、失焦不隐藏，仅悬浮模式）、**Liquid Glass**（主界面启用系统玻璃背景：macOS 26+ 用原生 Liquid Glass，旧系统回退 hud 毛玻璃，见 §8.1）、**Liquid Glass 透明度**（滑块 0–100，越大越透明，**实时生效**；默认 80；仅开启 Liquid Glass 时显示）、剪贴板条数、剪贴板轮询间隔、打开数据文件夹、**清理数据**（二次确认后删除窗口位置 / 大小、列宽 / 面板高度、cd 历史等**非业务数据**）、关于（版本号 + **检查更新**按钮（`app:check-updates`，见 §7）+ **开发者模式开关** `settings.developerMode`，默认关，值持久化）、开发者（**仅开发者模式开启时显示**；打开悬浮界面 / 设置界面 / **终端界面** / 文件界面 DevTools，`devtools:open` 的 `main` / `settings` / `terminal` / `file`） | 见 §5.1 |
 | 设置 · 日志 | **日志保留天数**（下拉：1 / 3 / 7 / 14 / 30 / 90，默认 7）、**日志文件夹**（按钮，打开日志目录 `~/Library/Logs/Ships`，**只打开文件夹**不打开日志文件）、**打开控制台 App**（按钮，位于最下，仅 macOS：打开系统「控制台」App 查看「日志报告」下的 Ships 日志） | 对应 `settings.json` 的 `logRetentionDays`；默认值来自 `package.json` 的 `ships.logRetentionDays`（7） |
 | 设置 · SSH | `~/.ssh/config` 主机的增删改（别名/HostName/User/Port/IdentityFile/ProxyJump/**分组**）；列表左侧显示系统图标；**按分组显示为手风琴**（分组来自 config 的 `# group:` 注释，**默认全部展开**，命名分组在前、未分组在后，无命名分组时保持扁平列表）；**每个命名分组的手风琴标题带一个重命名图标**：点击后就地编辑分组名（`Enter` 确认 / `Esc` 取消，重名提示「同名分组已存在」且不保存；未分组不可重命名）——改名会更新 config 里对应的 `# group:` 注释（新增 / 编辑 / 删除 / 改名后都会广播 `ssh-config:changed`，终端与文件窗口的 SSH 下拉实时刷新）；新增时自动预填 **用户 root / 端口 22 / 私钥 `~/.ssh/id_ed25519`**，**私钥支持手动选择文件**（对话框默认 `~/.ssh`，选后转为 `~` 路径），保存时别名默认取主机地址；**新增 / 编辑表单含「分组」控件：TAB 式 Switch 列出已有分组（默认选中「未分组」，可横向滚动），最右侧「新增分组」按钮点击后就地输入新分组名（`Enter` 确认 / `Esc` 取消，重名提示「同名分组已存在」），新分组自动加入并选中**（写入 config 注释 `# group: <名>`）；**表单含「密码」字段（可选）：密码经 AES-256-GCM 加密存入应用数据目录（不落明文），连接时在内置终端自动输入；已存密码时占位提示「已保存（留空则不修改）」并可点「清除密码」**；表单内含「探测系统」，**探测成功后才允许保存**，探测失败**保留表单内容**；支持**导出 config** | 别名与主机地址至少填一项；删除二次确认 |
 | 设置 · 导入 / 导出 | **导出配置**（保存对话框导出**全部配置**为 JSON：应用设置 + SSH 主机；**SSH 密码为明文**，界面提示妥善保管）；**导入配置**（选择 JSON 后二次确认；**设置覆盖当前值**、**SSH 主机只新增不覆盖已有别名**，随新增主机导入其密码；结果就地提示新增 / 跳过 / 密码数量） | 文件为导出生成的 JSON；密码在文件里为明文 |
@@ -310,7 +310,7 @@ Ships/
 
 | 文件 | 位置 | 结构 | 生命周期 |
 | --- | --- | --- | --- |
-| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/ships/settings.json`） | `{ locale, theme, accent, launchAtLogin, floatMode, pinWindow, vibrancy, developerMode, clipboardLimit, clipboardPollMs, terminalShell, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, terminalHotkey, terminalCloseAction, sshBuiltinTerminal, sftpDownloadDir, terminalBallEnabled, terminalBallDelayMs, terminalBallSize, terminalBallIcon, terminalBallDark, fileWindowAlwaysOnTop, logRetentionDays }` | 持久；重启保留 |
+| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/ships/settings.json`） | `{ locale, theme, accent, launchAtLogin, floatMode, pinWindow, vibrancy, glassOpacity, developerMode, clipboardLimit, clipboardPollMs, terminalShell, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, terminalHotkey, terminalCloseAction, sshBuiltinTerminal, sftpDownloadDir, terminalBallEnabled, terminalBallDelayMs, terminalBallSize, terminalBallIcon, terminalBallDark, fileWindowAlwaysOnTop, logRetentionDays }` | 持久；重启保留 |
 | `ships-YYYY-MM-DD.log` | **macOS：`~/Library/Logs/Ships/`**（Console.app 的「日志报告」会收录该目录，与 JetBrains/CLion 一致，与用户数据目录分离）；其它平台：`app.getPath('userData')` 的 `logs/` 子目录（`src/main/utils/paths.js` 的 `LOG_DIR`，按 `process.platform` 选择） | 按天追加的文本日志（启动信息、SSH 探测 / SFTP / 终端 / 文件管理等）；启动时把数据文件清单也写进去 | 持久；**惰性清理**：每天首次写日志时删除保留期之前的日志文件（保留天数取设置 `logRetentionDays`，默认 **7 天**，来自 `package.json` 的 `ships.logRetentionDays`） |
 | `ssh-detected.json` | 同上目录 | `{ [alias]: { os, family, label, at } }` | 持久；缓存探测结果 |
 | `ssh-credentials.json` | 同上目录 | `{ entries: { [别名]: { iv, tag, data } } }`（**AES-256-GCM 密文**，全 base64） | 持久；在设置里保存 / 清除 SSH 密码时更新。密钥随机生成、存 `ssh-credentials.key`（0600）；密码明文不落盘，连接时主进程解密后交给内置终端自动输入（见 §3.4） |
@@ -634,8 +634,8 @@ flowchart TD
 **窗口模式（默认）**
 
 - **标准窗口 + 置顶悬浮 panel**：`titleBarStyle: 'hiddenInset'` + **系统红绿灯**（`trafficLightPosition {14,16}`）、不占 Dock；**置顶**（`alwaysOnTop` + `setAlwaysOnTop(true, 'screen-saver')`，可浮在全屏应用之上）；**固定 640 × 480、不可缩放**（`resizable: false`，`ships.mainWindow`），仅位置可拖动。
-- **桌面归属**：`setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true })` —— **固定在自己的桌面、不跨桌面跟随**；点托盘显示 / 带到前台（聚焦让系统切到它所在的桌面）。
-- **几何记忆**：**只记位置（不记桌面 / 屏幕）**写入 `main-window.json`（单槽，见 §5.1）；每次都在**当前桌面 / 当前屏幕**显示，有记忆则沿用它（夹回当前屏幕），无记录则居中。**拖动时纵向磁性吸附**：窗口纵向中心与屏幕工作区纵向中心对齐（±10px）时吸附到正中并轻微「卡」一下，拖动超过 26px 才脱开（`CENTER_SNAP`；与终端窗口同一行为）。
+- **桌面归属**：点托盘显示时用 `setVisibleOnAllWorkspaces(true)` → `setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true })` 把窗口**带到当前桌面 / 空间**（与独立文件窗口同一技巧）；窗口打开后切换桌面不跟随。
+- **几何记忆**：**只记位置（不记桌面 / 屏幕）**写入 `main-window.json`（单槽，见 §5.1）；每次显示都在**当前鼠标所在屏幕**、有记忆则沿用其位置（夹回当前屏幕），无记录则居中。**拖动时纵向磁性吸附**：窗口纵向中心与屏幕工作区纵向中心对齐（±10px）时吸附到正中并轻微「卡」一下，拖动超过 26px 才脱开（`CENTER_SNAP`；与终端窗口同一行为）。
 - **布局适配**：顶部栏 `#tabbar` 左侧留出 **80px** 给系统红绿灯；**整条顶部栏可拖动窗口**——`#tabbar` / `#brand` / `#tablist` 均为 `-webkit-app-region: drag`（TAB 区虽铺满右侧，但其空白处也可拖动），仅真正的 **TAB 按钮**（`#tablist .tab`）为 `no-drag` 保证可点击，品牌图标禁用原生图片拖拽以免抢走窗口拖动；内容区加宽（`padding: 16px 20px`），工具内容 `#content > .tool-body` 用 `repeat(auto-fit, minmax(320px, 1fr))` 网格（固定 640 宽下为单列，窗口更宽时自动分栏）；面板圆角取消（`#panel border-radius:0`）。**图钉（固定悬浮）按钮隐藏**（仅悬浮模式有意义）；**Liquid Glass / 毛玻璃与悬浮模式一样生效**（开启时窗口透明、材质透出；见 §8.1「Liquid Glass」）。
 
 **悬浮模式（`floatMode = true`，原主面板行为）**
@@ -651,7 +651,7 @@ flowchart TD
   - **`liquid`（macOS 26+，优先）**：用 `electron-liquid-glass` 在窗口内容后插入原生 `NSGlassEffectView`（Liquid Glass）。窗口 `transparent: true`、**不设 `vibrancy`**、`roundedCorners: false`，内容加载后 `liquidGlass.addView(win.getNativeWindowHandle(), { cornerRadius: WINDOW.cornerRadius })`（默认 10px）由玻璃自带圆角；**不叠加 tint，保持高透**（背景的 blur 与折射直接透出）。
   - **`vibrancy`（旧 macOS 回退）**：用系统 `hud` 材质（强透明，Control Center 那种通透感；`content` / `under-window` 会几乎不透或发灰，故不用），`visualEffectState: active`，并需 `roundedCorners: true` 让系统裁剪材质；常量见 `shared/constants.js` 的 `VIBRANCY`。
   - **`off`**：无玻璃，`roundedCorners: false`，由 CSS 圆角塑形。
-  因 `roundedCorners` / `vibrancy` / 原生玻璃视图都是**创建期**行为，切换该设置时丢弃并按新配置**重建主面板**（此时面板隐藏，无闪烁；`main.js` 已订阅 `window-all-closed` 不退出）。`app.js` 在 macOS 下于 `<html>` 置 `data-vibrancy="on"`，`constants.css` 把 `--color-bg` 置 `transparent` 让玻璃透出（浅色下卡片 / 输入框保持不透明主题色，深色下沿用半透明 `--color-surface*`）；另由 `nativeTheme.themeSource` 使材质跟随应用主题。**作用于主界面（悬浮模式与窗口模式都生效）**，设置窗口保持不透明；非 macOS 不生效（属性置 `off`，`glassMode()='off'`）。默认关闭。
+  因 `roundedCorners` / `vibrancy` / 原生玻璃视图都是**创建期**行为，切换该设置时丢弃并按新配置**重建主面板**（此时面板隐藏，无闪烁；`main.js` 已订阅 `window-all-closed` 不退出）。`app.js` 在 macOS 下于 `<html>` 置 `data-vibrancy="on"`，`constants.css` 把 `--color-bg` 置 `transparent` 让玻璃透出（浅色下卡片 / 输入框保持不透明主题色，深色下沿用半透明 `--color-surface*`）；另由 `nativeTheme.themeSource` 使材质跟随应用主题。**透明度可调**：设置 → 应用设置的滑块 `settings.glassOpacity`（0–100，越大越透明，默认 80）由 `app.js` 换算成 `:root` 的 `--glass-surface` / `--glass-surface-2` / `--glass-surface-3`（base = `(100-glassOpacity)/100 × 0.4`，三项为 base ×1 / ×1.5 / ×2.75），`constants.css` 在 `[data-vibrancy='on']` 下用它们作为 `--color-surface*`，**实时生效**。**作用于主界面（悬浮模式与窗口模式都生效）**，设置窗口保持不透明；非 macOS 不生效（属性置 `off`，`glassMode()='off'`）。默认关闭。
 
 ### 8.2 设置窗口
 
