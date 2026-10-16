@@ -29,6 +29,8 @@
         pinHint: '主界面置顶常驻，失焦不自动隐藏（仅悬浮模式）',
         vibrancy: 'Liquid Glass',
         vibrancyHint: '主界面使用 macOS 原生 Liquid Glass 背景（macOS 26+，旧系统回退毛玻璃）',
+        glassOpacity: 'Liquid Glass 透明度',
+        glassOpacityHint: '玻璃卡片 / 输入框的透明程度（越大越透明，实时生效）',
         clipboardLimit: '剪贴板条数',
         clipboardLimitHint: '最多保留最近几条记录',
         clipboardPoll: '剪贴板轮询间隔',
@@ -76,6 +78,8 @@
         pinHint: 'Pin the popover and never auto-hide on blur (floating mode only)',
         vibrancy: 'Liquid Glass',
         vibrancyHint: 'Use the native macOS Liquid Glass background (macOS 26+, with fallback)',
+        glassOpacity: 'Liquid Glass opacity',
+        glassOpacityHint: 'How transparent glass cards / inputs are (higher = more transparent, live)',
         clipboardLimit: 'Clipboard items',
         clipboardLimitHint: 'How many recent items to keep',
         clipboardPoll: 'Clipboard poll interval',
@@ -213,6 +217,33 @@
       row(i18n.t('settingsPage.vibrancy'), i18n.t('settingsPage.vibrancyHint'), vibrancySwitch.root)
     );
 
+    // Liquid Glass 透明度滑块（实时生效；仅在开启 Liquid Glass 时显示）。
+    const defaultOpacity = window.ShipsConstants.GLASS_DEFAULT_OPACITY || 80;
+    let opacityValue = Number.isFinite(Number(settings.glassOpacity)) ? Number(settings.glassOpacity) : defaultOpacity;
+    const opacityLabel = el(
+      'span',
+      { class: 'w-[42px] shrink-0 text-right font-mono text-[11px] text-fg-muted' },
+      `${opacityValue}%`
+    );
+    const opacitySlider = el('input', {
+      type: 'range',
+      min: '0',
+      max: '100',
+      step: '1',
+      class: 'glass-slider',
+    });
+    opacitySlider.value = String(opacityValue);
+    opacitySlider.addEventListener('input', () => {
+      opacityValue = Number(opacitySlider.value);
+      opacityLabel.textContent = `${opacityValue}%`;
+      patch({ glassOpacity: opacityValue });
+    });
+    const opacityControl = el('div', { class: 'flex w-[220px] shrink-0 items-center gap-2' });
+    opacityControl.append(opacitySlider, opacityLabel);
+    const opacityRow = row(i18n.t('settingsPage.glassOpacity'), i18n.t('settingsPage.glassOpacityHint'), opacityControl);
+    opacityRow.style.display = settings.vibrancy === true ? '' : 'none';
+    generalSection.appendChild(opacityRow);
+
     const limitSelect = createSelect({
       options: [3, 5, 10].map((value) => ({ value, label: String(value) })),
       value: settings.clipboardLimit || 3,
@@ -339,9 +370,10 @@
     }
     applyDeveloperMode(settings.developerMode === true);
 
-    const offSettings = window.ships.onSettingsChanged((next) =>
-      applyDeveloperMode(next && next.developerMode === true)
-    );
+    const offSettings = window.ships.onSettingsChanged((next) => {
+      applyDeveloperMode(next && next.developerMode === true);
+      opacityRow.style.display = next && next.vibrancy === true ? '' : 'none';
+    });
 
     pane.append(languageSection, appearanceSection, generalSection, aboutSection, devSection);
 

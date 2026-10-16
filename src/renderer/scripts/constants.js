@@ -3,6 +3,10 @@
 window.ShipsConstants = {
   FALLBACK_VERSION: '0.0.0',
   COPY_FEEDBACK_MS: 1200,
+  // Liquid Glass 表面透明度：glassOpacity(0–100，越大越透明) 映射到表面填充 alpha。
+  // base = (100 - glassOpacity)/100 * GLASS_MAX_ALPHA，默认 80 → 0.08（现有观感）。
+  GLASS_DEFAULT_OPACITY: 80,
+  GLASS_MAX_ALPHA: 0.4,
   // 文件管理状态栏：所有提示的保留时长（到点惰性清除）。
   FILE_STATUS_TTL_MS: 30000,
   // 双击文件的默认打开方式：超过该体积、或属于下面的非文本类型时用系统默认程序「打开」，

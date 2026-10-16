@@ -173,7 +173,24 @@
     // Glass 仅 macOS；悬浮与窗口模式都生效。
     const glass = Boolean(state.settings.vibrancy) && state.platform === 'darwin';
     document.documentElement.setAttribute('data-vibrancy', glass ? 'on' : 'off');
+    applyGlassOpacity(state.settings.glassOpacity);
     renderDevBadge();
+  }
+
+  /* Liquid Glass 表面透明度（设置滑块，实时生效）：把 0–100 的透明度换算成
+     surface / surface-2 / surface-3 的填充 alpha 写到 :root 的 CSS 变量。 */
+  function applyGlassOpacity(value) {
+    const constants = window.ShipsConstants || {};
+    const def = Number.isFinite(constants.GLASS_DEFAULT_OPACITY) ? constants.GLASS_DEFAULT_OPACITY : 80;
+    const maxAlpha = Number.isFinite(constants.GLASS_MAX_ALPHA) ? constants.GLASS_MAX_ALPHA : 0.4;
+    let t = Number(value);
+    if (!Number.isFinite(t)) t = def;
+    t = Math.max(0, Math.min(100, t));
+    const base = ((100 - t) / 100) * maxAlpha;
+    const root = document.documentElement.style;
+    root.setProperty('--glass-surface', `rgba(255, 255, 255, ${base.toFixed(3)})`);
+    root.setProperty('--glass-surface-2', `rgba(255, 255, 255, ${(base * 1.5).toFixed(3)})`);
+    root.setProperty('--glass-surface-3', `rgba(255, 255, 255, ${(base * 2.75).toFixed(3)})`);
   }
 
   async function boot() {

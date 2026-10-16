@@ -290,6 +290,27 @@
 .segment.segment-compact button {
   padding: 4px 6px;
 }
+/* Liquid Glass 透明度滑块（设置 → 应用设置）。 */
+.glass-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-surface-3);
+  outline: none;
+  cursor: pointer;
+}
+.glass-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
 .switch {
   position: relative;
   width: 38px;

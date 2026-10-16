@@ -100,11 +100,13 @@
  * 与描边），让原生玻璃的 blur 直接透出，贴近系统 Liquid Glass 应用的观感；
  * 同时加深文字以保证在玻璃上的可读性。设置窗口不置该属性，保持不透明。
  */
+/* 玻璃表面的填充透明度由「设置 → 应用设置 → Liquid Glass 透明度」实时写入
+   （`--glass-surface*`，见 app.js）；这里只做引用 + 兜底默认值。 */
 [data-vibrancy='on'] {
   --color-bg: transparent;
-  --color-surface: rgba(255, 255, 255, 0.08);
-  --color-surface-2: rgba(255, 255, 255, 0.12);
-  --color-surface-3: rgba(255, 255, 255, 0.22);
+  --color-surface: var(--glass-surface, rgba(255, 255, 255, 0.08));
+  --color-surface-2: var(--glass-surface-2, rgba(255, 255, 255, 0.12));
+  --color-surface-3: var(--glass-surface-3, rgba(255, 255, 255, 0.22));
   --color-border: rgba(0, 0, 0, 0.14);
   --color-fg: #000000;
   --color-fg-muted: rgba(0, 0, 0, 0.55);
@@ -112,9 +114,9 @@
 
 [data-vibrancy='on'][data-theme='dark'] {
   --color-bg: transparent;
-  --color-surface: rgba(255, 255, 255, 0.08);
-  --color-surface-2: rgba(255, 255, 255, 0.12);
-  --color-surface-3: rgba(255, 255, 255, 0.2);
+  --color-surface: var(--glass-surface, rgba(255, 255, 255, 0.08));
+  --color-surface-2: var(--glass-surface-2, rgba(255, 255, 255, 0.12));
+  --color-surface-3: var(--glass-surface-3, rgba(255, 255, 255, 0.2));
   --color-border: rgba(255, 255, 255, 0.16);
   --color-fg: #ffffff;
   --color-fg-muted: rgba(255, 255, 255, 0.62);

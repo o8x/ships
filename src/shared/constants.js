@@ -223,6 +223,8 @@ const DEFAULT_SETTINGS = {
   floatMode: false,
   pinWindow: false,
   vibrancy: false,
+  // Liquid Glass 表面透明度（0–100；越大越透明）。默认 80 = 现有观感。
+  glassOpacity: 80,
   // 开发者模式：开启后设置页才显示「开发者」工具区，主界面版本号旁显示标记。
   developerMode: false,
   clipboardLimit: 3,
