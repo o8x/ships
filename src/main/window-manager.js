@@ -823,10 +823,10 @@ function createWindowWindow() {
     // （固定在自己的桌面，切换桌面时不跟随）。
     alwaysOnTop: true,
     // 玻璃开启时窗口透明（vibrancy 材质 / 原生玻璃视图透出），否则用主题底色。
+    // 注意：窗口模式是**标准窗口**，必须保留系统圆角（`roundedCorners` 默认 true）——
+    // 之前设成 false 会让 macOS 连标题栏 / 红绿灯一起去掉。
     transparent: glass !== 'off',
     ...glassOptions,
-    // 与悬浮面板一致：vibrancy 需原生圆角裁剪材质；liquid 由玻璃视图自己画圆角。
-    roundedCorners: glass === 'vibrancy',
     backgroundColor: glass !== 'off' ? '#00000000' : themeBackgroundColor(),
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'main-preload.js'),
