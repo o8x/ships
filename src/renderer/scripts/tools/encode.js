@@ -31,6 +31,7 @@
         qrSize: '尺寸',
         qrVersion: '版本',
         qrVersionAuto: '自动',
+        qrMargin: '边框',
       },
     },
     en: {
@@ -59,6 +60,7 @@
         qrSize: 'Size',
         qrVersion: 'Version',
         qrVersionAuto: 'Auto',
+        qrMargin: 'Border',
       },
     },
   });
@@ -142,7 +144,12 @@
 
   function svgToPngDataUrl(svg, size) {
     return new Promise((resolve, reject) => {
-      const source = new XMLSerializer().serializeToString(svg);
+      // 显示用的 SVG 是 scalable（只有 viewBox、没有 width/height），直接作为图片加载时
+      // 尺寸不确定（可能 onerror / 0×0）。复制一份并写死 width/height 再用。
+      const clone = svg.cloneNode(true);
+      clone.setAttribute('width', String(size));
+      clone.setAttribute('height', String(size));
+      const source = new XMLSerializer().serializeToString(clone);
       const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`;
       const image = new Image();
       image.onload = () => {
@@ -155,7 +162,7 @@
         ctx.drawImage(image, 0, 0, size, size);
         resolve(canvas.toDataURL('image/png'));
       };
-      image.onerror = reject;
+      image.onerror = () => reject(new Error('svg load failed'));
       image.src = url;
     });
   }
@@ -191,7 +198,7 @@
 
     // 二维码区：左侧二维码，右侧可调参数（纠错等级 / 尺寸 / 边距）+ 复制 / 下载按钮。
     // 数据源固定为最上面的「字符串」框内容。
-    const params = { ec: QR_ERROR_CORRECTION, size: 200, version: 0 };
+    const params = { ec: QR_ERROR_CORRECTION, size: 200, version: 0, margin: 4 };
     const qrBox = el('div', { class: 'qr-box', style: `width:${params.size}px;height:${params.size}px` });
     const qrNote = el('div', { class: 'qr-note' }, '');
     const qrCopyBtn = el('button', { class: 'btn shrink-0', type: 'button' });
@@ -247,6 +254,17 @@
       },
     });
 
+    const marginControl = createSelect({
+      options: [0, 1, 2, 3, 4, 6, 8].map((value) => ({ value, label: String(value) })),
+      value: params.margin,
+      align: 'right',
+      className: 'w-[88px] shrink-0',
+      onChange: (value) => {
+        params.margin = Number(value);
+        renderQr(qrText);
+      },
+    });
+
     const qrActions = el('div', { class: 'mt-1 flex items-center gap-2' });
     qrActions.append(qrCopyBtn, qrDownloadBtn);
     const qrParams = el('div', { class: 'flex min-w-0 flex-1 flex-col gap-2' });
@@ -254,6 +272,7 @@
       paramRow(i18n.t('encode.qrEc'), ecControl.root),
       paramRow(i18n.t('encode.qrSize'), sizeControl.el),
       paramRow(i18n.t('encode.qrVersion'), versionControl.el),
+      paramRow(i18n.t('encode.qrMargin'), marginControl.el),
       qrActions
     );
 
@@ -278,8 +297,7 @@
         const qr = window.qrcode(params.version, params.ec);
         qr.addData(text);
         qr.make();
-        // 固定边距 4 个模块（标准静区）；createSvgTag 的 margin 默认即 cellSize×4。
-        qrBox.innerHTML = qr.createSvgTag({ scalable: true, cellSize: 1 });
+        qrBox.innerHTML = qr.createSvgTag({ scalable: true, cellSize: 1, margin: params.margin });
         currentQrSvg = qrBox.querySelector('svg');
         qrCopyBtn.disabled = false;
         qrDownloadBtn.disabled = false;
