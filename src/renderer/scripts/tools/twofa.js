@@ -178,13 +178,16 @@
       });
 
       const head = el('div', { class: 'flex items-center gap-2' });
+      const badge = el('span', { class: 'inline-flex shrink-0' });
+      badge.innerHTML = Icons.shield(17);
+      badge.style.color = 'var(--color-success)';
       const namesBox = el('div', { class: 'flex min-w-0 flex-1 items-baseline gap-2' });
-      namesBox.appendChild(el('div', { class: 'truncate text-[13px] font-medium text-fg' }, names.title));
+      namesBox.appendChild(el('div', { class: 'truncate text-[15px] font-medium text-fg' }, names.title));
       if (names.subtitle) {
         namesBox.appendChild(el('div', { class: 'truncate text-[11px] text-fg-muted' }, names.subtitle));
       }
       const actions = el('div', { class: 'flex shrink-0 items-center' });
-      head.append(namesBox, actions);
+      head.append(badge, namesBox, actions);
       root.appendChild(head);
 
       const codeRow = el('div', { class: 'flex items-end gap-2' });
