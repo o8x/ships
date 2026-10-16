@@ -138,9 +138,9 @@
     }
   }
 
-  // 二维码：实时生成（版本自动、纠错 M、矢量 SVG）；导出 PNG 的边长。
+  // 二维码：实时生成（矢量 SVG）。展示区固定 200×200；「尺寸」参数只决定导出 PNG 的边长。
   const QR_ERROR_CORRECTION = 'M';
-  const QR_EXPORT_SIZE = 1024;
+  const QR_BOX_SIZE = 200;
 
   function svgToPngDataUrl(svg, size) {
     return new Promise((resolve, reject) => {
@@ -198,8 +198,9 @@
 
     // 二维码区：左侧二维码，右侧可调参数（纠错等级 / 尺寸 / 边距）+ 复制 / 下载按钮。
     // 数据源固定为最上面的「字符串」框内容。
-    const params = { ec: QR_ERROR_CORRECTION, size: 200, version: 0, margin: 4 };
-    const qrBox = el('div', { class: 'qr-box', style: `width:${params.size}px;height:${params.size}px` });
+    // 展示区固定 200×200（与参数无关，避免整行跳动）；size 只用于导出 PNG。
+    const params = { ec: QR_ERROR_CORRECTION, size: 1024, version: 0, margin: 1 };
+    const qrBox = el('div', { class: 'qr-box', style: `width:${QR_BOX_SIZE}px;height:${QR_BOX_SIZE}px` });
     const qrNote = el('div', { class: 'qr-note' }, '');
     const qrCopyBtn = el('button', { class: 'btn shrink-0', type: 'button' });
     qrCopyBtn.append(el('span', { class: 'inline-flex' }, Icons.copy(14)), el('span', {}, i18n.t('encode.qrCopy')));
@@ -230,14 +231,14 @@
       },
       { className: 'segment-compact' }
     );
+    // 「尺寸」= 导出（复制 / 下载）PNG 的边长；展示始终 200×200，故无需重绘。
     const sizeControl = createSelect({
-      options: [160, 200, 240, 280, 320].map((value) => ({ value, label: `${value}px` })),
+      options: [256, 512, 1024, 2048].map((value) => ({ value, label: `${value}px` })),
       value: params.size,
       align: 'right',
       className: 'w-[88px] shrink-0',
       onChange: (value) => {
         params.size = Number(value);
-        renderQr(qrText);
       },
     });
     const versionControl = createSelect({
@@ -278,8 +279,6 @@
 
     function renderQr(text) {
       qrText = text;
-      qrBox.style.width = `${params.size}px`;
-      qrBox.style.height = `${params.size}px`;
       qrBox.innerHTML = '';
       currentQrSvg = null;
       qrNote.textContent = '';
@@ -313,7 +312,7 @@
       if (!currentQrSvg) return;
       const label = qrCopyBtn.lastChild;
       try {
-        const dataUrl = await svgToPngDataUrl(currentQrSvg, QR_EXPORT_SIZE);
+        const dataUrl = await svgToPngDataUrl(currentQrSvg, params.size);
         const res = await window.ships.copyImage(dataUrl);
         if (!res || !res.ok) throw new Error((res && res.error) || 'error');
       } catch (err) {
@@ -333,7 +332,7 @@
     async function downloadQr() {
       if (!currentQrSvg) return;
       try {
-        const dataUrl = await svgToPngDataUrl(currentQrSvg, QR_EXPORT_SIZE);
+        const dataUrl = await svgToPngDataUrl(currentQrSvg, params.size);
         const res = await window.ships.saveImage({ dataUrl, name: 'qrcode.png' });
         if (res && res.canceled) return;
         if (!res || !res.ok) throw new Error((res && res.error) || 'error');
