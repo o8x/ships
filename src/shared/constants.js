@@ -32,6 +32,8 @@ const IPC = {
   WINDOW_CLOSE_SETTINGS: 'window:close-settings',
   WINDOW_CONTROL: 'window:control',
   LOG_WRITE: 'log:write',
+  COPY_IMAGE: 'app:copy-image',
+  SAVE_IMAGE: 'app:save-image',
   THEME_CHANGED: 'theme:changed',
 
   GEO_LOOKUP: 'geo:lookup',

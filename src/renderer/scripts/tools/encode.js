@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerEncodeTool() {
-  const { el, section, inputField } = window.ShipsUI;
+  const { Icons, el, section, inputField } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -12,13 +12,21 @@
         base64: 'Base64',
         hex: '十六进制',
         url: 'URL 编码',
+        urlDecode: 'URL 解码',
         ascii: 'ASCII 十进制',
         invalid: '无法解码',
         textPlaceholder: '输入文本…',
         base64Placeholder: '如 aGVsbG8=',
         hexPlaceholder: '如 68 65 6c 6c 6f',
         urlPlaceholder: '如 hello%20world',
+        urlDecodePlaceholder: '如 https://a.com/搜索?q=%E4%B8%AD%E6%96%87',
         asciiPlaceholder: '如 104 101 108 108 111',
+        qrCopy: '复制',
+        qrDownload: '下载到本地',
+        qrCopied: '已复制',
+        qrCopyFailed: '复制失败',
+        qrSaveFailed: '保存失败：{error}',
+        qrTooLong: '内容过长，无法生成二维码',
       },
     },
     en: {
@@ -28,13 +36,21 @@
         base64: 'Base64',
         hex: 'Hex',
         url: 'URL',
+        urlDecode: 'URL decode',
         ascii: 'ASCII decimal',
         invalid: 'Invalid input',
         textPlaceholder: 'Type text…',
         base64Placeholder: 'e.g. aGVsbG8=',
         hexPlaceholder: 'e.g. 68 65 6c 6c 6f',
         urlPlaceholder: 'e.g. hello%20world',
+        urlDecodePlaceholder: 'e.g. https://a.com/search?q=%E4%B8%AD%E6%96%87',
         asciiPlaceholder: 'e.g. 104 101 108 108 111',
+        qrCopy: 'Copy',
+        qrDownload: 'Download',
+        qrCopied: 'Copied',
+        qrCopyFailed: 'Copy failed',
+        qrSaveFailed: 'Save failed: {error}',
+        qrTooLong: 'Content is too long to encode as a QR code',
       },
     },
   });
@@ -97,6 +113,45 @@
     return bytes;
   }
 
+  /* URL 反转义（容错）：还原 %xx（含中文等多字节 UTF-8），保留 URL 结构。
+     遇到非法转义（孤立 % / 非十六进制）不报错，先把非法 % 转义成 %25 再尽量还原。 */
+  function decodeUrl(text) {
+    const value = String(text == null ? '' : text);
+    try {
+      return decodeURIComponent(value);
+    } catch (err) {
+      try {
+        return decodeURIComponent(value.replace(/%(?![0-9a-fA-F]{2})/g, '%25'));
+      } catch (err2) {
+        return value;
+      }
+    }
+  }
+
+  // 二维码：实时生成（版本自动、纠错 M、矢量 SVG）；导出 PNG 的边长。
+  const QR_ERROR_CORRECTION = 'M';
+  const QR_EXPORT_SIZE = 1024;
+
+  function svgToPngDataUrl(svg, size) {
+    return new Promise((resolve, reject) => {
+      const source = new XMLSerializer().serializeToString(svg);
+      const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`;
+      const image = new Image();
+      image.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size, size);
+        ctx.drawImage(image, 0, 0, size, size);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      image.onerror = reject;
+      image.src = url;
+    });
+  }
+
   function mount(container) {
     function area(label, placeholder) {
       const input = el('textarea', {
@@ -112,6 +167,7 @@
     const base64Field = area(i18n.t('encode.base64'), i18n.t('encode.base64Placeholder'));
     const hexField = area(i18n.t('encode.hex'), i18n.t('encode.hexPlaceholder'));
     const urlField = area(i18n.t('encode.url'), i18n.t('encode.urlPlaceholder'));
+    const urlDecodeField = area(i18n.t('encode.urlDecode'), i18n.t('encode.urlDecodePlaceholder'));
     const asciiField = area(i18n.t('encode.ascii'), i18n.t('encode.asciiPlaceholder'));
 
     const fields = {
@@ -119,10 +175,89 @@
       base64: base64Field.input,
       hex: hexField.input,
       url: urlField.input,
+      urlDecode: urlDecodeField.input,
       ascii: asciiField.input,
     };
 
     let syncing = false;
+
+    // 最下方的二维码：内容 = 字符串字段（实时生成，200×200）。
+    const qrBox = el('div', { class: 'qr-box qr-box-fixed' });
+    const qrNote = el('div', { class: 'qr-note' }, '');
+    const qrCopyBtn = el('button', { class: 'btn shrink-0', type: 'button' });
+    qrCopyBtn.append(el('span', { class: 'inline-flex' }, Icons.copy(14)), el('span', {}, i18n.t('encode.qrCopy')));
+    const qrDownloadBtn = el('button', { class: 'btn shrink-0', type: 'button' });
+    qrDownloadBtn.append(
+      el('span', { class: 'inline-flex' }, Icons.download(14)),
+      el('span', {}, i18n.t('encode.qrDownload'))
+    );
+    qrCopyBtn.disabled = true;
+    qrDownloadBtn.disabled = true;
+    let currentQrSvg = null;
+    let qrCopiedTimer = null;
+
+    function renderQr(text) {
+      qrBox.innerHTML = '';
+      currentQrSvg = null;
+      qrNote.textContent = '';
+      qrNote.style.color = '';
+      if (!text || typeof window.qrcode !== 'function') {
+        qrCopyBtn.disabled = true;
+        qrDownloadBtn.disabled = true;
+        return;
+      }
+      try {
+        const qr = window.qrcode(0, QR_ERROR_CORRECTION);
+        qr.addData(text);
+        qr.make();
+        qrBox.innerHTML = qr.createSvgTag({ scalable: true, margin: 2, cellSize: 2 });
+        currentQrSvg = qrBox.querySelector('svg');
+        qrCopyBtn.disabled = false;
+        qrDownloadBtn.disabled = false;
+      } catch (err) {
+        qrCopyBtn.disabled = true;
+        qrDownloadBtn.disabled = true;
+        qrNote.textContent = i18n.t('encode.qrTooLong');
+        qrNote.style.color = 'var(--color-danger)';
+      }
+    }
+
+    async function copyQr() {
+      if (!currentQrSvg) return;
+      const label = qrCopyBtn.lastChild;
+      try {
+        const dataUrl = await svgToPngDataUrl(currentQrSvg, QR_EXPORT_SIZE);
+        const res = await window.ships.copyImage(dataUrl);
+        if (!res || !res.ok) throw new Error((res && res.error) || 'error');
+      } catch (err) {
+        qrNote.textContent = i18n.t('encode.qrCopyFailed');
+        qrNote.style.color = 'var(--color-danger)';
+        return;
+      }
+      qrCopyBtn.classList.add('btn-accent');
+      if (label) label.textContent = i18n.t('encode.qrCopied');
+      clearTimeout(qrCopiedTimer);
+      qrCopiedTimer = setTimeout(() => {
+        qrCopyBtn.classList.remove('btn-accent');
+        if (label) label.textContent = i18n.t('encode.qrCopy');
+      }, 1200);
+    }
+
+    async function downloadQr() {
+      if (!currentQrSvg) return;
+      try {
+        const dataUrl = await svgToPngDataUrl(currentQrSvg, QR_EXPORT_SIZE);
+        const res = await window.ships.saveImage({ dataUrl, name: 'qrcode.png' });
+        if (res && res.canceled) return;
+        if (!res || !res.ok) throw new Error((res && res.error) || 'error');
+      } catch (err) {
+        qrNote.textContent = i18n.t('encode.qrSaveFailed', { error: (err && err.message) || 'error' });
+        qrNote.style.color = 'var(--color-danger)';
+      }
+    }
+
+    qrCopyBtn.addEventListener('click', copyQr);
+    qrDownloadBtn.addEventListener('click', downloadQr);
 
     function setError(field, invalid) {
       field.style.borderColor = invalid ? 'var(--color-danger)' : '';
@@ -134,8 +269,10 @@
       if (field !== fields.base64) fields.base64.value = bytesToBase64(bytes);
       if (field !== fields.hex) fields.hex.value = bytesToHex(bytes);
       if (field !== fields.url) fields.url.value = encodeURIComponent(text);
+      if (field !== fields.urlDecode) fields.urlDecode.value = decodeUrl(text);
       if (field !== fields.ascii) fields.ascii.value = bytesToAscii(bytes);
       syncing = false;
+      renderQr(text);
     }
 
     function handle(field) {
@@ -148,6 +285,7 @@
           setError(fields[key], false);
         }
         syncing = false;
+        renderQr('');
         return;
       }
 
@@ -165,13 +303,17 @@
       } else if (field === fields.ascii) {
         bytes = asciiToBytes(value);
         text = bytes ? decoder.decode(bytes) : '';
-      } else {
+      } else if (field === fields.url) {
         try {
           text = decodeURIComponent(value);
           bytes = encoder.encode(text);
         } catch (err) {
           bytes = null;
         }
+      } else {
+        // URL 解码：容错反转义，还原中文等字符（不报错、尽量还原）。
+        text = decodeUrl(value);
+        bytes = encoder.encode(text);
       }
 
       if (bytes == null) {
@@ -193,10 +335,20 @@
       base64Field.wrapper,
       hexField.wrapper,
       urlField.wrapper,
+      urlDecodeField.wrapper,
       asciiField.wrapper
     );
 
-    container.append(body);
+    // 底部：200×200 二维码 + 左对齐的「复制 / 下载到本地」按钮。
+    const qrActions = el('div', { class: 'mt-2 flex items-center gap-2' });
+    qrActions.append(qrCopyBtn, qrDownloadBtn);
+    const qrSection = section();
+    qrSection.append(qrBox, qrActions, qrNote);
+
+    container.append(body, qrSection);
+    renderQr('');
+
+    return () => clearTimeout(qrCopiedTimer);
   }
 
   window.ShipsToolRegistry.register({ id: 'encode', icon: 'swap', mount });

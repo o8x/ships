@@ -23,6 +23,8 @@ const api = {
   openDataFolder: () => ipcRenderer.invoke(IPC.OPEN_DATA_FOLDER),
   openExternal: (url) => ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url),
   log: (text) => ipcRenderer.send(IPC.LOG_WRITE, text),
+  copyImage: (dataUrl) => ipcRenderer.invoke(IPC.COPY_IMAGE, dataUrl),
+  saveImage: (payload) => ipcRenderer.invoke(IPC.SAVE_IMAGE, payload),
   geoLookup: (ip) => ipcRenderer.invoke(IPC.GEO_LOOKUP, ip),
   clipboard: {
     list: () => ipcRenderer.invoke(IPC.CLIPBOARD_LIST),

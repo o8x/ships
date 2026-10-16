@@ -1,7 +1,7 @@
 'use strict';
 
 const fs = require('fs');
-const { app, shell, BrowserWindow, dialog } = require('electron');
+const { app, shell, BrowserWindow, dialog, clipboard, nativeImage } = require('electron');
 const os = require('os');
 const { IPC, VERSION, TERMINAL_WINDOW } = require('../../shared/constants');
 const logger = require('../utils/logger');
@@ -122,6 +122,39 @@ function registerAppIpc(ipcMain) {
   // 渲染层请求写日志：控制台 + ships.log（窗口尺寸 / 字体 / 行高等调试信息）。
   ipcMain.on(IPC.LOG_WRITE, (_event, text) => {
     logger.info(String(text == null ? '' : text));
+  });
+
+  // 把 PNG data URL 写进系统剪贴板（二维码工具「复制二维码」）。
+  ipcMain.handle(IPC.COPY_IMAGE, (_event, dataUrl) => {
+    const value = String(dataUrl || '');
+    if (!/^data:image\/png;base64,/.test(value)) return { ok: false, error: 'invalid' };
+    try {
+      const image = nativeImage.createFromDataURL(value);
+      if (image.isEmpty()) return { ok: false, error: 'empty' };
+      clipboard.writeImage(image);
+    } catch (err) {
+      return { ok: false, error: (err && err.message) || 'error' };
+    }
+    return { ok: true };
+  });
+
+  // 把 PNG data URL 保存为本地文件（二维码工具「下载到本地」）。
+  ipcMain.handle(IPC.SAVE_IMAGE, async (event, payload) => {
+    const dataUrl = String((payload && payload.dataUrl) || '');
+    if (!/^data:image\/png;base64,/.test(dataUrl)) return { ok: false, error: 'invalid' };
+    const defaultName = String((payload && payload.name) || 'qrcode.png');
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const options = { defaultPath: defaultName, filters: [{ name: 'PNG', extensions: ['png'] }] };
+    const result = win
+      ? await dialog.showSaveDialog(win, options)
+      : await dialog.showSaveDialog(options);
+    if (result.canceled || !result.filePath) return { ok: false, canceled: true };
+    try {
+      fs.writeFileSync(result.filePath, Buffer.from(dataUrl.split(',')[1] || '', 'base64'));
+    } catch (err) {
+      return { ok: false, error: (err && err.message) || 'error' };
+    }
+    return { ok: true, path: result.filePath };
   });
 }
 

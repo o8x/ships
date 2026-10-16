@@ -4,7 +4,7 @@
 | --- | --- |
 | 产品名称 | Ships |
 | 产品定位 | 面向开发者的 macOS 菜单栏（Tray）工具箱，点击托盘图标在下方展开轻量面板 |
-| 技术栈 | Electron 44（主进程）+ Tailwind CSS 3（界面样式）+ 原生 JavaScript（渲染层，无打包器）+ ssh2（SSH 探测）+ electron-liquid-glass（macOS 26+ 原生 Liquid Glass，可选）+ electron-updater（自动更新）+ @xterm/xterm 与 @xterm/addon-fit（设置页内嵌终端）+ python3（PTY 桥接脚本）+ 本地 geoip.json（IP 归属地） |
+| 技术栈 | Electron 44（主进程）+ Tailwind CSS 3（界面样式）+ 原生 JavaScript（渲染层，无打包器）+ ssh2（SSH 探测）+ qrcode-generator（二维码生成）+ electron-liquid-glass（macOS 26+ 原生 Liquid Glass，可选）+ electron-updater（自动更新）+ @xterm/xterm 与 @xterm/addon-fit（设置页内嵌终端）+ python3（PTY 桥接脚本）+ 本地 geoip.json（IP 归属地） |
 | 支持平台 | macOS（arm64 / x64；当前主要面向 arm64） |
 | 当前版本 | 3.25.2 |
 | 发布方式 | 本地/CI 通过 `electron-builder` 打包 macOS arm64 **DMG + ZIP**（`pnpm dist:mac`）；打 `v*` tag 时发布到 GitHub Releases；更新用 `electron-updater` 做版本检测，**macOS 下载 DMG 手动安装**（挂载 DMG 后拖入 Applications）、Windows 走 `electron-updater` 自动安装（见 §7）；暂未签名 / 公证 |
@@ -290,7 +290,7 @@ Ships/
 | JSON 格式化 | 粘贴/失焦后**原地格式化**（固定 4 空格缩进）并语法高亮；工具栏单行：文本/结构切换、键排序、复制、压缩、清空；错误定位（行列）；**结构查看**（可折叠树） | 超过 1MB 仅格式化不高亮；输入改变仅重高亮；编辑器高度 180px |
 | SSH 管理 | 读取 `~/.ssh/config` 列表；每行显示系统图标、`user@host(:port)`（22 不显示端口）、别名与**连接按钮**；**双击条目（按钮除外）等同于连接**（连接在置顶终端窗口里执行，见 §3.9，不会切换桌面）；列表在打开面板时自动刷新（无手动刷新按钮）；系统图标来自缓存的探测结果（品牌彩色图标，探测在「设置 · SSH 管理」进行）；行内 `folder` 图标**打开独立文件窗口并自动连接该主机**（`file-window:open`，见 §3.9-11）；**按分组显示为手风琴**（分组来自 config 的 `# group:` 注释，**默认全部展开**，点分组标题折叠 / 展开；命名分组在前、未分组在后；没有任何命名分组时保持扁平列表） | 忽略通配符主机（如 `Host *`）；未探测显示通用主机图标 |
 | 剪贴板 | 主进程按设置周期轮询系统剪贴板，展示最近 N 条记录（默认 **3**，可在设置调整）；文本固定 2 行截断预览，图片渲染为小缩略图，**SVG 代码也渲染为小图（固定 64×64 框内等比缩放）**；每条可复制，支持一键清空历史 | 历史仅存内存、退出即清空；文本超 10 万字截断；图片按「大小+哈希」去重；SVG 超 20 万字符按文本处理 |
-| 编码转换 | 字符串 / Base64 / 十六进制 / URL 编码 / ASCII 十进制 五个字段双向实时同步（UTF-8） | 输入非法时标红不联动 |
+| 编码转换 | 字符串 / Base64 / 十六进制 / URL 编码 / **URL 解码** / ASCII 十进制 六个字段双向实时同步（UTF-8）；**URL 解码**=`decodeURIComponent` 的**容错反转义**（还原 `%xx` 里的中文等多字节字符、保留 URL 结构；孤立 `%` 等非法转义不报错、尽量还原），在任意字段输入即可实时得到其余表示。**最下方按「字符串」内容实时生成 200×200 二维码**（`qrcode-generator`，版本自动 = 0、纠错等级 **M**、矢量 SVG，支持中文等 UTF-8），下方**左对齐**「**复制**」/「**下载到本地**」按钮：复制=把二维码渲染成 1024×1024 PNG 写入剪贴板（`app:copy-image`），下载=保存对话框存为 PNG（`app:save-image`） | 输入非法时标红不联动（URL 解码容错、不标红）；二维码内容为空时按钮禁用、过长时红字提示；不落盘 |
 | 哈希计算 | 计算 **MD5 / SHA1 / SHA256**；支持输入字符串或**选择本地文件**（流式计算，适合大文件）；切换类型时清空结果 | 字符串输入防抖 200ms；文件经系统对话框选择 |
 | 营养成分 | 输入商品名与每 100g 的能量(kJ)/蛋白质/脂肪/碳水/钠及商品总重，实时换算：盐、千卡、千焦（含每日推荐 2250kcal / 9410kJ 对比与超出量）、慢跑与步行消耗（公里 / 分钟 / 步数）；底部提供**清空（图标）**与**一个复制按钮（复制输入与结果）** | 输入不做历史记录、不落盘，每次打开为默认值；不做历史列表与商品保存 |
 | 设置 · 应用设置 | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、**悬浮模式（开关，默认关 = 窗口模式；开 = 托盘弹出面板）**、固定悬浮（置顶常驻、失焦不隐藏，仅悬浮模式）、**Liquid Glass**（主界面启用系统玻璃背景：macOS 26+ 用原生 Liquid Glass，旧系统回退 hud 毛玻璃，见 §8.1）、**Liquid Glass 透明度**（滑块 0–100，越大越透明，**实时生效**；默认 80；仅开启 Liquid Glass 时显示）、剪贴板条数、剪贴板轮询间隔、打开数据文件夹、**清理数据**（二次确认后删除窗口位置 / 大小、列宽 / 面板高度、cd 历史等**非业务数据**）、关于（版本号 + **检查更新**按钮（`app:check-updates`，见 §7）+ **开发者模式开关** `settings.developerMode`，默认关，值持久化）、开发者（**仅开发者模式开启时显示**；打开悬浮界面 / 设置界面 / **终端界面** / 文件界面 DevTools，`devtools:open` 的 `main` / `settings` / `terminal` / `file`） | 见 §5.1 |
@@ -340,6 +340,8 @@ Ships/
 | `app:open-console` | — | `{ ok, error? }` | 打开 macOS 系统「控制台」App（`/System/Applications/Utilities/Console.app`，缺失时退回 `/Applications/Utilities/Console.app`）；非 macOS 返回 `{ ok: false, error: 'unsupported' }`；由设置 → 日志的「打开控制台 App」按钮调用 |
 | `app:clear-data` | — | `{ ok }` | 一键清理**非业务数据**：删除 `main-window.json`、`terminal-window.json`、`file-window.json`、`file-layout.json`、`file-window-layout.json`、`cd-history.json`（窗口位置 / 尺寸、列宽 / 面板高度、cd 历史）；**不动** `settings.json`、日志与 `~/.ssh/config`；由设置 → 应用设置 的「清理数据」（二次确认后）调用 |
 | `app:open-external` | `url` | `{ ok, error? }` | 仅允许 `http(s)` |
+| `app:copy-image` | PNG data URL | `{ ok, error? }` | 把 PNG 图片写入系统剪贴板（`nativeImage.createFromDataURL` + `clipboard.writeImage`）；仅接受 `data:image/png;base64,` 前缀；编码转换工具的二维码「复制」用 |
+| `app:save-image` | `{ dataUrl, name? }` | `{ ok, path?, canceled?, error? }` | 保存对话框把 PNG data URL 存为本地文件（默认名 `qrcode.png`）；编码转换工具的二维码「下载到本地」用 |
 | `app:check-updates` | — | `{ ok, checking?, error?, message? }` | 设置 → Ships → 关于 的「检查更新」：触发一次自动更新检查（`updater-service`）。**每次手动检查都会给出反馈**（有新版本 / 已是最新 / 暂时无法检查，均弹窗），反复点击不会静默无响应；检查进行中再次点击返回 `{ ok: true, checking: true }`，界面就地提示「正在检查…」。打包后由主进程弹窗（**失败只给一句友好提示，不暴露技术错误**，详情写日志）；开发模式返回 `{ ok: false, error: 'unsupported', message }` 由界面就地提示 |
 | `update:state` | — | 下载状态快照 `{ phase, version, percent, transferred, total, bytesPerSecond, countdown }` 或 `null` | 更新下载窗口查询当前状态（`phase` ∈ `idle` / `downloading` / `downloaded`）；只接受来自**更新下载窗口**的请求 |
 | `update:cancel` | — | `{ ok }` | 下载窗口「取消」：下载阶段中止下载（`CancellationToken`），已完成则停止倒计时、不立即重启（退出本次更新）；只接受来自更新下载窗口的请求 |
