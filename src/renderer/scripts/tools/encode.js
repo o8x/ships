@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerEncodeTool() {
-  const { Icons, el, section, inputField } = window.ShipsUI;
+  const { Icons, el, section, inputField, segmented, createSelect } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -27,6 +27,10 @@
         qrCopyFailed: '复制失败',
         qrSaveFailed: '保存失败：{error}',
         qrTooLong: '内容过长，无法生成二维码',
+        qrEc: '纠错等级',
+        qrSize: '尺寸',
+        qrVersion: '版本',
+        qrVersionAuto: '自动',
       },
     },
     en: {
@@ -51,6 +55,10 @@
         qrCopyFailed: 'Copy failed',
         qrSaveFailed: 'Save failed: {error}',
         qrTooLong: 'Content is too long to encode as a QR code',
+        qrEc: 'Error correction',
+        qrSize: 'Size',
+        qrVersion: 'Version',
+        qrVersionAuto: 'Auto',
       },
     },
   });
@@ -181,8 +189,10 @@
 
     let syncing = false;
 
-    // 最下方的二维码：内容 = 字符串字段（实时生成，200×200）。
-    const qrBox = el('div', { class: 'qr-box qr-box-fixed' });
+    // 二维码区：左侧二维码，右侧可调参数（纠错等级 / 尺寸 / 边距）+ 复制 / 下载按钮。
+    // 数据源固定为最上面的「字符串」框内容。
+    const params = { ec: QR_ERROR_CORRECTION, size: 200, version: 0 };
+    const qrBox = el('div', { class: 'qr-box', style: `width:${params.size}px;height:${params.size}px` });
     const qrNote = el('div', { class: 'qr-note' }, '');
     const qrCopyBtn = el('button', { class: 'btn shrink-0', type: 'button' });
     qrCopyBtn.append(el('span', { class: 'inline-flex' }, Icons.copy(14)), el('span', {}, i18n.t('encode.qrCopy')));
@@ -195,8 +205,62 @@
     qrDownloadBtn.disabled = true;
     let currentQrSvg = null;
     let qrCopiedTimer = null;
+    let qrText = '';
+
+    function paramRow(label, control) {
+      const row = el('div', { class: 'flex items-center justify-between gap-2' });
+      row.appendChild(el('span', { class: 'shrink-0 text-[11px] text-fg-muted' }, label));
+      row.appendChild(control);
+      return row;
+    }
+
+    const ecControl = segmented(
+      ['L', 'M', 'Q', 'H'].map((value) => ({ value, label: value })),
+      params.ec,
+      (value) => {
+        params.ec = value;
+        renderQr(qrText);
+      },
+      { className: 'segment-compact' }
+    );
+    const sizeControl = createSelect({
+      options: [160, 200, 240, 280, 320].map((value) => ({ value, label: `${value}px` })),
+      value: params.size,
+      align: 'right',
+      className: 'w-[88px] shrink-0',
+      onChange: (value) => {
+        params.size = Number(value);
+        renderQr(qrText);
+      },
+    });
+    const versionControl = createSelect({
+      options: [
+        { value: 0, label: i18n.t('encode.qrVersionAuto') },
+        ...Array.from({ length: 40 }, (_v, i) => ({ value: i + 1, label: String(i + 1) })),
+      ],
+      value: params.version,
+      align: 'right',
+      className: 'w-[88px] shrink-0',
+      onChange: (value) => {
+        params.version = Number(value);
+        renderQr(qrText);
+      },
+    });
+
+    const qrActions = el('div', { class: 'mt-1 flex items-center gap-2' });
+    qrActions.append(qrCopyBtn, qrDownloadBtn);
+    const qrParams = el('div', { class: 'flex min-w-0 flex-1 flex-col gap-2' });
+    qrParams.append(
+      paramRow(i18n.t('encode.qrEc'), ecControl.root),
+      paramRow(i18n.t('encode.qrSize'), sizeControl.el),
+      paramRow(i18n.t('encode.qrVersion'), versionControl.el),
+      qrActions
+    );
 
     function renderQr(text) {
+      qrText = text;
+      qrBox.style.width = `${params.size}px`;
+      qrBox.style.height = `${params.size}px`;
       qrBox.innerHTML = '';
       currentQrSvg = null;
       qrNote.textContent = '';
@@ -207,10 +271,15 @@
         return;
       }
       try {
-        const qr = window.qrcode(0, QR_ERROR_CORRECTION);
+        // 库默认按 Latin-1 取字节，会让中文乱码；显式改用 UTF-8。
+        if (window.qrcode.stringToBytesFuncs && window.qrcode.stringToBytesFuncs['UTF-8']) {
+          window.qrcode.stringToBytes = window.qrcode.stringToBytesFuncs['UTF-8'];
+        }
+        const qr = window.qrcode(params.version, params.ec);
         qr.addData(text);
         qr.make();
-        qrBox.innerHTML = qr.createSvgTag({ scalable: true, margin: 2, cellSize: 2 });
+        // 固定边距 4 个模块（标准静区）；createSvgTag 的 margin 默认即 cellSize×4。
+        qrBox.innerHTML = qr.createSvgTag({ scalable: true, cellSize: 1 });
         currentQrSvg = qrBox.querySelector('svg');
         qrCopyBtn.disabled = false;
         qrDownloadBtn.disabled = false;
@@ -272,7 +341,8 @@
       if (field !== fields.urlDecode) fields.urlDecode.value = decodeUrl(text);
       if (field !== fields.ascii) fields.ascii.value = bytesToAscii(bytes);
       syncing = false;
-      renderQr(text);
+      // 二维码数据源固定取最上面的「字符串」框内容。
+      renderQr(fields.text.value);
     }
 
     function handle(field) {
@@ -339,11 +409,11 @@
       asciiField.wrapper
     );
 
-    // 底部：200×200 二维码 + 左对齐的「复制 / 下载到本地」按钮。
-    const qrActions = el('div', { class: 'mt-2 flex items-center gap-2' });
-    qrActions.append(qrCopyBtn, qrDownloadBtn);
+    // 底部：左=二维码，右=参数（纠错 / 尺寸 / 边距）+「复制 / 下载到本地」按钮。
+    const qrWrap = el('div', { class: 'flex items-start gap-3' });
+    qrWrap.append(qrBox, qrParams);
     const qrSection = section();
-    qrSection.append(qrBox, qrActions, qrNote);
+    qrSection.append(qrWrap, qrNote);
 
     container.append(body, qrSection);
     renderQr('');
