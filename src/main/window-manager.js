@@ -801,6 +801,7 @@ function createWindowWindow() {
   const bounds = mainWindowBoundsForOpen();
   // Liquid Glass / 毛玻璃在窗口模式同样生效（与悬浮模式一致）。
   const glass = glassMode();
+  logger.file(`[window-mode] create main window glass=${glass}`);
   const glassOptions =
     glass === 'vibrancy' ? { vibrancy: VIBRANCY.type, visualEffectState: VIBRANCY.state } : {};
   mainWindow = new BrowserWindow({
@@ -824,6 +825,8 @@ function createWindowWindow() {
     // 玻璃开启时窗口透明（vibrancy 材质 / 原生玻璃视图透出），否则用主题底色。
     transparent: glass !== 'off',
     ...glassOptions,
+    // 与悬浮面板一致：vibrancy 需原生圆角裁剪材质；liquid 由玻璃视图自己画圆角。
+    roundedCorners: glass === 'vibrancy',
     backgroundColor: glass !== 'off' ? '#00000000' : themeBackgroundColor(),
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'main-preload.js'),
@@ -918,10 +921,12 @@ function showMainWindow() {
     }
     const win = getMainWindow() || createMainWindow();
     if (win.isMinimized && win.isMinimized()) win.restore();
-    // 每次显示都重申「置顶到 screen-saver + 固定在自己的桌面」：可浮在全屏应用之上，
-    // 但切换桌面时不跟随（与终端窗口一致）。
-    win.setAlwaysOnTop(true, 'screen-saver');
+    // 每次显示都放到**当前鼠标所在屏幕**（沿用记忆位置并夹回；无记忆则居中）。
+    win.setBounds(mainWindowBoundsForOpen(), false);
+    // 带到**当前桌面 / 空间**（与独立文件窗口同一技巧：先加入所有桌面再固定回当前桌面）。
+    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
     win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
+    win.setAlwaysOnTop(true, 'screen-saver');
     win.show();
     win.focus();
     if (typeof win.moveTop === 'function') win.moveTop();
