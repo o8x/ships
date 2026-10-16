@@ -123,6 +123,12 @@
     return bytes;
   }
 
+  /* URL 编码：保留 URL 结构字符（`://` `/` `?` `=` `&` `#` `;` `,` `@` `+` `$` 等，见 `encodeURI`）
+     与 `%`，只编码其余字符（空格 / 中文等），便于直接得到各应用可识别的可读 URL。 */
+  function encodeUrl(text) {
+    return encodeURI(String(text == null ? '' : text)).replace(/%25/g, '%');
+  }
+
   /* URL 反转义（容错）：还原 %xx（含中文等多字节 UTF-8），保留 URL 结构。
      遇到非法转义（孤立 % / 非十六进制）不报错，先把非法 % 转义成 %25 再尽量还原。 */
   function decodeUrl(text) {
@@ -354,7 +360,7 @@
       if (field !== fields.text) fields.text.value = text;
       if (field !== fields.base64) fields.base64.value = bytesToBase64(bytes);
       if (field !== fields.hex) fields.hex.value = bytesToHex(bytes);
-      if (field !== fields.url) fields.url.value = encodeURIComponent(text);
+      if (field !== fields.url) fields.url.value = encodeUrl(text);
       if (field !== fields.urlDecode) fields.urlDecode.value = decodeUrl(text);
       if (field !== fields.ascii) fields.ascii.value = bytesToAscii(bytes);
       syncing = false;
@@ -391,12 +397,9 @@
         bytes = asciiToBytes(value);
         text = bytes ? decoder.decode(bytes) : '';
       } else if (field === fields.url) {
-        try {
-          text = decodeURIComponent(value);
-          bytes = encoder.encode(text);
-        } catch (err) {
-          bytes = null;
-        }
+        // URL 编码保留 `%`，可能出现孤立 `%`；用容错反转义避免据此报错。
+        text = decodeUrl(value);
+        bytes = encoder.encode(text);
       } else {
         // URL 解码：容错反转义，还原中文等字符（不报错、尽量还原）。
         text = decodeUrl(value);
