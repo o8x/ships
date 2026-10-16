@@ -189,7 +189,7 @@
     if (!rowHeight) {
       const root = document.getElementById('file-root');
       const fs = root ? parseFloat(getComputedStyle(root).fontSize) || 12 : 12;
-      rowHeight = 1.95 * fs;
+      rowHeight = 1.9 * fs;
     }
     if (!rowHeight) return;
     const cs = getComputedStyle(listEl);

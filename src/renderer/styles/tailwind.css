@@ -1072,7 +1072,8 @@ body.term-window .select-menu .select-group-title {
   outline: none;
 }
 .fm-row {
-  height: 1.95em;
+  /* 与表头 / 路径行同高（1.9em），三处对齐。 */
+  height: 1.9em;
   cursor: default;
 }
 .fm-row:hover {
@@ -1098,7 +1099,8 @@ body.term-window .select-menu .select-group-title {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-mono);
-  font-size: 0.92em;
+  /* 与文件名 / 表头同号（1em）：中英文观感一致（原来 0.92em 会显得中文更大）。 */
+  font-size: 1em;
   color: var(--color-fg-muted);
 }
 /* 时间列表头：只有「时间」标签（上传已在目录树右键菜单，分离按钮已移到路径行） */
