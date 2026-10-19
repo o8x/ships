@@ -96,7 +96,7 @@
       options: Array.from({ length: 35 }, (_v, i) => ({ value: i + 2, label: String(i + 2) })),
       value: 36,
       align: 'right',
-      className: 'w-[88px]',
+      className: '',
       onChange: (value) => {
         customBase = Number(value);
         if (lastValue != null) {

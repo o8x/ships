@@ -151,7 +151,7 @@
       options: LANGUAGES.map((lang) => ({ value: lang.value, label: lang.label })),
       value: settings.locale || 'zh',
       align: 'right',
-      className: 'w-[140px] shrink-0',
+      className: 'shrink-0',
       onChange: (value) => patch({ locale: value }),
     });
     languageSection.appendChild(
@@ -248,7 +248,7 @@
       options: [3, 5, 10].map((value) => ({ value, label: String(value) })),
       value: settings.clipboardLimit || 3,
       align: 'right',
-      className: 'w-[100px] shrink-0',
+      className: 'shrink-0',
       onChange: (value) => patch({ clipboardLimit: Number(value) }),
     });
     generalSection.appendChild(
@@ -259,7 +259,7 @@
       options: [500, 800, 1000, 1200, 1500, 2000, 3000].map((value) => ({ value, label: `${value} ms` })),
       value: settings.clipboardPollMs || 1200,
       align: 'right',
-      className: 'w-[110px] shrink-0',
+      className: 'shrink-0',
       onChange: (value) => patch({ clipboardPollMs: Number(value) }),
     });
     generalSection.appendChild(

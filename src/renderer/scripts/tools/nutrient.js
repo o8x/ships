@@ -149,7 +149,7 @@
       options: [],
       value: '',
       align: 'right',
-      className: 'w-[128px] shrink-0',
+      className: 'shrink-0',
       placeholder: i18n.t('nutrient.selectRecord'),
       onChange: (name) => loadProduct(name),
     });
@@ -205,7 +205,7 @@
       options: ACTIVITIES.map((item) => ({ value: item.value, label: i18n.t(item.label) })),
       value: 'moderate',
       align: 'right',
-      className: 'w-full',
+      className: '',
       onChange: () => onTdeeChange(),
     });
 

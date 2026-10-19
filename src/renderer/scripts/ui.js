@@ -349,12 +349,10 @@ window.ShipsUI = (function createUI() {
       trigger.classList.add('open');
 
       const rect = trigger.getBoundingClientRect();
-      // 头栏 SSH 下拉：菜单宽度严格等于触发器宽度，保证与本体左右对齐。
-      if (options.matchTrigger) {
-        menu.style.width = `${rect.width}px`;
-        menu.style.minWidth = `${rect.width}px`;
-        menu.style.maxWidth = `${rect.width}px`;
-      }
+      // 所有下拉菜单与触发器同宽；选项文字溢出时省略。
+      menu.style.width = `${rect.width}px`;
+      menu.style.minWidth = `${rect.width}px`;
+      menu.style.maxWidth = `${rect.width}px`;
       // 用 offsetWidth/Height（不受入场动画 transform 影响，getBoundingClientRect 会被 scale 影响）。
       const menuWidth = menu.offsetWidth;
       const menuHeight = menu.offsetHeight;

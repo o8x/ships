@@ -276,7 +276,7 @@
       })),
       value: normalizeBallDelay(ctx.settings.terminalBallDelayMs),
       align: 'right',
-      className: 'w-[120px] shrink-0',
+      className: 'shrink-0',
       onChange: (value) => ctx.patch({ terminalBallDelayMs: Number(value) }),
     });
     syncers.push((next) => {
@@ -315,7 +315,7 @@
       })),
       value: ctx.settings.terminalBallIcon || 'ball.svg',
       align: 'right',
-      className: 'w-[64px] shrink-0',
+      className: 'shrink-0',
       menuClassName: 'select-menu-icons',
       onChange: (value) => ctx.patch({ terminalBallIcon: value }),
     });

@@ -242,7 +242,7 @@
       options: [256, 512, 1024, 2048].map((value) => ({ value, label: `${value}px` })),
       value: params.size,
       align: 'right',
-      className: 'w-[88px] shrink-0',
+      className: 'shrink-0',
       onChange: (value) => {
         params.size = Number(value);
       },
@@ -254,7 +254,7 @@
       ],
       value: params.version,
       align: 'right',
-      className: 'w-[88px] shrink-0',
+      className: 'shrink-0',
       onChange: (value) => {
         params.version = Number(value);
         renderQr(qrText);
@@ -265,7 +265,7 @@
       options: [0, 1, 2, 3, 4, 6, 8].map((value) => ({ value, label: String(value) })),
       value: params.margin,
       align: 'right',
-      className: 'w-[88px] shrink-0',
+      className: 'shrink-0',
       onChange: (value) => {
         params.margin = Number(value);
         renderQr(qrText);

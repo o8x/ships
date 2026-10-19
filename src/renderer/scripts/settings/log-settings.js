@@ -55,7 +55,7 @@
       })),
       value: settings.logRetentionDays || 7,
       align: 'right',
-      className: 'w-[120px] shrink-0',
+      className: 'shrink-0',
       onChange: (value) => patch({ logRetentionDays: Number(value) }),
     });
     logsSection.appendChild(
