@@ -1,4 +1,4 @@
-// Generates Ships icons (tray template + app icon) with zero dependencies.
+// Generates Vessel icons (tray template + app icon) with zero dependencies.
 // Usage: node scripts/gen-icons.mjs
 import fs from 'node:fs';
 import path from 'node:path';

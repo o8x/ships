@@ -14,11 +14,11 @@ const pkg = require('../../../package.json');
 
 /* 自动更新：
    - **macOS**：用 GitHub Releases API 检测最新版本并下载 `.pkg`（`模式 = pkg`），完成后
-     打开系统安装器；PKG 的 postinstall 会重新启动 Ships。未签名 / ad-hoc 构建下也能更新。
+     打开系统安装器；PKG 的 postinstall 会重新启动 Vessel。未签名 / ad-hoc 构建下也能更新。
    - **Windows**：仍用 electron-updater 自动下载并 `quitAndInstall()`（模式 = auto）。
    - 发现新版本 → 提示后下载 → 小型不可关闭的前台下载窗口（进度条 + 取消 + 安装按钮）。
    - 取消 = 退出本次更新（下载阶段会中止下载）。
-   - 设置 → Ships → 关于 可手动「检查更新」（提示已是最新 / 暂时无法检查，不报技术错误）。
+   - 设置 → Vessel → 关于 可手动「检查更新」（提示已是最新 / 暂时无法检查，不报技术错误）。
    仅打包后的 macOS / Windows 生效；开发模式不检查。 */
 
 const COPY = {
@@ -178,11 +178,11 @@ let publishCache = null;
 
 function publishConfig() {
   if (publishCache) return publishCache;
-  // 打包后 package.json 的 build 段会被裁剪，产物前缀仍固定是应用名（Ships）。
+  // 打包后 package.json 的 build 段会被裁剪，产物前缀仍固定是应用名（Vessel）。
   const productName = (pkg.build && pkg.build.productName) || APP_NAME;
 
-  // ships.updateRepo 不会被 electron-builder 裁剪，PKG 更新检测优先用它。
-  const configured = (pkg.ships && pkg.ships.updateRepo) || {};
+  // vessel.updateRepo 不会被 electron-builder 裁剪，PKG 更新检测优先用它。
+  const configured = (pkg.vessel && pkg.vessel.updateRepo) || (pkg.ships && pkg.ships.updateRepo) || {};
   if (configured.owner && configured.repo) {
     publishCache = { owner: configured.owner, repo: configured.repo, productName };
     return publishCache;
@@ -262,7 +262,7 @@ function requestStream(url, redirects = 0, onRequest) {
       return;
     }
     const mod = parsed.protocol === 'http:' ? http : https;
-    const req = mod.get(parsed, { headers: { 'User-Agent': 'Ships-Updater', Accept: '*/*' } }, (res) => {
+    const req = mod.get(parsed, { headers: { 'User-Agent': 'Vessel-Updater', Accept: '*/*' } }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects < 5) {
         res.resume();
         resolve(requestStream(new URL(res.headers.location, parsed).toString(), redirects + 1, onRequest));

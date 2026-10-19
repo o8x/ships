@@ -15,7 +15,7 @@ const logger = require('../utils/logger');
    - ssh 密码：导出为**明文**写入 JSON（由用户自行保管）；导入时随新增主机一并保存（加密到本地）。
    导出文件可用于「导入覆盖」当前配置。 */
 
-const FORMAT = 'ships-backup';
+const FORMAT = 'vessel-backup';
 const FORMAT_VERSION = 1;
 
 function buildExport() {
@@ -49,7 +49,7 @@ async function exportToFile(win) {
   const stamp = new Date().toISOString().slice(0, 10);
   const opts = {
     title: APP_NAME,
-    defaultPath: `ships-backup-${stamp}.json`,
+    defaultPath: `vessel-backup-${stamp}.json`,
     filters: [{ name: 'JSON', extensions: ['json'] }],
   };
   const result = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);

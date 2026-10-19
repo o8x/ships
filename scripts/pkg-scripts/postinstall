@@ -1,7 +1,7 @@
 #!/bin/bash
 set -u
 
-APP="/Applications/Ships.app"
+APP="/Applications/Vessel.app"
 [ -d "$APP" ] || exit 0
 
 # The installer runs as root; launch the app inside the logged-in user's GUI session.

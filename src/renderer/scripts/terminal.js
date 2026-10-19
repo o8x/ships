@@ -360,7 +360,7 @@
     resizeTimer = setTimeout(fitIfNeeded, 150);
   }
 
-  /* 窗口尺寸变化时把「字体大小 / 行高 / 窗口大小」写到控制台与 ships.log（节流 250ms）。 */
+  /* 窗口尺寸变化时把「字体大小 / 行高 / 窗口大小」写到控制台与 vessel.log（节流 250ms）。 */
   function logWindowMetrics() {
     if (!term || !host) return;
     const { width: cellWidth, height: cellHeight } = readCellSize();

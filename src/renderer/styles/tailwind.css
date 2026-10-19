@@ -212,7 +212,7 @@
     display: none;
   }
   .tab {
-    @apply icon-btn relative h-9 w-9 rounded-control-sm;
+    @apply icon-btn relative h-10 w-10 rounded-control-sm;
   }
   .tab:focus,
   .tab:focus-visible {
@@ -223,16 +223,6 @@
     color: var(--color-accent);
     background: var(--color-accent-soft);
     box-shadow: inset 0 0 0 1px var(--color-accent-line);
-  }
-  .tab-active::after {
-    content: '';
-    position: absolute;
-    left: 28%;
-    right: 28%;
-    bottom: 3px;
-    height: 2px;
-    border-radius: 1px;
-    background: var(--color-accent);
   }
   .tool-title {
     @apply relative text-[12px] font-semibold tracking-tight text-fg;
@@ -374,6 +364,13 @@
 .segment.segment-compact button {
   padding: 4px 6px;
 }
+/* 等宽分段控件（例如二维码纠错等级 L / M / Q / H）：与下拉框同宽，按钮均分。 */
+.segment.segment-even {
+  width: var(--control-width, 120px);
+}
+.segment.segment-even button {
+  flex: 1 1 0;
+}
 /* 编码转换工具的二维码：白底、矢量 SVG；尺寸由内联 width/height 控制。 */
 .qr-box {
   display: flex;
@@ -481,7 +478,7 @@ input[type='color'].swatch::-webkit-color-swatch {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  width: 120px;
+  width: var(--control-width, 120px);
   flex-shrink: 0;
   height: 34px;
   padding: 0 10px;
@@ -1572,6 +1569,11 @@ body.file-window {
   flex-direction: column;
   gap: var(--space-card-gap);
   margin-bottom: var(--space-card-gap);
+}
+/* 编码转换有 6 个连续输入框，使用更紧凑的字段间距。 */
+.section.encode-fields,
+.section.radix-fields {
+  gap: 8px;
 }
 
 /* 工具标题区：固定在内容区上方，不随内容滚动；滚动后切换为紧凑的单行标题。 */

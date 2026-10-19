@@ -11,7 +11,7 @@ const iterm = require('../services/iterm-service');
 const wm = require('../window-manager');
 const logger = require('../utils/logger');
 
-// 设置 → 终端 里「重置」要恢复的设置项（都来自 package.json 的 ships 配置）。
+// 设置 → 终端 里「重置」要恢复的设置项（都来自 package.json 的 vessel 配置）。
 const TERMINAL_SETTING_KEYS = [
   'terminalShell',
   'terminalFontSize',
@@ -188,7 +188,7 @@ function registerTerminalIpc(ipcMain) {
     const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
     const options = {
       title: 'Export terminal text',
-      defaultPath: (payload && payload.name) || path.join(os.homedir(), `ships-terminal-${stamp}.txt`),
+      defaultPath: (payload && payload.name) || path.join(os.homedir(), `vessel-terminal-${stamp}.txt`),
       filters: [{ name: 'Text', extensions: ['txt', 'log'] }],
     };
     const win = wm.getTerminalWindowForWebContents(event.sender.id);

@@ -263,7 +263,7 @@
   }
 
   function mount(container) {
-    const nowSection = section(i18n.t('timestamp.now'));
+    const nowSection = section();
     const bigTime = el('div', { class: 'shrink-0 font-mono text-[22px] font-semibold text-fg' }, '--:--:--');
     const tzLine = el('div', { class: 'min-w-0 truncate text-[11px] text-fg-muted' }, '');
     const nowRow = el('div', { class: 'flex min-w-0 items-baseline gap-x-2' });

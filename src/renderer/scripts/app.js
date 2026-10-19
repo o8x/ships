@@ -75,10 +75,14 @@
   /* 工具标题固定在内容区上方；内容滚动后标题缩小、说明并到同一行。 */
   let headerCompact = false;
   let headerScrollFrame = 0;
+  const headerCollapseLockMs =
+    (window.ShipsConstants && window.ShipsConstants.HEADER_COLLAPSE_LOCK_MS) || 190;
+  let headerLockUntil = 0;
 
   function setHeaderCompact(compact) {
     if (compact === headerCompact) return;
     headerCompact = compact;
+    headerLockUntil = performance.now() + headerCollapseLockMs;
     dom.headerHost.classList.toggle('is-compact', compact);
   }
 
@@ -124,7 +128,14 @@
     if (event.deltaY > 0 && !headerCompact) {
       event.preventDefault();
       setHeaderCompact(true);
-    } else if (event.deltaY < 0 && headerCompact) {
+      return;
+    }
+    if (event.deltaY > 0 && headerCompact && performance.now() < headerLockUntil) {
+      // 标题收起动画尚未完成：继续吞掉滚轮，内容保持不动。
+      event.preventDefault();
+      return;
+    }
+    if (event.deltaY < 0 && headerCompact) {
       event.preventDefault();
       setHeaderCompact(false);
     }
@@ -160,7 +171,7 @@
         'data-tip': i18n.t(`tools.${tool.id}`),
         dataset: { tool: tool.id },
       });
-      btn.innerHTML = Icons[tool.icon](22);
+      btn.innerHTML = Icons[tool.icon](24, true);
       btn.addEventListener('click', () => setActive(tool.id));
       dom.tablist.appendChild(btn);
     }

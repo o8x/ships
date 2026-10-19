@@ -36,7 +36,7 @@ const SECRET_PROMPT_RE = /password[^\n\r]*:\s*$/i;
 /* GUI apps inherit a minimal PATH, so probe the usual absolute locations before
    falling back to `python3` from PATH. */
 function pythonBinary() {
-  const override = String(process.env.SHIPS_PYTHON || '').trim();
+  const override = String(process.env.VESSEL_PYTHON || process.env.SHIPS_PYTHON || '').trim();
   if (override) return override;
   for (const candidate of PYTHON_CANDIDATES) {
     try {

@@ -3,7 +3,7 @@
 window.ShipsI18n = (function createI18n() {
   const dict = {
     zh: {
-      appName: 'Ships',
+      appName: 'Vessel',
       settings: '设置',
       networkTest: '网络测试',
       terminal: '终端（置顶）',
@@ -57,7 +57,7 @@ window.ShipsI18n = (function createI18n() {
       },
     },
     en: {
-      appName: 'Ships',
+      appName: 'Vessel',
       settings: 'Settings',
       networkTest: 'Network test',
       terminal: 'Terminal (on top)',

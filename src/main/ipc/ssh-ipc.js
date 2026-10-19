@@ -123,7 +123,7 @@ function registerSshIpc(ipcMain) {
     const win = getMainWindow();
     if ((!win || !win.isVisible()) && Notification.isSupported()) {
       new Notification({
-        title: 'Ships',
+        title: 'Vessel',
         body: `${payload.alias} · ${payload.label || 'Unknown'}`,
       }).show();
     }

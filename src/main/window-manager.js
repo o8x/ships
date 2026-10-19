@@ -821,7 +821,7 @@ function createWindowWindow() {
     y: bounds.y,
     width: bounds.width,
     height: bounds.height,
-    title: 'Ships',
+    title: 'Vessel',
     show: false,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 14, y: 16 },
@@ -831,9 +831,9 @@ function createWindowWindow() {
     minimizable: true,
     maximizable: false,
     fullscreenable: false,
-    // 像终端窗口一样的置顶悬浮 panel：可浮在全屏应用之上，但**不加入所有桌面**
-    // （固定在自己的桌面，切换桌面时不跟随）。
-    alwaysOnTop: true,
+    // 普通标准窗口层级：不常驻置顶（置顶只属于悬浮模式与终端 / 文件窗口）。
+    // 仍固定在自己的桌面，切换桌面时不跟随。
+    alwaysOnTop: false,
     // 玻璃开启时窗口透明（vibrancy 材质 / 原生玻璃视图透出），否则用主题底色。
     // 注意：窗口模式是**标准窗口**，必须保留系统圆角（`roundedCorners` 默认 true）——
     // 之前设成 false 会让 macOS 连标题栏 / 红绿灯一起去掉。
@@ -849,9 +849,9 @@ function createWindowWindow() {
     },
   });
 
-  // 置顶到 screen-saver 层级（可浮在全屏应用之上）；先按单桌面窗口创建，
-  // 显示时再「临时加入所有桌面 → 绑定当前桌面」，避免被拉回旧 Space。
-  mainWindow.setAlwaysOnTop(true, 'screen-saver');
+  // 普通窗口层级（不置顶）；先按单桌面窗口创建，显示时再「临时加入所有桌面 →
+  // 绑定当前桌面」，避免被拉回旧 Space。
+  mainWindow.setAlwaysOnTop(false);
   mainWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
   mainWindow.loadFile(path.join(RENDERER_DIR, 'index.html'));
   mainWindow.webContents.setZoomFactor(1);
@@ -925,7 +925,7 @@ function showMainWindow() {
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
     // 每次都放到当前鼠标所在屏幕（沿用保存的位置并夹回工作区；无记录则居中）。
     win.setBounds(mainWindowBoundsForOpen(), false);
-    win.setAlwaysOnTop(true, 'screen-saver');
+    win.setAlwaysOnTop(false);
     win.show();
     win.focus();
     // 不用 app.focus({ steal: true })：它会激活应用并可能把系统切回窗口原来的 Space。
@@ -1021,7 +1021,7 @@ function openSettingsWindow(section) {
     height: SETTINGS_WINDOW.height,
     minWidth: 560,
     minHeight: 420,
-    title: 'Ships',
+    title: 'Vessel',
     show: false,
     resizable: true,
     minimizable: true,
@@ -1087,7 +1087,7 @@ function openTerminalWindow() {
     height: bounds.height,
     minWidth: TERMINAL_WINDOW.minWidth,
     minHeight: TERMINAL_WINDOW.minHeight,
-    title: 'Ships Terminal',
+    title: 'Vessel Terminal',
     // 无边框 + 透明：让窗口在「悬浮球」模式下能呈现圆形（圆角 / 圆形由 CSS 画，见 §3.9-12）。
     frame: false,
     transparent: true,
@@ -1301,7 +1301,7 @@ function openFileWindow(target, pathArg) {
     height: bounds.height,
     minWidth: FILE_WINDOW.minWidth,
     minHeight: FILE_WINDOW.minHeight,
-    title: 'Ships Files',
+    title: 'Vessel Files',
     titleBarStyle: 'hiddenInset',
     backgroundColor: themeBackgroundColor(),
     show: false,
@@ -1455,7 +1455,7 @@ function openUpdateWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     center: true,
-    title: 'Ships',
+    title: 'Vessel',
     backgroundColor: themeBackgroundColor(),
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'update-preload.js'),

@@ -5,11 +5,22 @@ window.ShipsUI = (function createUI() {
   // as window.shipsIcons); icons are sized by injecting width/height.
   const sources = window.shipsIcons || {};
 
+  /* 把单色图标统一成 currentColor（兼容用户替换进来、带写死 fill 的 SVG）。 */
+  function monochrome(source) {
+    let out = String(source).replace(/\s(fill|stroke)="(?!none(?:\s|"))[^"]*"/gi, ' $1="currentColor"');
+    const rootTag = out.match(/<svg\b[^>]*>/i);
+    if (rootTag && !/\sfill=/.test(rootTag[0])) {
+      out = out.replace(rootTag[0], rootTag[0].replace('<svg', '<svg fill="currentColor"'));
+    }
+    return out;
+  }
+
   const Icons = {};
   for (const name of Object.keys(sources)) {
-    Icons[name] = (size) => {
+    Icons[name] = (size, options) => {
       const s = size || 20;
-      const source = sources[name];
+      const monochromeIcon = options === true || Boolean(options && options.monochrome);
+      const source = monochromeIcon ? monochrome(sources[name]) : sources[name];
       const rootTag = source.match(/<svg\b[^>]*>/i);
       if (!rootTag) return source;
       const cleaned = rootTag[0].replace(/\s(width|height)="[^"]*"/gi, '');
@@ -49,7 +60,10 @@ window.ShipsUI = (function createUI() {
   }
 
   function inputField(labelText, inputEl) {
-    const wrap = el('label', { class: 'block' });
+    // 只有原生输入控件用 <label> 包（点击标签聚焦输入）；
+    // 自绘按钮 / 分段控件 / 多控件行用 <div>，否则点击整行都会转发成控件点击。
+    const labelable = Boolean(inputEl && /^(INPUT|TEXTAREA|SELECT)$/.test(inputEl.tagName));
+    const wrap = el(labelable ? 'label' : 'div', { class: 'block' });
     if (labelText) wrap.appendChild(el('span', { class: 'tool-label' }, labelText));
     wrap.appendChild(inputEl);
     return wrap;

@@ -3,6 +3,8 @@
 window.ShipsConstants = {
   FALLBACK_VERSION: '0.0.0',
   COPY_FEEDBACK_MS: 1200,
+  // 工具标题收起动画期间先锁住内容滚动，动画完成后再滚动内容。
+  HEADER_COLLAPSE_LOCK_MS: 190,
   // Liquid Glass 表面透明度：glassOpacity(0–100，越大越透明) 映射到表面填充 alpha。
   // base = (100 - glassOpacity)/100 * GLASS_MAX_ALPHA，默认 80 → 0.08（现有观感）。
   GLASS_DEFAULT_OPACITY: 80,

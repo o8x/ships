@@ -72,6 +72,7 @@
   function mount(container) {
     const rows = [];
     const rowsSection = section();
+    rowsSection.classList.add('radix-fields');
 
     function makeRow(labelText, base, placeholder) {
       const input = el('input', {

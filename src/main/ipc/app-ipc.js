@@ -119,7 +119,7 @@ function registerAppIpc(ipcMain) {
     return { paths: result.filePaths };
   });
 
-  // 渲染层请求写日志：控制台 + ships.log（窗口尺寸 / 字体 / 行高等调试信息）。
+  // 渲染层请求写日志：控制台 + vessel.log（窗口尺寸 / 字体 / 行高等调试信息）。
   ipcMain.on(IPC.LOG_WRITE, (_event, text) => {
     logger.info(String(text == null ? '' : text));
   });

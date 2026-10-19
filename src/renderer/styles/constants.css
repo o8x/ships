@@ -1,5 +1,5 @@
 /*
- * Ships - 统一设计变量（样式常量唯一来源）
+ * Vessel - 统一设计变量（样式常量唯一来源）
  * 颜色 / 圆角 / 阴影 / 间距 / 字体 等全部在此定义，
  * 样式与脚本都引用这里（脚本通过 getComputedStyle 读取，带 JS 兜底默认值）。
  */
@@ -18,6 +18,9 @@
   --radius-control-sm: 4px;
   --radius-xs: 2px;
   --radius-pill: 999px;
+
+  /* 表单控件默认宽度（下拉框 / L-M-Q-H 等分段控件）。 */
+  --control-width: 120px;
 
   /* 间距 */
   --space-1: 4px;

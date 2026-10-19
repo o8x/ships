@@ -50,6 +50,7 @@
         height: '身高（cm）',
         weight: '体重（kg）',
         activity: '活动水平',
+        activityPlaceholder: '请选择',
         activitySedentary: '久坐（1.2）',
         activityLight: '轻度（1.375）',
         activityModerate: '中度（1.55）',
@@ -105,6 +106,7 @@
         height: 'Height (cm)',
         weight: 'Weight (kg)',
         activity: 'Activity level',
+        activityPlaceholder: 'Select',
         activitySedentary: 'Sedentary (1.2)',
         activityLight: 'Light (1.375)',
         activityModerate: 'Moderate (1.55)',
@@ -183,7 +185,7 @@
     actions.append(copyBtn);
 
     const tdeeSection = section(i18n.t('tdee.title'));
-    let sexValue = 'male';
+    let sexValue = '';
     const sexSegment = segmented(
       [
         { value: 'male', label: i18n.t('tdee.male') },
@@ -198,14 +200,15 @@
     const sexWrap = el('div', { class: 'col-span-2' });
     sexWrap.appendChild(inputField(i18n.t('tdee.sex'), sexSegment.root));
 
-    const ageInput = numberField('tdee.age', '30');
-    const heightInput = numberField('tdee.height', '175');
-    const weightInput = numberField('tdee.weight', '70');
+    const ageInput = numberField('tdee.age', '');
+    const heightInput = numberField('tdee.height', '');
+    const weightInput = numberField('tdee.weight', '');
     const activitySelect = createSelect({
       options: ACTIVITIES.map((item) => ({ value: item.value, label: i18n.t(item.label) })),
-      value: 'moderate',
+      value: '',
       align: 'right',
       className: '',
+      placeholder: i18n.t('tdee.activityPlaceholder'),
       onChange: () => onTdeeChange(),
     });
 
@@ -302,16 +305,17 @@
 
     function activityFactor() {
       const found = ACTIVITIES.find((item) => item.value === activitySelect.getValue());
-      return found ? found.factor : 1.55;
+      return found ? found.factor : null;
     }
 
     function calcTdee() {
       const age = Number(ageInput.value);
       const height = Number(heightInput.value);
       const weight = Number(weightInput.value);
-      if (!(age > 0 && height > 0 && weight > 0)) return { bmr: null, tdee: null };
+      const factor = activityFactor();
+      if (!sexValue || !factor || !(age > 0 && height > 0 && weight > 0)) return { bmr: null, tdee: null };
       const bmr = 10 * weight + 6.25 * height - 5 * age + (sexValue === 'female' ? -161 : 5);
-      return { bmr, tdee: bmr * activityFactor() };
+      return { bmr, tdee: bmr * factor };
     }
 
     function tdeePayload() {
@@ -357,12 +361,12 @@
     function applyTdee(record) {
       if (!record) return;
       state.applying = true;
-      sexValue = record.sex === 'female' ? 'female' : 'male';
+      sexValue = record.sex === 'female' || record.sex === 'male' ? record.sex : '';
       sexSegment.set(sexValue);
-      ageInput.value = String(record.age || 30);
-      heightInput.value = String(record.height || 175);
-      weightInput.value = String(record.weight || 70);
-      activitySelect.setValue(record.activity || 'moderate');
+      ageInput.value = record.age != null ? String(record.age) : '';
+      heightInput.value = record.height != null ? String(record.height) : '';
+      weightInput.value = record.weight != null ? String(record.weight) : '';
+      activitySelect.setValue(record.activity || '');
       computeTdee();
       state.applying = false;
     }

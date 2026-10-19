@@ -235,7 +235,7 @@
         params.ec = value;
         renderQr(qrText);
       },
-      { className: 'segment-compact' }
+      { className: 'segment-compact segment-even' }
     );
     // 「尺寸」= 导出（复制 / 下载）PNG 的边长；展示始终 200×200，故无需重绘。
     const sizeControl = createSelect({
@@ -420,6 +420,7 @@
     }
 
     const body = section();
+    body.classList.add('encode-fields');
     body.append(
       textField.wrapper,
       base64Field.wrapper,

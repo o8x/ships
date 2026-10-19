@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PTY bridge for the Ships network-test terminal.
+"""PTY bridge for the Vessel network-test terminal.
 
 Usage: pty-bridge.py <shell> <cols> <rows>
   stdin  <- raw keystrokes from the renderer's xterm

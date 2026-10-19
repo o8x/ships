@@ -1,8 +1,8 @@
-# Ships 产品需求文档（PRD）
+# Vessel 产品需求文档（PRD）
 
 | 项目 | 说明 |
 | --- | --- |
-| 产品名称 | Ships |
+| 产品名称 | Vessel |
 | 产品定位 | 面向开发者的 macOS 菜单栏（Tray）工具箱，点击托盘图标在下方展开轻量面板 |
 | 技术栈 | Electron 44（主进程）+ Tailwind CSS 3（界面样式）+ 原生 JavaScript（渲染层，无打包器）+ ssh2（SSH 探测）+ qrcode-generator（二维码生成）+ electron-liquid-glass（macOS 26+ 原生 Liquid Glass，可选）+ electron-updater（自动更新）+ @xterm/xterm 与 @xterm/addon-fit（设置页内嵌终端）+ python3（PTY 桥接脚本）+ 本地 geoip.json（IP 归属地） |
 | 支持平台 | macOS（arm64 / x64；当前主要面向 arm64） |
@@ -15,7 +15,7 @@
 
 ## 1.1 阅读与维护规则
 
-- 本文件是 Ships 行为的**唯一事实来源**：先读本文件、再读代码，不凭猜测改代码。
+- 本文件是 Vessel 行为的**唯一事实来源**：先读本文件、再读代码，不凭猜测改代码。
 - **改代码必须同步改文档**，不得只改其一；文档与实现不一致时**以代码为准**（先核对主进程 / 预加载 / 渲染层入口，再修文档）。
 - 对外接口必须写清：**签名、可用范围、是否持久（刷新 / 重启是否丢失）、副作用条件与示例**。
 - 版本号变更时，同步更新本文件内所有版本引用（含示例）。
@@ -27,7 +27,7 @@
 | 新增 / 删除工具 | §4 主要功能清单、§11 GUI 与布局规范 |
 | 修改现有工具的交互 / 控件 | §4 主要功能清单、§11 GUI 与布局规范 |
 | 新增 / 修改 IPC 通道 | §5.2 IPC 通道三张表、§2.1 安全模型、对应流程 |
-| 修改窗口行为 / 尺寸 | §2.1 进程模型、§4、§8 主界面布局、§11 GUI 与布局规范、`package.json` 的 `ships` 配置 |
+| 修改窗口行为 / 尺寸 | §2.1 进程模型、§4、§8 主界面布局、§11 GUI 与布局规范、`package.json` 的 `vessel` 配置 |
 | 修改设置项 | §3 核心流程、§5.1 本地数据、§4 功能清单 |
 | 修改 SSH 相关行为 | §3 核心流程、§5.1 本地数据、§5.2、§6 流程图 |
 | 修改样式常量 | §11 GUI 与布局规范、`src/renderer/styles/constants.css` |
@@ -40,7 +40,7 @@
 ## 2. 项目概述
 
 - **产品定位**：一个常驻 macOS 菜单栏的开发者工具箱，把高频小工具与 SSH 管理收纳进一个托盘弹出的面板。
-- **技术栈**：Electron 44；界面使用 Tailwind CSS 3 编译产物 + 原生 JS（`window.Ships*` 命名空间）；SSH 探测使用 `ssh2`；原生玻璃使用 `electron-liquid-glass`（N-API 原生插件，macOS 26+ 生效，旧系统 / 非 macOS 由主进程回退，见 §8.1）。
+- **技术栈**：Electron 44；界面使用 Tailwind CSS 3 编译产物 + 原生 JS（`window.Vessel*` 命名空间）；SSH 探测使用 `ssh2`；原生玻璃使用 `electron-liquid-glass`（N-API 原生插件，macOS 26+ 生效，旧系统 / 非 macOS 由主进程回退，见 §8.1）。
   - 说明：AGENTS 建议界面优先 Vue 3；当前实现选用**无打包器的原生 JS + Tailwind**，以减小体积、避免引入前端构建链，后续如需可平滑替换为 Vue 3。
 - **支持平台**：macOS（Darwin）。代码通过 `process.platform` 判断，非 macOS 下托盘行为与登录项设置自动降级。
 - **当前版本**：3.34.0。
@@ -58,8 +58,8 @@
 **项目结构**
 
 ```
-Ships/
-├── package.json                 # 依赖、脚本、ships 系统配置段
+Vessel/
+├── package.json                 # 依赖、脚本、vessel 系统配置段
 ├── tailwind.config.js           # Tailwind：颜色/圆角/阴影/字体均映射到 CSS 变量
 ├── AGENTS.md                    # 客户端设计与编码约定
 ├── README.md                    # 英文说明（应用图标 + 简短概述，默认语言）
@@ -79,7 +79,7 @@ Ships/
 │   ├── dist-mac.sh              # dist:mac 包装脚本：选择签名方式
 │   ├── after-pack.cjs           # electron-builder afterPack：asar 加固 + fuses + ad-hoc 签名
 │   ├── adhoc-sign.sh            # 未配置正式签名时对 .app 做 ad-hoc 签名
-│   ├── pkg-scripts/             # PKG 安装前退出已运行的 Ships，安装后自动启动新版本
+│   ├── pkg-scripts/             # PKG 安装前退出已运行的 Vessel，安装后自动启动新版本
 │   ├── notarize.cjs             # electron-builder afterSign：按需公证
 │   └── gen-icons.mjs            # 零依赖 PNG / icns 图标生成脚本
 └── src/
@@ -111,13 +111,13 @@ Ships/
 - 来源校验：主进程处理 SSH 连接 / 探测时**不信任渲染层传入的主机字段**，仅以 `alias` 在 `~/.ssh/config` 中查表后使用配置值（见 `ssh-ipc.js`）。
 - 打开外链仅允许 `http(s)` 协议（`app:open-external`）。
 - 数据落盘：设置与探测结果均为**非机密 JSON**，位于用户数据目录；`~/.ssh/config` 仅由用户本机维护。SSH 登录密码（可选）**以 AES-256-GCM 加密后保存在应用数据目录**（`ssh-credentials.json` + 随机密钥 `ssh-credentials.key`，均 0600），明文不落盘（见 §5.1）。2FA（TOTP）密钥同样**以 AES-256-GCM 加密保存**（`totp-accounts.json` + 随机密钥 `totp-accounts.key`，均 0600），密钥只在主进程内解密、**验证码由主进程计算**（见 §4「2FA 验证码」），明文既不落盘也不下发到渲染层。
-- 日志：详细日志（`debug` 级）仅在调试模式（`SHIPS_DEBUG=1` 或 `--debug`）输出；`info` / `warn` / `error` 始终写入当天日志文件；启动时始终打印数据文件清单与绝对路径。macOS 下日志写到 `~/Library/Logs/Ships`，**Console.app 的「日志报告」会直接收录**，因此**不再做统一日志同步**；可在 **设置 → 日志** 配置**保留天数**（默认 7）并打开日志文件夹 / 控制台 App。
+- 日志：详细日志（`debug` 级）仅在调试模式（`VESSEL_DEBUG=1`（兼容旧 `SHIPS_DEBUG`） 或 `--debug`）输出；`info` / `warn` / `error` 始终写入当天日志文件；启动时始终打印数据文件清单与绝对路径。macOS 下日志写到 `~/Library/Logs/Vessel`，**Console.app 的「日志报告」会直接收录**，因此**不再做统一日志同步**；可在 **设置 → 日志** 配置**保留天数**（默认 7）并打开日志文件夹 / 控制台 App。
 - 登录项：仅在值发生变化时调用 `app.setLoginItemSettings`，避免无意义报错。
 
 **来源标识注入 / 常驻与托盘**
 
 - 不涉及来源标识注入（无 Webview）。
-- 常驻托盘：`app.dock.hide()`（由 `ships.showDockIcon` 控制）后仅保留 Tray；`window-all-closed` 不退出应用；主面板关闭（隐藏）不影响进程。
+- 常驻托盘：`app.dock.hide()`（由 `vessel.showDockIcon` 控制）后仅保留 Tray；`window-all-closed` 不退出应用；主面板关闭（隐藏）不影响进程。
 
 ---
 
@@ -138,15 +138,15 @@ Ships/
 
 1. 点击托盘图标 → 若窗口未创建则创建；每次显示依次 `win.show()` → `win.focus()` → `app.focus({ steal: true })` → `win.moveTop()`，确保在当前桌面直接浮出。
 2. **只记忆位置，不记桌面 / 屏幕**：`setBounds(mainWindowBoundsForOpen())` 读取 `main-window.json` 的 `{ x, y }` 并夹回**当前鼠标所在屏幕**的工作区；无记录时在当前屏幕工作区居中。显示前先 `setVisibleOnAllWorkspaces(true)` 让窗口能在当前 Space 浮出，`show()` / `focus()` 后约 60ms 再 `false` 绑定到**当前桌面**；不再调用 `app.focus({ steal: true })`（它会激活应用并可能切回旧 Space）。
-3. 窗口是**独立的标准窗口**（`titleBarStyle: hiddenInset` + 系统红绿灯），行为像终端窗口的**置顶悬浮 panel**：`alwaysOnTop` 且 `setAlwaysOnTop(true, 'screen-saver')`（可浮在**全屏应用之上**）。
+3. 窗口是**独立的标准窗口**（`titleBarStyle: hiddenInset` + 系统红绿灯），**普通窗口层级、不常驻置顶**（`alwaysOnTop: false`）。
 4. **桌面归属**：窗口打开后固定在其所在桌面，切换桌面时不跟随（保持留在旧桌面）；把它关闭（隐藏）后从另一个桌面点托盘，会先临时加入所有桌面再绑定当前桌面，因此在**新桌面打开**，不会被拉回旧桌面。
 5. 关闭按钮（系统红绿灯）= **隐藏**（应用常驻托盘）；`Escape` 亦隐藏。拖动后（防抖 400ms）与关闭前把 `{ x, y }` 写入 `main-window.json`。
-6. 尺寸：**固定 640 × 480、不可缩放**（`package.json` 的 `ships.mainWindow`）；窗口可拖动，位置跨显示保留（只记录坐标，不记录屏幕 / 桌面）。
+6. 尺寸：**固定 640 × 480、不可缩放**（`package.json` 的 `vessel.mainWindow`）；窗口可拖动，位置跨显示保留（只记录坐标，不记录屏幕 / 桌面）。
 
 **悬浮模式（`floatMode = true`）**
 
 1. 点击托盘图标 → 记录托盘 `getBounds()`。
-2. 计算 `x = 托盘中心 - 面板宽/2`，`y = 托盘底部 + gapBelowTray`（`package.json` 的 `ships.window.gapBelowTray`，当前 **2px**，使面板紧贴菜单栏），并按所在显示器工作区夹取。
+2. 计算 `x = 托盘中心 - 面板宽/2`，`y = 托盘底部 + gapBelowTray`（`package.json` 的 `vessel.window.gapBelowTray`，当前 **2px**，使面板紧贴菜单栏），并按所在显示器工作区夹取。
 3. 显示并聚焦主面板。
 4. 再次点击、或面板失焦（点击别处）时隐藏；`Escape` 亦隐藏。
 5. 打开设置窗口会使主面板失焦并隐藏（与设置互斥）；若面板与设置窗口同时打开，面板失焦（含焦点转到设置窗口）同样自动隐藏。
@@ -174,8 +174,8 @@ Ships/
 3. 归类到具体系统 / 发行版：Linux 读取 `/etc/os-release` 的 `ID`（如 `ubuntu` / `fedora` / `arch` / `centos` / `debian` / `rhel` / `alpine` …），macOS 为 `macos`，BSD 为 `freebsd` / `openbsd` 等，Windows 为 `windows`；同时给出 `family`（`macos`/`linux`/`windows`/`bsd`/`unknown`）与显示名 `label`。
 4. 结果（`{ os, family, label, at }`）写入 `ssh-detected.json` 并广播 `ssh:detected` 事件；渲染层据此更新左侧彩色系统图标与提示。
 5. 表单内探测期间按钮显示「探测中…」且禁用；**探测成功后**才启用「保存」。**探测失败不清空表单**：已填写的别名 / 地址 / 用户 / 端口 / 私钥 / 跳板机 / 分组 / 密码都会保留，便于原地修改后直接重新探测（密码为内存草稿，不落盘）。
-6. **日志**：探测的每一步（开始、目标、认证方式、执行命令、stdout/stderr、解析结果、连接报错）都会追加写入**当天的日志文件** `~/Library/Logs/Ships/ships-YYYY-MM-DD.log`（设置 → 日志 → 日志文件夹可打开所在目录）；便于排查本地网络 / 权限问题。
-7. **macOS 本地网络权限**：Info.plist 含 `NSLocalNetworkUsageDescription`。macOS 15+ 首次访问局域网（如 192.168.x / 10.x）时会弹「本地网络」授权，需允许 Ships，否则连接会被系统拦截（表现即“没有本地 SSH 探测权限”）；可在「系统设置 → 隐私与安全性 → 本地网络」中开启。
+6. **日志**：探测的每一步（开始、目标、认证方式、执行命令、stdout/stderr、解析结果、连接报错）都会追加写入**当天的日志文件** `~/Library/Logs/Vessel/vessel-YYYY-MM-DD.log`（设置 → 日志 → 日志文件夹可打开所在目录）；便于排查本地网络 / 权限问题。
+7. **macOS 本地网络权限**：Info.plist 含 `NSLocalNetworkUsageDescription`。macOS 15+ 首次访问局域网（如 192.168.x / 10.x）时会弹「本地网络」授权，需允许 Vessel，否则连接会被系统拦截（表现即“没有本地 SSH 探测权限”）；可在「系统设置 → 隐私与安全性 → 本地网络」中开启。
 
 ### 3.6 修改设置
 
@@ -203,7 +203,7 @@ Ships/
    - ICMP → `ping -c 4 <ip>`；ARP → `arp -n <ip>`
    - 扫描主机 → `nmap -sn <网段>`；扫描应用 → `nmap -sT [-p <port>] <目标>`（connect 扫描，无需 root）
    执行位置选了 SSH 主机时，整条命令包一层 `ssh … '<命令>'`（在那台机器上跑同一份命令）。「停止」= 向终端发送 `Ctrl-C`。
-5. **交互终端**：xterm.js + **真实 PTY**。PTY 由 `src/main/scripts/pty-bridge.py`（Python 标准库 `pty`）创建，运行**用户默认登录 shell**（`$SHELL`，回退 `os.userInfo().shell`，最后 `/bin/sh`）：可直接敲命令、`clear` / `Ctrl-L` 清屏、`Ctrl-C` 中断、`cd` / 管道 / 重定向，以及需要终端的交互式工具（`vim`、`sudo` 密码提示等）。键盘输入经 `terminal:input` 写入 PTY，输出经 `terminal:data` 原样回传（含 ANSI），`TERM=xterm-256color`；终端尺寸随面板自适应（`FitAddon`），并在变化时通过 `terminal:resize` → `TIOCSWINSZ` 同步给 PTY。会话由 `terminal-service` 统一管理（带 id，可同时存在多个：设置页一个、置顶终端窗口一个）。需要系统提供 `python3`：打包后脚本位于 `Contents/Resources/app.asar.unpacked/src/main/scripts/pty-bridge.py`（`build.asarUnpack` 含 `src/main/scripts/*`，因为 `app.asar` 内的脚本无法执行），`terminal-service` 会把 `app.asar` 路径改写为 `app.asar.unpacked`；解释器依次探测 `/usr/bin/python3`、`/opt/homebrew/bin/python3`、`/usr/local/bin/python3`（可用 `SHIPS_PYTHON` 覆盖），都找不到时用 PATH 里的 `python3`，脚本缺失则在终端里报错。
+5. **交互终端**：xterm.js + **真实 PTY**。PTY 由 `src/main/scripts/pty-bridge.py`（Python 标准库 `pty`）创建，运行**用户默认登录 shell**（`$SHELL`，回退 `os.userInfo().shell`，最后 `/bin/sh`）：可直接敲命令、`clear` / `Ctrl-L` 清屏、`Ctrl-C` 中断、`cd` / 管道 / 重定向，以及需要终端的交互式工具（`vim`、`sudo` 密码提示等）。键盘输入经 `terminal:input` 写入 PTY，输出经 `terminal:data` 原样回传（含 ANSI），`TERM=xterm-256color`；终端尺寸随面板自适应（`FitAddon`），并在变化时通过 `terminal:resize` → `TIOCSWINSZ` 同步给 PTY。会话由 `terminal-service` 统一管理（带 id，可同时存在多个：设置页一个、置顶终端窗口一个）。需要系统提供 `python3`：打包后脚本位于 `Contents/Resources/app.asar.unpacked/src/main/scripts/pty-bridge.py`（`build.asarUnpack` 含 `src/main/scripts/*`，因为 `app.asar` 内的脚本无法执行），`terminal-service` 会把 `app.asar` 路径改写为 `app.asar.unpacked`；解释器依次探测 `/usr/bin/python3`、`/opt/homebrew/bin/python3`、`/usr/local/bin/python3`（可用 `VESSEL_PYTHON`（兼容旧 `SHIPS_PYTHON`） 覆盖），都找不到时用 PATH 里的 `python3`，脚本缺失则在终端里报错。
 6. **会话生命周期**：进入分区自动启动会话；shell 退出（如输入 `exit`）后终端提示「会话已结束」，此时敲任意键或点「测试」会重新启动；离开分区、关闭窗口、退出应用都会结束会话（`terminal:kill`；主进程 `before-quit` 调 `killAll()` 兜底）。
 
 ------
@@ -211,12 +211,12 @@ Ships/
 ### 3.9 置顶终端窗口（Steam 式悬浮）
 
 1. **入口与多窗口（Steam 式独立）**：主面板底部栏的**终端图标**（`terminal`）**每次点击都新开一扇独立的终端窗口**，落在**当前桌面 / 鼠标所在屏幕**（`terminal:open` → `openTerminalWindow()`；几何沿用 `terminal-window.json` 记忆）；已有多扇时，新窗口相对记忆位置**逐扇偏移 26px**（并夹回该屏工作区），避免完全盖在一起。**窗口一旦打开就永远留在那个桌面**——不同桌面可以同时存在多扇终端，且**绝不**把别的桌面上已打开的窗口拉过来（已移除原来的「先 true 再 false」跨桌面拉取）。**全局快捷键**（§3.9-8）在当前终端前台时按 = **收缩成悬浮球**（球态时按 = 放大回窗口），否则新开一扇。**SSH 连接**（§3.4）注入命令到**当前聚焦的终端**；没有聚焦的终端时新开一扇。多扇终端窗口各自持有独立的会话、文件面板与 SFTP 连接（按 webContents 归属）。
-2. **窗口**：默认 **1024 × 768**（`ships.terminalWindow.width/height`，**可在 设置 → 终端 → 窗口大小 调整**，见 §5.1；`terminalWindowWidth` / `terminalWindowHeight`），可缩放、最小 `ships.terminalWindow.minWidth × minHeight` = 350×200；改设置立即 `setSize`，手动拖动窗口（非最大化 / 全屏）防抖 400ms 写回设置。`titleBarStyle: hiddenInset`，但**系统红绿灯由主进程 `setWindowButtonVisibility(false)` 隐藏**，头栏左侧改为**自绘小红绿灯**；终端内容**上下不留边距、左侧留 2px**（`--term-padding-y: 0`，`#term-host` 左内边距 2px；`vim` 之类的全屏程序左右基本铺满）；窗口可自由拉伸，**拖动过程中不干预**（下边框严格跟手、绝不中途改尺寸），松手后按实测余量把窗口对齐到整格（见下条）。
+2. **窗口**：默认 **1024 × 768**（`vessel.terminalWindow.width/height`，**可在 设置 → 终端 → 窗口大小 调整**，见 §5.1；`terminalWindowWidth` / `terminalWindowHeight`），可缩放、最小 `vessel.terminalWindow.minWidth × minHeight` = 350×200；改设置立即 `setSize`，手动拖动窗口（非最大化 / 全屏）防抖 400ms 写回设置。`titleBarStyle: hiddenInset`，但**系统红绿灯由主进程 `setWindowButtonVisibility(false)` 隐藏**，头栏左侧改为**自绘小红绿灯**；终端内容**上下不留边距、左侧留 2px**（`--term-padding-y: 0`，`#term-host` 左内边距 2px；`vim` 之类的全屏程序左右基本铺满）；窗口可自由拉伸，**拖动过程中不干预**（下边框严格跟手、绝不中途改尺寸），松手后按实测余量把窗口对齐到整格（见下条）。
    - **头栏（`#term-header`，默认 22px）**：左侧自绘小红绿灯（**尺寸随头栏字号缩放**：`--traffic-size = 字号 × 0.75`、`--traffic-glyph-size = 字号 × 0.5`，12px 字号 = 9px 圆点 / 6px 符号；**左右 padding 均为 10px**：左边距 10px = 第一个圆点到窗口左边缘的距离、右侧图标区距右边缘 10px；悬浮符号 `×` / `−` / `⤢`，颜色取 `--traffic-*`；悬浮任意一个时三个都显示符号，窗口失焦时整体变灰并隐藏符号 —— 与系统观感一致），点击分别调 `window:control` 的 `close` / `minimize` / `zoom`（只作用于发起窗口）；**不显示任何标题文字**（当前 SSH 信息仅用于内部逻辑，不在头栏显示，见下条），右侧图标区（**SSH 主机下拉** + **文件** `folder`、**在 iTerm 中打开并关闭此窗口**、**行号** `eye`/`eye-off`、**窗口分裂** `split`（点击**新开一扇终端窗口**，与主面板底部栏的终端按钮行为一致）；**已去掉置顶（图钉）按钮**，置顶只由设置里的 `terminalAlwaysOnTop` 决定）。头部不挂 `data-tip` 悬浮提示，为拖拽区（红绿灯与图标区为 `no-drag`）。
    - **头栏尺寸随终端字号缩放（永远 = 终端字号 + 1px）**：字号取 CSS 变量 `--term-header-font-size`（`styles/constants.css` 定义、`terminal.js` 的 `applyFontSize()` 在改设置 / `Cmd +`/`Cmd -`/`Cmd 0` 缩放时写入为 `终端字号 + 1`）；头栏高 `max(22px, 字号 + 6px)`、图标按钮 `字号 + 6px`（符号 `字号`）、SSH 下拉**固定 120px 宽**（与下拉条目同宽，超出省略号）/ 字号**固定 11px**（与终端字号无关）/ 高 **固定 14px** 且在头栏内**上下居中**，下拉箭头也固定 11px。下拉菜单（挂在 `body` 上）宽度 **120px**（与下拉同宽、左右对齐；`createSelect` 传 `matchTrigger: true`，打开时把菜单宽设为触发器实测宽度）、**条目 `width: 100%`、高 20px、四周留 3px（菜单 `padding: 3px` + 条目间距 3px）、字号 11px、圆角 5px**（悬浮高亮为固定宽度的内缩圆角矩形，与右键菜单观感一致）、**无分隔线**。
     - **头部 SSH 下拉**（图标区最左）：列出 `~/.ssh/config` 里的主机，条目文本为 `用户名@主机地址`（无 `User` 时只显示主机地址）；占位「SSH」**只显示在触发器上（未选择时），不出现在下拉列表里**。列表顺序为**有分组的主机在前（按分组在配置中出现的顺序）、未分组的主机排最后**；**存在多个分组时在每组条目前插入一个分组小标题**（不可点，未分组组的标题为「未分组」；只有一个分组时不显示标题）——分组来自 config 的 `# group:` 注释（见 §5.1）。**设置页对主机 / 分组的增删改会经 `ssh-config:changed` 广播，下拉实时刷新**。选中任意主机 → `ssh:connect`（带 `inTerminal: true`）→ 由主进程用 `ssh-service.buildCommand()` 拼 `ssh [-p 端口] [-i 私钥] [-J 跳板机] [user@]host` 并**注入当前终端会话**（等价于在这个终端里手敲 `ssh …`，不新建会话、不重建窗口、不弹 iTerm —— 因此也不受「SSH 使用内置终端连接」开关影响）；**同一台主机可以重复选**（每次选择都重新执行，便于断开后重连）。下拉**禁用**并降低不透明度当 `~/.ssh/config` 里没有主机；主机列表在窗口启动与 `settings:changed` 广播时重新读取。控件用 `select-compact`，宽度**固定 120px**、高 14px，与头部图标按钮同一观感。
    - **屏幕 / 位置 / 尺寸记忆**（`terminal-window.json`，单槽）：打开、移动、缩放、关闭时把「所在屏幕 + 位置 + 尺寸」写入 `terminal-window.json`（关闭前同步落盘，拖动后立刻关窗也不会丢；写盘读窗口**此刻**的真实几何，程序化改尺寸不会被旧快照覆盖）。下次打开时：**该屏幕还在**（`id` + `scaleFactor` + `bounds` 全一致）→ 应用记忆的位置与尺寸（越界部分夹回该屏幕工作区，整窗可见）；**换屏 / 拔掉外接屏 / 分辨率或排列变了 / 无记录** → 用设置里的默认尺寸在当前屏幕（鼠标所在屏幕）工作区内居中。屏幕签名一致才复用，是因为分辨率 / 排列变化后记忆里的绝对坐标不再是同一块屏幕上的同一位置。**拖动时水平磁性吸附**：窗口中心与屏幕工作区的**垂直中线**（x 方向）对齐（±10px）时吸附到正中并轻微「卡」住，拖动超过 26px 才脱开（`CENTER_SNAP.xThreshold` / `xRelease`，仅改 x、不要求上下居中；与窗口模式主窗口同一行为）。
-3. **置顶与全屏**：默认置顶（`ships.terminalWindow.alwaysOnTop` / `settings.terminalAlwaysOnTop`，缺省为开；`alwaysOnTop` 且 `setAlwaysOnTop(true, 'screen-saver')`）。**头栏没有置顶（图钉）按钮**，置顶只由设置 `terminalAlwaysOnTop`（`terminal:set-top` 仍可被设置界面 / 其它入口调用）决定。**该开关只作用于终端窗口，不影响主面板**（面板恒定置顶，见 §8.1）。空格行为是 `setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true })` = `NSWindowCollectionBehaviorDefault | FullScreenAuxiliary` —— **带全屏辅助、但不加入所有桌面**：可以浮在（当前桌面里的）全屏应用之上，同时**不会跟随桌面切换**，始终留在打开它的那个桌面。**该声明在窗口创建时、以及每次获得焦点时（此刻窗口就在活动桌面上）执行**（`skipTransformProcessType: true`：应用已是 `LSUIElement` 菜单栏 Agent，无需进程类型转换，转换会短暂隐藏窗口 / Dock 并改变激活行为）；**变球时不再重新声明**（变球发生在用户已切到其它桌面之后，此时再设会按 macOS 语义把窗口重新分配到「当前活动桌面」→ 球会跟着切换桌面，见 §3.9-12）；放大回来时最后重申一次，便于经全局快捷键把窗口带到当前桌面。iTerm 会强制切桌面，所以 SSH 连接改走这里。
+3. **置顶与全屏**：默认置顶（`vessel.terminalWindow.alwaysOnTop` / `settings.terminalAlwaysOnTop`，缺省为开；`alwaysOnTop` 且 `setAlwaysOnTop(true, 'screen-saver')`）。**头栏没有置顶（图钉）按钮**，置顶只由设置 `terminalAlwaysOnTop`（`terminal:set-top` 仍可被设置界面 / 其它入口调用）决定。**该开关只作用于终端窗口，不影响主面板**（悬浮面板恒定置顶；窗口模式不置顶，见 §8.1）。空格行为是 `setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true })` = `NSWindowCollectionBehaviorDefault | FullScreenAuxiliary` —— **带全屏辅助、但不加入所有桌面**：可以浮在（当前桌面里的）全屏应用之上，同时**不会跟随桌面切换**，始终留在打开它的那个桌面。**该声明在窗口创建时、以及每次获得焦点时（此刻窗口就在活动桌面上）执行**（`skipTransformProcessType: true`：应用已是 `LSUIElement` 菜单栏 Agent，无需进程类型转换，转换会短暂隐藏窗口 / Dock 并改变激活行为）；**变球时不再重新声明**（变球发生在用户已切到其它桌面之后，此时再设会按 macOS 语义把窗口重新分配到「当前活动桌面」→ 球会跟着切换桌面，见 §3.9-12）；放大回来时最后重申一次，便于经全局快捷键把窗口带到当前桌面。iTerm 会强制切桌面，所以 SSH 连接改走这里。
 4. **终端**：与 §3.8 同一套 xterm.js + `pty-bridge.py` 真实 PTY，运行 shell（取设置 → 终端的**默认 shell**，`terminalShell`；留空或文件不存在时回退 `$SHELL` / `os.userInfo().shell`）；**滚动缓冲与字号取设置**（`terminalScrollback` / `terminalFontSize`，默认 10000 行 / 12px；`app:info.terminalScrollback` 仅作为配置缺失时的兜底）；窗口尺寸变化会同步 PTY 尺寸，关闭窗口即结束会话。
    - **不显示滚动条**：两处都关掉 —— ① 原生滚动条：`.xterm-viewport` 用 `scrollbar-width: none` / `::-webkit-scrollbar { display: none }`（`xterm.css` 先于本应用样式加载，保证规则生效）；② **xterm 自绘的滚动条**：`.xterm .xterm-scrollable-element > .scrollbar { display: none !important }`（xterm 6 只是用该元素做视觉指示，缓冲区滚动由它自己处理，隐藏后滚轮 / 触控板照常滚动）。主题里同时给出 macOS 风格的滑块色（`scrollbarSliderBackground/Hover/Active`）作为兜底，万一再出现滚动条也是圆角半透明样式。
    - **防跳变**：只在容器尺寸真的变化时 `fit()`，且只在 `cols`/`rows` 变化时才 `terminal:resize` —— 多余的 PTY resize 会让 shell 重绘，看起来像滚动时视图跳。
@@ -242,12 +242,12 @@ Ships/
 6. **iTerm 交接**：头部终端图标调用 `iterm-service.openCommand()` 在 iTerm 中重放**最后一次由外部注入的命令**（例如 SSH 连接 / 网络测试命令；没有则开一个登录 shell），成功后关闭当前终端窗口。
 7. **SSH 连接改走这里**：`ssh:connect`（§3.4）默认不打开 iTerm，而是把 `ssh …` 命令注入**当前聚焦的终端窗口**（没有聚焦的终端就新开一扇；窗口不跨桌面移动），失败时才提示错误；受 设置 → 终端 →「SSH 使用内置终端连接」（`settings.sshBuiltinTerminal`）控制，关掉后退回 iTerm（头部 SSH 下拉传 `inTerminal: true`，明确要求在**当前终端**执行，不受该开关影响，见第 2 条）。
 8. **全局快捷键**（`hotkey-service`）：设置 → 快捷键 分别绑定**主窗口**与**终端**（`settings.mainWindowHotkey` / `settings.terminalHotkey`，默认都为 `CommandOrControl+Shift+Z`）。触发规则：**终端 = 按一下**；**主窗口 = 快速连按两下**。两者使用同一组合键时，单击会等待 `SHORTCUT_DOUBLE_TAP_MS`（260ms）以区分双击：双击 = 主窗口，单击 = 终端；绑定不同组合键时各自按上述次数工作。终端行为：**同时存在多扇终端窗口时快捷键失效（不响应）**；只有一扇时，在**悬浮球 ↔ 终端窗口**之间互相切换 —— 处于悬浮球时放大回窗口；窗口在前台时**收缩成悬浮球**；窗口既不在前台也非球态时**拉回前台**；一扇都没有则**新开一扇**（窗口不跨桌面移动）。**悬浮球关闭时回退为「关闭按钮行为」**（`hide` 隐藏 / `destroy` 销毁）。改绑 / 取消时先试注册，**注册失败（被其它 App 占用、格式非法）不写入设置**，设置界面红字提示并把原值留在设置里；空字符串 = 不注册（界面显示「未设置」）。应用退出（`before-quit`）时 `unregisterAll()`。
-9. **关闭按钮行为**（设置 → 终端 →「关闭按钮行为」，`settings.terminalCloseAction`，默认 `destroy`，来自 `ships.terminalWindow.closeAction`）：所有「隐藏终端」的路径统一走 `window-manager.shrinkTerminalToBall()` —— 悬浮球开启时**收缩成悬浮球**，关闭时才真正隐藏。
+9. **关闭按钮行为**（设置 → 终端 →「关闭按钮行为」，`settings.terminalCloseAction`，默认 `destroy`，来自 `vessel.terminalWindow.closeAction`）：所有「隐藏终端」的路径统一走 `window-manager.shrinkTerminalToBall()` —— 悬浮球开启时**收缩成悬浮球**，关闭时才真正隐藏。
     - **`destroy`**：关闭按钮 / `Cmd-W` **直接销毁**（结束会话）。
     - **`hide`**：关闭按钮 / `Cmd-W` **收缩成悬浮球**（不再真正隐藏窗口；会话与 shell 保留，点球或快捷键放大回来，见 §3.9-12）。窗口 `close` 事件被 `preventDefault()` 拦下后走 `shrinkTerminalToBall`。
     - **最小化按钮禁用**：终端窗口头栏的「最小化」红绿灯**失效**（灰显、不可点）。
     - **例外**：在终端里 `exit`（会话结束）与「iTerm 交接」走 `terminal:destroy` → **始终销毁窗口**，不受上述规则影响 —— 否则会留下一个已结束的会话挂在后台。
-    - **退出应用例外**：`app.quit()`（如托盘右键「退出 Ships」）时主进程先置 `isQuitting`，终端窗口的 `close` 不再走 `preventDefault()`，而是正常关闭，保证退出不被拦截。
+    - **退出应用例外**：`app.quit()`（如托盘右键「退出 Vessel」）时主进程先置 `isQuitting`，终端窗口的 `close` 不再走 `preventDefault()`，而是正常关闭，保证退出不被拦截。
 10. **内嵌文件面板（SFTP）**：头部 **文件按钮**（`folder`，仅当检测到当前 ssh 目标时可用，否则禁用；连接中图标旋转、展开时强调色）显隐**窗口底部的内嵌文件面板**（终端区域随之收窄并自动重新 fit）。面板与终端之间有一条**可拖动分隔线**（向上拖 = 终端变小、面板变高），高度持久化到 `file-layout.json`（见 §5.1）。文件管理 UI（左目录树、右文件列表、状态栏、可拖动分栏）由 **`scripts/file-manager.js`** 提供，终端窗口（`terminal-files.js`）与独立文件窗口（`file-window.js`）共用同一套（见 §3.9-11）。
     - **布局**：左列**目录树**占初始 **300px**（可在分隔线上拖动改变宽度；顶部路径行 = **分离为独立窗口 / 刷新 / 家目录 / 路径输入框**，顺序固定 —— 前三者为图标、排成一排，分离仅内嵌面板有，高度与右列表头一致）；右列**文件列表**表头与行均为网格（图标 / 文件名 / 体积 / **权限** / 时间；**文件名 / 体积 / 权限 / 时间四列列宽可拖动改变**，默认 **160 / 60 / 90 / 130px**）；列表头「时间」列只有标签（上传已移到**目录树节点右键菜单**，分离按钮已移到路径行）。文件行不再有行内下载按钮，改为**右键菜单「从文件夹打开」/「下载到本地」**。最底**状态栏**（左=当前绝对路径，右=状态信息，中间=**进度条**）。树宽与列宽一并持久化到 `file-layout.json`。字体与样式**跟随终端字号**（`--file-font-size`，`Cmd +/-`、`Cmd 0`、设置里的字体大小都同步作用到文件管理部分）。**面板默认隐藏**（ID 规则用 `:not(.hidden)` 保证不被 `.hidden` 覆盖），仅在点击头部文件按钮时展开。**终端与面板之间只有一条分隔线**（面板自身不再画上边框；分隔线就是那条可拖动的线）。
     - **首次打开自动放大**：若 `file-layout.json` **没有**本地调整记录，打开面板时按最小布局套用并把终端窗口**只放大不缩小**到够用 —— 终端 ≥ **300**、文件管理 ≥ **200**（目录树 **220**、文件列表 ≥ **400**），即内容区约 **626 × 550**（`terminal:ensure-size`，受屏幕工作区限制，不写回几何记忆）；有本地记录则完全按记录（含面板高度 / 树宽 / 列宽）来。
@@ -294,10 +294,10 @@ Ships/
 | 编码转换 | 字符串 / Base64 / 十六进制 / URL 编码 / **URL 解码** / ASCII 十进制 六个字段双向实时同步（UTF-8）；**URL 编码**保留 URL 结构字符（`encodeURI` 的保留集：`://` `/` `?` `=` `&` `#` `;` `,` `@` `+` `$` 等）**与 `%`**（只编码空格、中文等其余字符），得到各应用可直接识别的可读 URL，且对已编码内容幂等；URL 框回读用**容错反转义**（允许孤立 `%`）；**URL 解码**=`decodeURIComponent` 的**容错反转义**（还原 `%xx` 里的中文等多字节字符、保留 URL 结构；孤立 `%` 等非法转义不报错、尽量还原），在任意字段输入即可实时得到其余表示。**最下方为二维码区**：**左=二维码，右=参数 + 按钮**；**展示区固定 200×200、该行尺寸恒定**（改变任何参数都不影响展示大小）。二维码数据源固定为最上面的「字符串」框内容、实时生成（`qrcode-generator`，矢量 SVG；**显式把库的 `stringToBytes` 设为 UTF-8**，避免中文乱码）；右侧参数：**纠错等级**（L / M / Q / H，默认 M）、**尺寸**（= 导出 PNG 边长 256 / 512 / 1024 / 2048px，默认 1024，不影响展示大小）、**版本**（自动 / 1–40，默认自动；版本过小放不下内容时红字提示）、**边框**（静区模块数 0–8，默认 1），除尺寸外改动即时重绘；参数下方为**左对齐**「**复制**」/「**下载到本地**」按钮：复制=把二维码渲染成 1024×1024 PNG 写入剪贴板（`app:copy-image`），下载=保存对话框存为 PNG（`app:save-image`） | 输入非法时标红不联动（URL 解码容错、不标红）；二维码内容为空时按钮禁用、过长时红字提示；不落盘 |
 | 哈希计算 | 计算 **MD5 / SHA1 / SHA256**；支持输入字符串或**选择本地文件**（流式计算，适合大文件）；两段式切换控件保持内容宽度（不占满整行），字符串输入框与文件选择区共用 `--hash-source-height`（76px），切换时下方结果区不跳动；文件选择区为整块虚线框（图标 + 提示 / 文件名同一行居中，选中后行内追加「重新选择」）；切换类型时清空结果 | 字符串输入防抖 200ms；文件经系统对话框选择 |
 | 2FA 验证码 | 顶部单行输入框（右对齐「添加」按钮）：接受 **`otpauth://totp/…` 链接**或**裸 Base32 密钥**（忽略空格 / 连字符 / 小写）；点「添加」由主进程校验非法 / 重复后解析并添加 —— 链接自动解析出**标题（issuer）**与**副标题（账号 label）**（UTF-8 解码，支持中文；无 issuer 时用 label 作标题），裸密钥标题为「未命名」。下方以**卡片**实时展示：**绿色盾牌图标** + 标题 + 副标题（同一行、超出省略）、**逐位验证码数字块**（6 或 8 位、按 3/3 或 4/4 分组）、**倒计时秒数**与**进度条**（≤5 秒变红，按各自 `period`）。卡片右侧依次为**复制**按钮（`copy`，一键复制当前验证码并就地显示 ✓ 反馈）与**删除**按钮（`trash`）→ 就地二次确认（`确认删除？` + ✓ / ✕）后删除。验证码由主进程按账号的 `period` / `digits` / `algorithm`（SHA1 / SHA256 / SHA512）计算、渲染层每 250ms 刷新倒计时、时间片切换时拉取新验证码 | 输入非法 / 重复时就地红字提示并闪烁输入框；列表持久保存（密钥加密，见 §5.1）、重启保留；输入不做历史记录 |
-| 营养成分 | 输入商品名（无独立标题标签）与每 100g 的能量(kJ)/蛋白质/脂肪/碳水/钠及商品总重，实时换算盐、千卡、千焦（含每日推荐对比）与慢跑 / 步行消耗；名称输入框右侧为**保存按钮 + 记录下拉**：按商品名保存输入，**忽略大小写去重 / 同名覆盖**；切换记录回填输入时按钮变为「删除」，删除需二次确认（4 秒未确认自动复位，再次编辑输入则回到「保存」）；下方 **TDEE 计算器**（性别 / 年龄 / 身高 / 体重 / 活动水平，Mifflin-St Jeor 计算 BMR 与 TDEE）自动记录输入与计算结果；底部保留**复制**按钮，已移除清空按钮 | 商品记录与 TDEE 最后状态持久化到 `nutrient-records.json`；TDEE 输入变化防抖自动保存；商品需点「保存」才写入 |
+| 营养成分 | 输入商品名（无独立标题标签）与每 100g 的能量(kJ)/蛋白质/脂肪/碳水/钠及商品总重，实时换算盐、千卡、千焦（含每日推荐对比）与慢跑 / 步行消耗；名称输入框右侧为**保存按钮 + 记录下拉**：按商品名保存输入，**忽略大小写去重 / 同名覆盖**；切换记录回填输入时按钮变为「删除」，删除需二次确认（4 秒未确认自动复位，再次编辑输入则回到「保存」）；下方 **TDEE 计算器**（性别 / 年龄 / 身高 / 体重 / 活动水平，**无默认值、需手动填写**；Mifflin-St Jeor 计算 BMR 与 TDEE）自动记录输入与计算结果；底部保留**复制**按钮，已移除清空按钮 | 商品记录与 TDEE 最后状态持久化到 `nutrient-records.json`；TDEE 输入变化防抖自动保存；商品需点「保存」才写入 |
 | 设置 · 应用 | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、**悬浮模式（开关，默认关 = 窗口模式；开 = 托盘弹出面板）**、固定悬浮（置顶常驻、失焦不隐藏，仅悬浮模式）、**Liquid Glass**（主界面启用系统玻璃背景：macOS 26+ 用原生 Liquid Glass，旧系统回退 hud 毛玻璃，见 §8.1）、**Liquid Glass 透明度**（滑块 0–100，越大越透明，**实时生效**；默认 80；仅开启 Liquid Glass 时显示）、剪贴板条数、剪贴板轮询间隔、打开数据文件夹、**清理数据**（二次确认后删除窗口位置 / 大小、列宽 / 面板高度、cd 历史等**非业务数据**）、**导入 / 导出**（保存对话框导出**全部配置**为 JSON：应用设置 + SSH 主机；**SSH 密码为明文**，界面提示妥善保管；导入时选择 JSON 后二次确认，**设置覆盖当前值**、**SSH 主机只新增不覆盖已有别名**，结果就地提示新增 / 跳过 / 密码数量）。**日志**（保留天数下拉 1 / 3 / 7 / 14 / 30 / 90，默认 7；日志文件夹按钮；仅 macOS 的「打开控制台 App」按钮）。关于（版本号 + **检查更新**按钮（`app:check-updates`，见 §7）+ **开发者模式开关** `settings.developerMode`，默认关，值持久化）、开发者（**仅开发者模式开启时显示**；打开悬浮界面 / 设置界面 / **终端界面** / 文件界面 DevTools，`devtools:open` 的 `main` / `settings` / `terminal` / `file`） | 见 §5.1 |
 | 设置 · SSH | `~/.ssh/config` 主机的增删改（别名/HostName/User/Port/IdentityFile/ProxyJump/**分组**）；列表左侧显示系统图标；**按分组显示为手风琴**（分组来自 config 的 `# group:` 注释，**默认全部展开**，命名分组在前、未分组在后，无命名分组时保持扁平列表）；**每个命名分组的手风琴标题带一个重命名图标**：点击后就地编辑分组名（`Enter` 确认 / `Esc` 取消，重名提示「同名分组已存在」且不保存；未分组不可重命名）——改名会更新 config 里对应的 `# group:` 注释（新增 / 编辑 / 删除 / 改名后都会广播 `ssh-config:changed`，终端与文件窗口的 SSH 下拉实时刷新）；新增时自动预填 **用户 root / 端口 22 / 私钥 `~/.ssh/id_ed25519`**，**私钥支持手动选择文件**（对话框默认 `~/.ssh`，选后转为 `~` 路径），保存时别名默认取主机地址；**新增 / 编辑表单含「分组」控件：TAB 式 Switch 列出已有分组（默认选中「未分组」，可横向滚动），最右侧「新增分组」按钮点击后就地输入新分组名（`Enter` 确认 / `Esc` 取消，重名提示「同名分组已存在」），新分组自动加入并选中**（写入 config 注释 `# group: <名>`）；**表单含「密码」字段（可选）：密码经 AES-256-GCM 加密存入应用数据目录（不落明文），连接时在内置终端自动输入；密码框右侧有「查看 / 隐藏密码」眼睛按钮（在明文 / 密文间切换）；已存密码时占位提示「已保存（留空则不修改）」并可点「清除密码」**；表单内含「探测系统」，**探测也使用密码**（表单填的密码优先，留空回退已存密码），**探测成功后才允许保存**，**探测失败保留表单内容（含密码草稿）以便修改后重新探测**；支持**导出 config** | 别名与主机地址至少填一项；删除二次确认 |
-| 设置 · 终端 | 配置置顶终端窗口：**默认 shell**（留空 = 系统默认 `$SHELL`，可手填或用「选择文件」挑，写入前校验文件存在）、**字体大小**（8–24px，默认 12）、**窗口大小**（宽 × 高，最小 350 × 200，默认 1024 × 768；改完立即作用到已打开的终端窗口，手动拖动窗口也会写回；这是「换屏 / 无记忆」时的默认尺寸，同屏则优先沿用终端窗口自己的位置与尺寸）、**缓冲区大小**（默认 10000 行）、**SSH 使用内置终端连接**（开关：开 = 点「连接」在置顶终端执行 `ssh`，关 = 改用 iTerm）、**关闭按钮行为**（分段控件：隐藏窗口 / 销毁窗口，默认销毁）、**自动缩成悬浮球**（开关，默认开）、**缩成悬浮球延迟**（下拉：立即 / 50ms / 100ms / 200ms / 500ms / 1s / 5s / 10s / 15s / 30s / 60s，默认 **50ms**；「立即」= 0ms）、**悬浮球大小**（数字，40–200px、1:1，默认 75，见 §3.9-12）、**悬浮球图标**（带预览的下拉，选项为 `assets/icons/ball/` 下所有 SVG，默认 `ball.svg`，**实时生效**）、**终端暗色模式**（开关，默认开：开 = 终端窗口（xterm 终端 + 悬浮球）始终暗色 / 关 = 跟随全局主题；悬浮球图标始终保留原色）、**SFTP 下载目录**（文本 + 「选择目录」，默认 `~/Downloads`，见 §3.9-10）、**重置**（二次确认后把以上终端设置恢复默认值，并清掉 `terminal-window.json` 里记住的屏幕 / 位置 / 大小） | 对应 `settings.json` 的 `terminalShell`/`terminalFontSize`/`terminalWindowWidth`/`terminalWindowHeight`/`terminalScrollback`/`terminalCloseAction`/`sshBuiltinTerminal`/`terminalBallEnabled`/`terminalBallDelayMs`/`terminalBallSize`/`terminalBallIcon`/`terminalBallDark`/`sftpDownloadDir`；默认值来自 `package.json` 的 `ships.terminalWindow`/`ships.sshBuiltinTerminal`/`ships.sftpDownloadDir`；窗口位置 / 屏幕在 `terminal-window.json`（见 §5.1、§3.9） |
+| 设置 · 终端 | 配置置顶终端窗口：**默认 shell**（留空 = 系统默认 `$SHELL`，可手填或用「选择文件」挑，写入前校验文件存在）、**字体大小**（8–24px，默认 12）、**窗口大小**（宽 × 高，最小 350 × 200，默认 1024 × 768；改完立即作用到已打开的终端窗口，手动拖动窗口也会写回；这是「换屏 / 无记忆」时的默认尺寸，同屏则优先沿用终端窗口自己的位置与尺寸）、**缓冲区大小**（默认 10000 行）、**SSH 使用内置终端连接**（开关：开 = 点「连接」在置顶终端执行 `ssh`，关 = 改用 iTerm）、**关闭按钮行为**（分段控件：隐藏窗口 / 销毁窗口，默认销毁）、**自动缩成悬浮球**（开关，默认开）、**缩成悬浮球延迟**（下拉：立即 / 50ms / 100ms / 200ms / 500ms / 1s / 5s / 10s / 15s / 30s / 60s，默认 **50ms**；「立即」= 0ms）、**悬浮球大小**（数字，40–200px、1:1，默认 75，见 §3.9-12）、**悬浮球图标**（带预览的下拉，选项为 `assets/icons/ball/` 下所有 SVG，默认 `ball.svg`，**实时生效**）、**终端暗色模式**（开关，默认开：开 = 终端窗口（xterm 终端 + 悬浮球）始终暗色 / 关 = 跟随全局主题；悬浮球图标始终保留原色）、**SFTP 下载目录**（文本 + 「选择目录」，默认 `~/Downloads`，见 §3.9-10）、**重置**（二次确认后把以上终端设置恢复默认值，并清掉 `terminal-window.json` 里记住的屏幕 / 位置 / 大小） | 对应 `settings.json` 的 `terminalShell`/`terminalFontSize`/`terminalWindowWidth`/`terminalWindowHeight`/`terminalScrollback`/`terminalCloseAction`/`sshBuiltinTerminal`/`terminalBallEnabled`/`terminalBallDelayMs`/`terminalBallSize`/`terminalBallIcon`/`terminalBallDark`/`sftpDownloadDir`；默认值来自 `package.json` 的 `vessel.terminalWindow`/`vessel.sshBuiltinTerminal`/`vessel.sftpDownloadDir`；窗口位置 / 屏幕在 `terminal-window.json`（见 §5.1、§3.9） |
 | 设置 · 快捷键 | **主窗口**与**终端**各绑定一个全局组合键（默认都是 `⌘⇧Z`）：终端按一下、主窗口快速连按两下（显示 / 带到前台）；两者同键时单击稍等 260ms 区分双击。点按钮后按新组合键改绑（`Backspace` 清除、`Esc` 取消，至少含 Command / Control / Alt 之一），被占用 / 非法时红字提示且不落盘 | `settings.mainWindowHotkey` / `settings.terminalHotkey` |
 | 设置 · 网络测试 | 在本地或通过 `~/.ssh/config` 里的主机执行测试命令（TCP / UDP / HTTP(S) / ICMP / ARP / 扫描应用 / 扫描主机）；下方是**可直接输入命令的交互终端**（真实 PTY + 默认登录 shell + xterm.js），「测试」把校验过的命令送进终端执行（选主机时包一层 `ssh`）、「停止」发送 Ctrl-C；详见 §3.8 | 端口默认 80；扫描主机需网段（前缀 16–30）；扫描应用端口可留空；输入不落盘 |
 | 底部栏 | 左侧依次为 **App 彩色图标 + 名称**（16px 图标 / 12px 名称）与版本号（`vX.Y.Z`；**开发者模式开启时**版本号右侧加一枚强调色描边的「开发者模式」标记，取 `settings.developerMode` 与 `i18n` 的 `developerMode` 文案）；右侧依次为**终端图标**（`terminal`，每次**新开**一扇置顶终端窗口，见 §3.9）、**文件管理图标**（`folder`，打开独立文件窗口且**不选中任何连接**，`file-window:open` 传空 `target`）、**网络测试图标**（打开设置 → 网络测试分区）、**外观图标**（`monitor`/`sun`/`moon`，点击在**跟随系统 → 浅色 → 深色 → 跟随系统**间循环，写 `settings.theme`；非 system 时图标用强调色）、**图钉（固定悬浮）**与设置入口 | 图钉状态取 `settings.pinWindow`；外观取 `settings.theme`；版本取 `package.json`；开发者模式标记取 `settings.developerMode` |
@@ -311,8 +311,8 @@ Ships/
 
 | 文件 | 位置 | 结构 | 生命周期 |
 | --- | --- | --- | --- |
-| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/ships/settings.json`） | `{ locale, theme, accent, launchAtLogin, floatMode, pinWindow, vibrancy, glassOpacity, developerMode, clipboardLimit, clipboardPollMs, terminalShell, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, mainWindowHotkey, terminalHotkey, terminalCloseAction, sshBuiltinTerminal, sftpDownloadDir, terminalBallEnabled, terminalBallDelayMs, terminalBallSize, terminalBallIcon, terminalBallDark, fileWindowAlwaysOnTop, logRetentionDays }` | 持久；重启保留 |
-| `ships-YYYY-MM-DD.log` | **macOS：`~/Library/Logs/Ships/`**（Console.app 的「日志报告」会收录该目录，与 JetBrains/CLion 一致，与用户数据目录分离）；其它平台：`app.getPath('userData')` 的 `logs/` 子目录（`src/main/utils/paths.js` 的 `LOG_DIR`，按 `process.platform` 选择） | 按天追加的文本日志（启动信息、SSH 探测 / SFTP / 终端 / 文件管理等）；启动时把数据文件清单也写进去 | 持久；**惰性清理**：每天首次写日志时删除保留期之前的日志文件（保留天数取设置 `logRetentionDays`，默认 **7 天**，来自 `package.json` 的 `ships.logRetentionDays`） |
+| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/vessel/settings.json`） | `{ locale, theme, accent, launchAtLogin, floatMode, pinWindow, vibrancy, glassOpacity, developerMode, clipboardLimit, clipboardPollMs, terminalShell, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, mainWindowHotkey, terminalHotkey, terminalCloseAction, sshBuiltinTerminal, sftpDownloadDir, terminalBallEnabled, terminalBallDelayMs, terminalBallSize, terminalBallIcon, terminalBallDark, fileWindowAlwaysOnTop, logRetentionDays }` | 持久；重启保留 |
+| `vessel-YYYY-MM-DD.log` | **macOS：`~/Library/Logs/Vessel/`**（Console.app 的「日志报告」会收录该目录，与 JetBrains/CLion 一致，与用户数据目录分离）；其它平台：`app.getPath('userData')` 的 `logs/` 子目录（`src/main/utils/paths.js` 的 `LOG_DIR`，按 `process.platform` 选择） | 按天追加的文本日志（启动信息、SSH 探测 / SFTP / 终端 / 文件管理等）；启动时把数据文件清单也写进去 | 持久；**惰性清理**：每天首次写日志时删除保留期之前的日志文件（保留天数取设置 `logRetentionDays`，默认 **7 天**，来自 `package.json` 的 `vessel.logRetentionDays`） |
 | `ssh-detected.json` | 同上目录 | `{ [alias]: { os, family, label, at } }` | 持久；缓存探测结果 |
 | `ssh-credentials.json` | 同上目录 | `{ entries: { [别名]: { iv, tag, data } } }`（**AES-256-GCM 密文**，全 base64） | 持久；在设置里保存 / 清除 SSH 密码时更新。密钥随机生成、存 `ssh-credentials.key`（0600）；密码明文不落盘，连接时主进程解密后交给内置终端自动输入（见 §3.4） |
 | `ssh-credentials.key` | 同上目录 | base64 的 32 字节随机密钥（0600） | 持久；首次存密码时生成，用于加解密 `ssh-credentials.json` |
@@ -329,7 +329,8 @@ Ships/
 | `~/.ssh/config` | 用户主目录 | 标准 OpenSSH 配置；**分组用一行注释 `# group: <名称>` 标记**（紧随其后的 Host 属于该分组，直到下一个标记；未标记的属「未分组」；ssh 忽略注释，不影响连接） | 由设置内 SSH 管理读写；未加密（非机密） |
 
 - 机密数据：**默认不保存密码**；仅当用户在设置 → SSH 主动填写登录密码时，密码以 **AES-256-GCM 加密**保存在 `ssh-credentials.json`（密钥 `ssh-credentials.key`，均 0600），明文不落盘。2FA（TOTP）密钥同理由用户主动添加，以 **AES-256-GCM 加密**保存在 `totp-accounts.json`（密钥 `totp-accounts.key`，均 0600），明文不落盘、且不下发到渲染层（验证码在主进程计算）。导出备份文件时密码为**明文**（用户自行保管）。SSH 私钥仍由用户自行管理与使用，不复制、不落盘到应用数据目录。
-- 设置默认值来自 `package.json` 的 `ships.defaultLocale/defaultTheme/defaultAccent`。
+- 设置默认值来自 `package.json` 的 `vessel.defaultLocale/defaultTheme/defaultAccent`。
+- **从 Ships 更名升级**：打包版首次启动时，若新数据目录不存在，会把旧 `~/Library/Application Support/ships` 重命名为新目录，并把旧 `~/Library/Logs/Ships` 重命名为 `~/Library/Logs/Vessel`；目标已存在时不覆盖。
 - 启动时打印数据文件清单与绝对路径（`src/main/utils/paths.js` → `describeDataFiles`）。
 
 ### 5.2 IPC 通道
@@ -338,9 +339,9 @@ Ships/
 
 | 通道 | 参数 | 返回 | 说明 |
 | --- | --- | --- | --- |
-| `app:info` | — | `{ version, platform, arch, systemLocale, dataDir, dataFiles, terminalScrollback }` | 版本取 `package.json`；`terminalScrollback` 取 `ships.terminalWindow.scrollback` |
+| `app:info` | — | `{ version, platform, arch, systemLocale, dataDir, dataFiles, terminalScrollback }` | 版本取 `package.json`；`terminalScrollback` 取 `vessel.terminalWindow.scrollback` |
 | `app:open-data-folder` | — | `{ ok, error? }` | 打开数据目录 |
-| `app:open-log` | — | `{ ok, error? }` | 打开**日志文件夹**（macOS：`~/Library/Logs/Ships`；不存在则创建；**只打开文件夹，不打开日志文件**） |
+| `app:open-log` | — | `{ ok, error? }` | 打开**日志文件夹**（macOS：`~/Library/Logs/Vessel`；不存在则创建；**只打开文件夹，不打开日志文件**） |
 | `app:open-console` | — | `{ ok, error? }` | 打开 macOS 系统「控制台」App（`/System/Applications/Utilities/Console.app`，缺失时退回 `/Applications/Utilities/Console.app`）；非 macOS 返回 `{ ok: false, error: 'unsupported' }`；由设置 → 日志的「打开控制台 App」按钮调用 |
 | `app:clear-data` | — | `{ ok }` | 一键清理**非业务数据**：删除 `main-window.json`、`terminal-window.json`、`file-window.json`、`file-layout.json`、`file-window-layout.json`、`cd-history.json`（窗口位置 / 尺寸、列宽 / 面板高度、cd 历史）；**不动** `settings.json`、日志与 `~/.ssh/config`；由设置 → 应用 的「清理数据」（二次确认后）调用 |
 | `app:open-external` | `url` | `{ ok, error? }` | 仅允许 `http(s)` |
@@ -459,7 +460,7 @@ Ships/
 
 ### 5.3 菜单与权限映射
 
-- 托盘左键：切换主面板；托盘右键菜单：`打开设置`、`退出 Ships`。
+- 托盘左键：切换主面板；托盘右键菜单：`打开设置`、`退出 Vessel`。
 - **应用菜单**（`src/main/menu.js`）：自定义模板 = 应用菜单 / 编辑（撤销、剪切、拷贝、粘贴、全选；终端窗口另有**右键快速编辑**直接复制选区 / 粘贴剪贴板，见 §3.9-4，因此编辑菜单只是快捷键层面的补充）/ 视图（放大、缩小、实际大小、全屏、开发者工具）/ 窗口菜单。视图里的三个缩放项 **只显示快捷键、不向系统注册**（`registerAccelerator: false`），改由主进程 `before-input-event` 统一处理：`Cmd + = / +` / `Cmd + -` / `Cmd + 0` —— **焦点在置顶终端窗口时直接修改设置里的字号**（`terminal:zoom` → 写 `settings.terminalFontSize`，8–24px、默认 12px、持久化，改完重新 fit 并同步 PTY；同时改写 `--file-font-size`，文件管理部分一并缩放；**不改页面缩放因子**）；**焦点在独立文件窗口时改其文件管理字号**（`file-window:zoom`）；其它窗口保持原来的整页缩放。两个悬浮窗口另外用 `setVisualZoomLevelLimits(1, 1)` 关掉 pinch 缩放、`zoom-changed` 把 `Cmd+滚轮` 也接到字号缩放上，保证头栏与图标永远不跟着放大缩小。
 - 不涉及系统权限申请（无摄像头/麦克风等）；SSH 连接依赖用户本机 iTerm 与 `~/.ssh/config`。
 
@@ -605,14 +606,14 @@ flowchart TD
   - `dist:mac`：执行 `scripts/dist-mac.sh` —— 先清理旧 `release/` 再 `build:css`，自动选择签名身份并 `electron-builder --mac --arm64 --publish never`（实际调用 `npx electron-builder`），产出 **PKG**；`--publish never` 时发布由 CI 完成（见下）。
   - `pack:mac`：同上但加 `--dir`，仅产出 `.app`（调试用）。
 - **打包配置**（`package.json` 的 `build` 段，electron-builder）：
-  - `appId = com.ships.app`，`productName = Ships`；产物目录 `release/`。
-  - `publish`：`[{ provider: 'github', owner: 'o8x', repo: 'ships' }]`；macOS 检测更新不依赖 `latest-mac.yml`，使用 `package.json` 的 `ships.updateRepo`（不会被 electron-builder 裁剪）调用 GitHub Releases API。
+  - `appId = cn.com.stdout.vessel`，`productName = Vessel`；产物目录 `release/`。
+  - `publish`：`[{ provider: 'github', owner: 'o8x', repo: 'ships' }]`；macOS 检测更新不依赖 `latest-mac.yml`，使用 `package.json` 的 `vessel.updateRepo`（不会被 electron-builder 裁剪）调用 GitHub Releases API。
   - `files`：`src/**/*`、`assets/**/*`、`package.json`；依赖由 electron-builder 自动收集（`asar: true`）—— 渲染层直接从 `node_modules/@xterm/…` 加载终端资源，因此 `@xterm/xterm` 与 `@xterm/addon-fit` 放在 `dependencies`（不是 devDependencies）；`electron-updater` 同样放在 `dependencies`。
   - **原生依赖 `electron-liquid-glass`**：N-API 预编译（含 `darwin-arm64` / `darwin-x64`），故 `npmRebuild: false` 无需重编；`build.asarUnpack` 把 `**/*.node` 与 `node_modules/electron-liquid-glass/**` 解包到 `app.asar.unpacked` 供加载（Liquid Glass 仅运行时 macOS 26+ 生效，旧系统由主进程回退）。
   - **`build.asarUnpack` 另含 `src/main/scripts/*`**：`pty-bridge.py` 要作为文件被 `python3` 打开，而 `app.asar` 是归档不是目录（否则打包后报 `can't open file '…/app.asar/src/main/scripts/pty-bridge.py': [Errno 20] Not a directory`），解包后由 `terminal-service` 把路径改写到 `app.asar.unpacked` 再 `spawn`。
   - `npmRebuild: false`（`ssh2` 使用纯 JS 回退，无需重编原生模块）。
   - `compression: 'maximum'`；`electronLanguages: ['en', 'zh_CN']`（仅保留中英文 Electron 语言包，剔除约 220 个语言包、解包体积减少约 48MB）。
-  - `mac.target`：**仅 arm64 的 pkg**。`build.pkg` 固定安装到 `/Applications`（`installLocation`），禁止安装到任意位置 / 当前用户 Home，`isRelocatable = false`；`pkg.scripts = ../scripts/pkg-scripts`：`preinstall` 先在登录用户会话中让已运行的 Ships 正常退出（5 秒未退出则强制结束），替换完成后 `postinstall` 在登录用户会话中 `open /Applications/Ships.app` 自动启动新版本。不产出 dmg / zip / `latest-mac.yml`。`mac.icon = assets/imgs/icon.icns`；`hardenedRuntime = true`、`gatekeeperAssess = false`；`extendInfo` 含 `LSUIElement = true`（纯菜单栏 Agent，无 Dock）与 `NSLocalNetworkUsageDescription`（本地网络授权说明）。
+  - `mac.target`：**仅 arm64 的 pkg**。`build.pkg` 固定安装到 `/Applications`（`installLocation`），禁止安装到任意位置 / 当前用户 Home，`isRelocatable = false`；`pkg.scripts = ../scripts/pkg-scripts`：`preinstall` 先在登录用户会话中让已运行的 Vessel（以及旧名 Ships）正常退出（5 秒未退出则强制结束），并删除旧的 `/Applications/Ships.app`；替换完成后 `postinstall` 在登录用户会话中 `open /Applications/Vessel.app` 自动启动新版本。不产出 dmg / zip / `latest-mac.yml`。`mac.icon = assets/imgs/icon.icns`；`hardenedRuntime = true`、`gatekeeperAssess = false`；`extendInfo` 含 `LSUIElement = true`（纯菜单栏 Agent，无 Dock）与 `NSLocalNetworkUsageDescription`（本地网络授权说明）。
 - **签名 / 公证（打包时自动）**：
   - 由 `scripts/dist-mac.sh` 判断：设置了 `CSC_LINK` / `APPLE_ID` / `CSC_NAME` 之一 → 视为**正式签名**，交给 electron-builder 在打包阶段用 Developer ID 签名 `.app`；PKG 安装器签名需要额外的 **Developer ID Installer** 证书（缺失时产出的 PKG 未签名，但可安装）。否则设 `CSC_IDENTITY_AUTO_DISCOVERY=false`（避免误用钥匙串里的无关证书而失败）。
   - **ad-hoc 兜底**：`afterPack` 钩子 `scripts/after-pack.cjs` 调用 `scripts/adhoc-sign.sh`：仅当未配置正式签名（同上三个环境变量都为空）时执行 `codesign --force --deep --sign -` 并对 `.app` 校验，保证**未签名环境下应用仍可运行**；配置了正式签名时跳过，以免覆盖。
@@ -621,14 +622,14 @@ flowchart TD
   - **Electron Fuses**（`@electron/fuses`）：`RunAsNode=false`、`EnableNodeOptionsEnvironmentVariable=false`、`EnableNodeCliInspectArguments=false`、`EnableCookieEncryption=true`、`OnlyLoadAppFromAsar=true`；`EnableEmbeddedAsarIntegrityValidation=false`（与 asar 改写冲突）。
   - 加固依赖 `asarmor`、`@electron/fuses` 位于 `devDependencies`。
   - **公证**：`afterSign` 钩子 `scripts/notarize.cjs`，当设置 `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` 时自动公证（`SKIP_NOTARIZE=1` 可跳过）。
-  - 产物命名：`Ships-v<version>-<arch>.pkg`；无 blockmap / latest-mac.yml。
+  - 产物命名：`Vessel-v<version>-<arch>.pkg`；无 blockmap / latest-mac.yml。
 - **更新流程（`src/main/services/updater-service.js`）**：
-  - **版本检测**：macOS 调用 GitHub Releases API（`releases/latest`，仓库来自 `ships.updateRepo`），Windows 仍用 `electron-updater`。**仅打包后**的 macOS / Windows 生效（`app.isPackaged`）；开发模式不检查。启动后**静默检查一次**（延迟 5s，不打扰）。
+  - **版本检测**：macOS 调用 GitHub Releases API（`releases/latest`，仓库来自 `vessel.updateRepo`），Windows 仍用 `electron-updater`。**仅打包后**的 macOS / Windows 生效（`app.isPackaged`）；开发模式不检查。启动后**静默检查一次**（延迟 5s，不打扰）。
   - **提示后下载**：`update-available` → 弹窗「发现新版本 vX（当前 vY），现在下载吗？」→ 确认才下载。
   - **下载方式按平台分两种模式**（`dl.mode`）：
-    - **macOS（`mode=pkg`）**：GitHub Releases API 返回的最新版本里选出与当前架构匹配的 `.pkg`；用 **Node 原生 `http(s)`** 流式下载到 `app.getPath('downloads')`（手动跟随重定向），可取消（`destroy` + 删除半成品）。**不用 Electron `net`**：`net` 走 Chromium 网络栈会触及加密 Cookie 存储（打包时翻转了 `EnableCookieEncryption` fuse），从而弹出 macOS「钥匙串」授权框；Node 原生请求不碰 Chromium 会话 / Cookie，因此更新检查与下载都不会再触发该弹框。**`owner` / `repo` 取自 `package.json` 的 `ships.updateRepo`**；产物前缀固定取应用名 `Ships`（`APP_NAME`）。**不依赖 Squirrel / 签名**，因此 ad-hoc 构建也能更新。
+    - **macOS（`mode=pkg`）**：GitHub Releases API 返回的最新版本里选出与当前架构匹配的 `.pkg`；用 **Node 原生 `http(s)`** 流式下载到 `app.getPath('downloads')`（手动跟随重定向），可取消（`destroy` + 删除半成品）。**不用 Electron `net`**：`net` 走 Chromium 网络栈会触及加密 Cookie 存储（打包时翻转了 `EnableCookieEncryption` fuse），从而弹出 macOS「钥匙串」授权框；Node 原生请求不碰 Chromium 会话 / Cookie，因此更新检查与下载都不会再触发该弹框。**`owner` / `repo` 取自 `package.json` 的 `vessel.updateRepo`**；产物前缀固定取应用名 `Vessel`（`APP_NAME`）。**不依赖 Squirrel / 签名**，因此 ad-hoc 构建也能更新。
     - **Windows（`mode=auto`）**：仍用 `electron-updater` 的 `downloadUpdate()` 自动下载并 `quitAndInstall()`（`autoInstallOnAppQuit=true`；6 秒未退出则 `app.relaunch()` + `app.quit()` 兜底）。
-  - **下载窗口**：确认下载后弹出一个**小型、不可关闭（`closable: false` + 系统关闭按钮禁用，仅退出应用时放行）、可最小化、置顶居中的前台窗口** `update.html`（尺寸 `ships.updateWindow` = 380 × 150，见 §8.7）。窗口采用 **`titleBarStyle: 'hiddenInset'`**：**真正的系统红绿灯**与标题同一行，**只有「最小化」可用**（关闭 / 缩放禁用）。窗口还有：**实时进度条**（`update:progress`）、**取消**、**安装按钮**（下载期间禁用）。下载完成后按钮可用并显示 **60 秒倒计时**（常量 `UPDATE_COUNTDOWN_SECONDS`）；**macOS 按钮为「退出并安装」**（`open` 打开 PKG 系统安装器，随后退出本程序；安装完成后 PKG 的 postinstall 会重新启动 Ships；倒计时文案「N 秒后自动退出并打开安装器」），**Windows 按钮为「重启更新」**（`quitAndInstall()`）。**取消 = 退出本次更新**（下载阶段中止下载并删除半成品；点击安装 / 倒计时到 0 后取消按钮禁用）。**注意**：macOS 上 `closable: false` 的窗口会让 `app.quit()` 卡住（窗口永不被关闭），因此退出时（`before-quit`）会对更新窗口 `setClosable(true)` 放行，保证能真正退出。
+  - **下载窗口**：确认下载后弹出一个**小型、不可关闭（`closable: false` + 系统关闭按钮禁用，仅退出应用时放行）、可最小化、置顶居中的前台窗口** `update.html`（尺寸 `vessel.updateWindow` = 380 × 150，见 §8.7）。窗口采用 **`titleBarStyle: 'hiddenInset'`**：**真正的系统红绿灯**与标题同一行，**只有「最小化」可用**（关闭 / 缩放禁用）。窗口还有：**实时进度条**（`update:progress`）、**取消**、**安装按钮**（下载期间禁用）。下载完成后按钮可用并显示 **60 秒倒计时**（常量 `UPDATE_COUNTDOWN_SECONDS`）；**macOS 按钮为「退出并安装」**（`open` 打开 PKG 系统安装器，随后退出本程序；安装完成后 PKG 的 postinstall 会重新启动 Vessel；倒计时文案「N 秒后自动退出并打开安装器」），**Windows 按钮为「重启更新」**（`quitAndInstall()`）。**取消 = 退出本次更新**（下载阶段中止下载并删除半成品；点击安装 / 倒计时到 0 后取消按钮禁用）。**注意**：macOS 上 `closable: false` 的窗口会让 `app.quit()` 卡住（窗口永不被关闭），因此退出时（`before-quit`）会对更新窗口 `setClosable(true)` 放行，保证能真正退出。
   - **下载失败**：仅在日志记录详细错误，并关闭下载窗口、给一句友好提示。
   - **手动检查**：设置 → 应用 → 关于「检查更新」（`app:check-updates`）触发，会提示「已是最新 / 暂时无法检查」；**每次点击都必须有反馈**（有新版本同样会重新弹窗，反复点击不会静默无响应）；检查进行中再次点击返回 `{ ok: true, checking: true }`，界面就地提示「正在检查…」。**出错时不报技术错误**：手动检查给一句友好提示（详情写日志），启动时的静默检查出错则完全不提示。
   - **说明**：macOS 的 Squirrel 自动安装需要稳定 **Developer ID 签名**，本项目默认 ad-hoc 签名，故改用 PKG + 系统安装器；发布仅含 `*.pkg`，更新检测通过 GitHub API 完成。
@@ -647,16 +648,16 @@ flowchart TD
 
 **窗口模式（默认）**
 
-- **标准窗口 + 置顶悬浮 panel**：`titleBarStyle: 'hiddenInset'` + **系统红绿灯**（`trafficLightPosition {14,16}`）、不占 Dock；**置顶**（`alwaysOnTop` + `setAlwaysOnTop(true, 'screen-saver')`，可浮在全屏应用之上）；**固定 640 × 480、不可缩放**（`resizable: false`，`ships.mainWindow`），仅位置可拖动。
+- **标准窗口（不置顶）**：`titleBarStyle: 'hiddenInset'` + **系统红绿灯**（`trafficLightPosition {14,16}`）、不占 Dock；**普通窗口层级**（`alwaysOnTop: false`，不会永远浮在其它应用之上）；**固定 640 × 480、不可缩放**（`resizable: false`，`vessel.mainWindow`），仅位置可拖动。
 - **桌面归属**：窗口绑定到显示时所在的桌面，打开期间切换桌面不跟随；关闭（隐藏）后从其它桌面点托盘时，先 `setVisibleOnAllWorkspaces(true)`、显示聚焦后再 `false` 绑定当前桌面，因此在新桌面打开而不是回到旧桌面。
 - **只记忆位置（panel 式当前桌面显示）**：`main-window.json` 只存 `{ x, y }`，不记录桌面 / 屏幕 / 尺寸；显示时应用到当前鼠标所在屏幕并夹回工作区，无记录则居中。显示前先加入所有桌面，`show()` / `focus()` 后约 60ms 再 `false` 绑定当前桌面，避免 `show` / 激活时被系统拉回旧桌面。**拖动时水平磁性吸附**：窗口中心与屏幕工作区的**垂直中线**（x 方向）对齐（±10px）时吸附到正中并轻微「卡」一下，拖动超过 26px 才脱开（`CENTER_SNAP.xThreshold` / `xRelease`，仅改 x；与终端窗口同一行为）。
 - **布局适配**：顶部栏 `#tabbar` 左侧留出 **80px** 给系统红绿灯；**整条顶部栏可拖动窗口**——`#tabbar` / `#tablist` 均为 `-webkit-app-region: drag`（TAB 区虽铺满右侧，但其空白处也可拖动），仅真正的 **TAB 按钮**（`#tablist .tab`）为 `no-drag` 保证可点击；内容区加宽（`padding: 16px 20px`），工具内容 `#content > .tool-body` 用 `repeat(auto-fit, minmax(320px, 1fr))` 网格（固定 640 宽下为单列，窗口更宽时自动分栏）；面板圆角取消（`#panel border-radius:0`）。**图钉（固定悬浮）按钮隐藏**（仅悬浮模式有意义）；**Liquid Glass / 毛玻璃与悬浮模式一样生效**（开启时窗口透明、材质透出；见 §8.1「Liquid Glass」）。
 
 **悬浮模式（`floatMode = true`，原主面板行为）**
 
-- 尺寸：**400 × 500**（`ships.window.width/height`），无边框、透明、不可缩放、置顶、不占 Dock。
+- 尺寸：**400 × 500**（`vessel.window.width/height`），无边框、透明、不可缩放、置顶、不占 Dock。
 - **浮动行为（与终端窗口的置顶开关无关）**：面板 `alwaysOnTop: true`（**恒定**，不跟随 `settings.terminalAlwaysOnTop` —— 终端窗口头部图钉只改终端自己），并用 `setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })` 加入所有桌面 + 全屏辅助；**每次弹出前**（`showMainWindow` → `setAlwaysOnTop(true)` + 重新声明上面的 collection behavior 后再 `show()`）都会重申一次，保证点击托盘时面板直接浮在当前界面（含全屏应用之上），而不是被系统切回某个桌面才显示得出来。`skipTransformProcessType: true`：本应用已是 `LSUIElement` 菜单栏 Agent（`app.dock.hide()`），不需要 Electron 在「UIElement ↔ 普通应用」之间转换进程类型 —— 该转换会短暂隐藏窗口 / Dock 并改变激活与窗口显示行为。
-- 结构：顶部栏（高 46px）：TAB 图标区右对齐、超出可横向滚动（图标 22×22px、按钮 36×36px、间距 6px）→ **固定工具标题区** `#tool-head-host`（不随内容滚动）→ 内容区（可滚动）→ 底部栏（高 34px）。
+- 结构：顶部栏（高 46px）：TAB 图标区右对齐、超出可横向滚动（图标 24×24px、按钮 40×40px、间距 8px）→ **固定工具标题区** `#tool-head-host`（不随内容滚动）→ 内容区（可滚动）→ 底部栏（高 34px）。
 - TAB 工具顺序由单一文件 `src/renderer/scripts/tool-order.js` 的 `window.ShipsToolOrder` 数组决定（改数组即改顺序；未列出的工具按注册顺序追加到末尾）。
 - 圆角：外层面板 `--radius-window`（10px），透明窗口使圆角外露；**主窗口无描边边框**（仅卡片/输入框有边框）。
 - 底部栏：左侧依次为 **App 彩色图标 + 名称**（16px 图标 / 12px 名称，固定不压缩）与版本号（`vX.Y.Z`；开发者模式开启时其右侧加一枚「开发者模式」标记）、右侧依次为**终端**（`terminal`，每次新开一扇置顶终端窗口，§3.9）、**文件管理**（`folder`，打开独立文件窗口且不选中任何连接，§3.9-11）、**网络测试**（`wifi`，打开设置 → 网络测试分区）、**外观**（`monitor`/`sun`/`moon`，循环切换跟随系统 / 浅色 / 深色）、图钉（固定悬浮）与设置按钮（齿轮），六个图标按钮均为 24×24px、**间距 12px**（比顶部 TAB 小，间距放大后图标之间的留白与顶部观感一致）。
@@ -670,7 +671,7 @@ flowchart TD
 
 ### 8.2 设置窗口
 
-- 尺寸：**800 × 600**（`ships.settingsWindow`），普通窗口，可缩放（最小 560×420），`titleBarStyle: hiddenInset`。
+- 尺寸：**800 × 600**（`vessel.settingsWindow`），普通窗口，可缩放（最小 560×420），`titleBarStyle: hiddenInset`。
 - 布局：**左右分栏** —— 左侧导航（宽 190px，顺序为：应用、SSH、终端、快捷键、网络测试；导入 / 导出与日志已合并到「应用」分区），右侧内容区。
 - 顶部 **28px** 为可拖拽区域（`.drag-region`，覆盖系统红绿灯 / 原生标题栏范围）；左侧导航从 **48px**（`padding-top`，为避开系统红绿灯留白）、右侧标题从 12px 起排，`Escape` 关闭窗口。
 
@@ -696,7 +697,7 @@ flowchart TD
 
 ### 8.5 置顶终端窗口
 
-- 尺寸与位置：默认 **1024 × 768**（`ships.terminalWindow.width/height`，可在 **设置 → 终端 → 窗口大小** 调整，存 `settings.json` 的 `terminalWindowWidth` / `terminalWindowHeight`），可缩放、最小 `minWidth × minHeight` = 350×200；改设置立即生效，手动拖动窗口写回设置。**窗口为无边框 + 透明**（`frame:false` + `transparent:true` + `hasShadow:false`）：窗口底色 / 圆角 / 描边由渲染层 `#term-shell`（`--color-bg` / `--radius-window`）绘制，便于「悬浮球」模式呈现圆形（见 §3.9-12）；开启「终端暗色模式」时该窗口主题变量整体改为暗色（与全局主题无关，见 §3.9-12）。**屏幕 / 位置 / 尺寸会自动记忆**（`terminal-window.json`）：同屏重开沿用记忆（越界夹回工作区），换屏 / 拔屏 / 无记录则用默认尺寸在当前屏幕居中，详见 §3.9。悬浮球尺寸 `BALL_SIZE` 默认 **100px**（`package.json` 的 `ships.terminalWindow.ballSize`）。
+- 尺寸与位置：默认 **1024 × 768**（`vessel.terminalWindow.width/height`，可在 **设置 → 终端 → 窗口大小** 调整，存 `settings.json` 的 `terminalWindowWidth` / `terminalWindowHeight`），可缩放、最小 `minWidth × minHeight` = 350×200；改设置立即生效，手动拖动窗口写回设置。**窗口为无边框 + 透明**（`frame:false` + `transparent:true` + `hasShadow:false`）：窗口底色 / 圆角 / 描边由渲染层 `#term-shell`（`--color-bg` / `--radius-window`）绘制，便于「悬浮球」模式呈现圆形（见 §3.9-12）；开启「终端暗色模式」时该窗口主题变量整体改为暗色（与全局主题无关，见 §3.9-12）。**屏幕 / 位置 / 尺寸会自动记忆**（`terminal-window.json`）：同屏重开沿用记忆（越界夹回工作区），换屏 / 拔屏 / 无记录则用默认尺寸在当前屏幕居中，详见 §3.9。悬浮球尺寸 `BALL_SIZE` 默认 **100px**（`package.json` 的 `vessel.terminalWindow.ballSize`）。
 - 层级：`alwaysOnTop` + `setAlwaysOnTop(true, 'screen-saver')`（由终端窗口自己的图钉开关控制，与主面板无关）；`setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true })` —— 带全屏辅助（可浮在全屏应用之上）但**不加入所有桌面**（切换桌面时窗口留在原桌面，详见 §3.9）。
 - 头部：**22px** 自绘头栏 `#term-header`（左侧**自绘小红绿灯** ×3 + **红绿灯右侧的「固定」按钮**（`pin`/`pin-off`，开启后本窗口失焦不缩成悬浮球，见 §3.9-12）、**左右 padding 各 10px** —— **红绿灯尺寸随头栏字号缩放**（字号×0.75 圆点 / ×0.5 符号，12px→9px/6px），系统红绿灯已隐藏，点击关闭 / **最小化（= 缩成悬浮球）** / 缩放；**不显示任何标题文字**；右侧图标区：**SSH 主机下拉**（宽度固定 120px，**高固定 14px、字号固定 11px**，条目 `用户名@主机地址`，选中即在当前终端执行 `ssh …`，见 §3.9-2）+ 四枚 18×18px 图标按钮（符号 12px）：**文件**（`folder`，无 ssh 目标时禁用、连接中图标旋转、面板展开时强调色，见 §3.9-10）、**iTerm 交接**、**行号**（`eye`/`eye-off`）、**窗口分裂**（`split`，点击新开一扇终端窗口，同主面板终端按钮）；**无置顶按钮**）；**头栏字号 = 终端字号 + 1**（`--term-header-font-size`，默认终端 12px → 头栏 13px：高 `max(22px, 字号+6px)`，终端 24px → 头栏 25px / 高 30px），头部为拖拽区、红绿灯与图标区为 `no-drag`，头栏不挂 `data-tip`。
 - 主体：xterm.js 终端铺满剩余区域（外层 `#term-host` 负责 6.5 / 13px 留白，xterm 挂在无内边距的 `#term-fit` 上，保证 `FitAddon` 按真实可用区算行数 —— 最后一行完整可见、页面不可滚动，见 §3.9），滚动缓冲 **10000 行**、**不显示滚动条**（滚轮 / 触控板滚动缓冲区，防跳变见 §3.9）。
@@ -715,10 +716,10 @@ flowchart TD
 
 ### 8.7 更新下载窗口
 
-- 尺寸 **380 × 150**（`package.json` 的 `ships.updateWindow` → `constants.js` 的 `UPDATE_WINDOW`）；**标准窗口 + `titleBarStyle: 'hiddenInset'`**（真正的系统红绿灯，`trafficLightPosition {14,13}`）、不可缩放、**不可关闭**（`closable: false`，系统关闭按钮禁用、Cmd-W 无效，仅应用退出 / `quitAndInstall` 时放行；`close` 事件另有 `preventDefault` 兜底）、置顶（`alwaysOnTop`）并**居中**显示。**可最小化**（`minimizable: true`，系统黄灯生效）；**缩放禁用**（`maximizable: false`）。
+- 尺寸 **380 × 150**（`package.json` 的 `vessel.updateWindow` → `constants.js` 的 `UPDATE_WINDOW`）；**标准窗口 + `titleBarStyle: 'hiddenInset'`**（真正的系统红绿灯，`trafficLightPosition {14,13}`）、不可缩放、**不可关闭**（`closable: false`，系统关闭按钮禁用、Cmd-W 无效，仅应用退出 / `quitAndInstall` 时放行；`close` 事件另有 `preventDefault` 兜底）、置顶（`alwaysOnTop`）并**居中**显示。**可最小化**（`minimizable: true`，系统黄灯生效）；**缩放禁用**（`maximizable: false`）。
 - **标题与红绿灯同一行**：`.update-titlebar`（高 40px、`padding-left: 74px` 避开红绿灯、整行为拖动区）内放标题 `#update-title`。
 - 结构（`update.html`）：红绿灯 → 标题（下载中「正在下载更新 vX」/ 完成「下载完成 vX」）→ **进度条** `update-progress`（宽 = `percent`）→ 状态行（`已下载 / 总量 · 速度`；完成时 macOS 显示「N 秒后自动退出并打开安装器」、Windows 显示「N 秒后自动重启更新」）→ 底部按钮「取消」与**安装按钮**（macOS =「**退出并安装**」/ Windows =「**重启更新**」，文案随状态里的 `mode` 切换；下载期间禁用；**一旦触发安装——点按钮或倒计时到 0——「取消」与安装按钮一并禁用**；两者紧贴状态行、无多余留白）。整窗为拖拽区、红绿灯与按钮为 `no-drag`。
-- 行为见 §6.6 / §7：进度实时回填；下载完成后安装按钮可用并显示 60 秒倒计时。**macOS**：点安装 / 倒计时到 0 → `open` 打开 PKG 系统安装器后退出本程序；安装完成由 PKG postinstall 自动启动 Ships。**Windows**：调用 `quitAndInstall()`，6 秒未退出则 `app.relaunch()` + `app.quit()` 兜底。
+- 行为见 §6.6 / §7：进度实时回填；下载完成后安装按钮可用并显示 60 秒倒计时。**macOS**：点安装 / 倒计时到 0 → `open` 打开 PKG 系统安装器后退出本程序；安装完成由 PKG postinstall 自动启动 Vessel。**Windows**：调用 `quitAndInstall()`，6 秒未退出则 `app.relaunch()` + `app.quit()` 兜底。
 
 ---
 
@@ -766,9 +767,9 @@ flowchart TD
 - JSON 语法色：`--color-json-key/str/num/bool/null`（深浅各一套）。
 - **控件底色**：浅色模式输入框 / 按钮 / 分段控件 / 下拉触发器 / 开关 / 芯片等使用 `--color-control`（`#ffffff`），与卡片同为白色、靠边框区分，不再使用灰色 `--color-surface-2`；深色模式为 `#1d222b`。Liquid Glass 下 `--color-control` 取 `--glass-surface-2`，保持半透明。
 - **强调色派生令牌**（`constants.css` 的 `:root`，随 `--color-accent` 实时变化）：`--color-accent-soft`（12% 透明底）、`--color-accent-soft-2`（20%）、`--color-accent-line`（48% 描边）、`--focus-ring`（2px / 14% 焦点环）。均只使用 `color-mix(…, transparent)`，保证 Liquid Glass 下仍能透出原生材质。
-- **强调色使用范围**：`--color-accent` 用于 TAB 选中（含底色 / 描边 / 底部短线）、分区标题的左侧色条、输入框 / 下拉 / 卡片悬浮描边与焦点环、分段控件选中、开关、色板、图标按钮悬浮、普通按钮悬浮描边与文字、文件管理选中行（底色 + 左侧色条）、分隔线悬浮、进度条、JSON 编辑器聚焦描边等；设置左侧导航选中仅使用强调色文字 + 淡强调色底（无左侧边框线）；卡片 / 输入框的**常态**底色仍保持中性色，避免整体过度着色。
+- **强调色使用范围**：`--color-accent` 用于 TAB 选中（含底色 / 描边）、分区标题的左侧色条、输入框 / 下拉 / 卡片悬浮描边与焦点环、分段控件选中、开关、色板、图标按钮悬浮、普通按钮悬浮描边与文字、文件管理选中行（底色 + 左侧色条）、分隔线悬浮、进度条、JSON 编辑器聚焦描边等；设置左侧导航选中仅使用强调色文字 + 淡强调色底（无左侧边框线）；卡片 / 输入框的**常态**底色仍保持中性色，避免整体过度着色。
 - **标题层级**：工具页由 `app.js` 渲染 `.tool-head`（标题 + 说明）；设置窗口的页面标题由 `settings.html` 顶部 `#settings-title` 承担，分区内容**不再重复同名标题**（如「日志」「导入 / 导出」），避免双层标题。
-- **清晰度**：`theme.js` 按 `window.devicePixelRatio` 在 `<html>` 上设置 `data-dpr`（≥2 为 `2`，否则 `1`，并在 `resize` / 分辨率变化时更新）。仅当 `data-dpr="2"` 时，卡片 / 输入框 / 分段 / 下拉 / 右键菜单等使用 **0.5px 发丝线**、浅色卡片带轻微投影；非 HiDPI 下**不使用**这些效果。图标 / 图片：内联 SVG 统一 `shape-rendering: geometricPrecision`（平滑缩放不糊），位图（如品牌图标 `<img>`）用 `image-rendering: -webkit-optimize-contrast` 提升重采样锐度。
+- **清晰度**：`theme.js` 按 `window.devicePixelRatio` 在 `<html>` 上设置 `data-dpr`（≥2 为 `2`，否则 `1`，并在 `resize` / 分辨率变化时更新）。仅当 `data-dpr="2"` 时，卡片 / 输入框 / 分段 / 下拉 / 右键菜单等使用 **0.5px 发丝线**、浅色卡片带轻微投影；非 HiDPI 下**不使用**这些效果。图标 / 图片：内联 SVG 统一 `shape-rendering: geometricPrecision`（平滑缩放不糊），位图（如品牌图标 `<img>`）用 `image-rendering: -webkit-optimize-contrast` 提升重采样锐度。**TAB 图标渲染时会把 `fill` / `stroke` 非 `none` 的颜色统一为 `currentColor`**，因此用户替换进来、写死 `#000` 等颜色的 SVG 也会跟随选中 / 悬停 / 主题变色。
 - 强调色由设置写入 `:root` 的 `--color-accent`；TAB 选中、开关、按钮等统一引用。
 - **Liquid Glass / 毛玻璃配色**：`[data-vibrancy='on']`（浅色）与 `[data-vibrancy='on'][data-theme='dark']`（深色）在 `constants.css` 中把 `--color-bg` 覆盖为 `transparent`，并把 `--color-surface/-2/-3` 调成**极淡的半透明白**（`0.08 / 0.12 / 0.22`）：卡片 / 输入框几乎不填色、仅留描边与极淡一层，让原生玻璃的 blur 与折射直接透出（贴近系统 Liquid Glass 应用）；同时**加深文字**（浅色 `--color-fg` 近黑、`--color-fg-muted` 黑 58%；深色反之）保证可读性，并把 `--color-border` / `--color-border-strong` 提到 16% / 28%（深色 18% / 32%）。强调色派生令牌在玻璃下提高透明度（soft 16%、soft-2 26%、line 58%），仍只叠加 `transparent`；头栏 / 底栏 / 顶部强调色线在玻璃下保持透明或半透明，不引入不透明填充。弹层 `select-menu` 额外用 `--color-surface-3` 提高辨识度。属性由主面板 `app.js` 设置，设置窗口不设置（保持不透明）。材质明暗由主进程 `nativeTheme.themeSource`（取 `settings.theme`）控制。
 
@@ -777,9 +778,9 @@ flowchart TD
 | 名称 | 值 |
 | --- | --- |
 | 悬浮面板尺寸 | 400 × 500 |
-| 窗口模式主窗口尺寸 | 固定 640 × 480（不可缩放；`ships.mainWindow`） |
+| 窗口模式主窗口尺寸 | 固定 640 × 480（不可缩放；`vessel.mainWindow`） |
 | 设置窗口尺寸 | 800 × 600 |
-| 更新下载窗口尺寸 | 380 × 150（`ships.updateWindow`） |
+| 更新下载窗口尺寸 | 380 × 150（`vessel.updateWindow`） |
 | `--tabbar-height` | 46px |
 | `--footer-height` | 34px |
 | `--term-header-height` | 22px（终端窗口头栏最小高度，刚好放下自绘小红绿灯；实际为 `max(22px, --term-header-font-size + 6px)`） |
@@ -795,6 +796,7 @@ flowchart TD
 | `--radius-xs` | 2px |
 | 间距 `--space-1..5` | 4 / 8 / 12 / 16 / 20px |
 | `--space-card-gap` | 12px（卡片 / 输入框 / 设置分区之间的统一间距；`gap-card` / `mb-card` / `mt-card`） |
+| `--control-width` | 120px（下拉框默认宽度；二维码纠错等级 L / M / Q / H 分段控件同宽） |
 
 **组件**
 
@@ -802,10 +804,10 @@ flowchart TD
 - **分组手风琴** `accordion` / `accordion-item` / `accordion-header`（含 `.accordion-chevron` / `.accordion-name` / `.accordion-count`）/ `accordion-body`：用于 SSH 管理（设置页与主界面工具）按分组折叠展示，**默认全部展开**，点击标题切换、`.accordion-item.collapsed` 时旋转箭头（-90°）并隐藏 `.accordion-body`。
 - **2FA 验证码卡片**（2FA 工具）：顶部为单行 `field` 输入框 + `btn-accent`「添加」按钮；卡片为 `rounded-card` + `border-border` + `bg-surface` 的纵向布局 —— 第一行为**绿色盾牌图标**（`shield`，`--color-success`）+ 标题（`text-[15px]`）+ 副标题（`items-baseline`、超出省略）、右侧**复制** / **删除**图标按钮，第二行为**逐位验证码数字块**（`h-11 w-8`、`text-[22px]` 等宽、每 3/4 位一组留一道间隙）+ 右侧倒计时秒数，底行为 1px 进度条（`rounded-pill`，剩余 ≤5 秒由强调色变 `--color-danger`）；复制成功就地显示 ✓ 反馈，删除走**就地二次确认**（`text-danger` 文案 + ✓ / ✕ 图标按钮）。样式复用中性卡片色，强调色仅用于进度条；卡片内元素纵向间距统一为 `--space-card-gap`（当前 12px，`gap-card`）；输入区与卡片列表也使用同一间距。
 - **更新下载窗口组件**：`.update-shell`（整窗拖拽区 + 纵向布局）/ `.update-title` / `.update-progress` + `.update-progress-fill`（强调色进度条，`transition: width 0.15s linear`）/ `.update-status` / `.update-actions`（`no-drag`，右对齐按钮）。
-- **卡片 / 输入框间距统一 12px**：唯一来源是 `constants.css` 的 `--space-card-gap`（默认 12px）；`.section`（`gap` / `margin-bottom`）、窗口模式工具网格、手风琴、设置卡片、工具列表与输入区块均使用它（Tailwind 暴露为 `gap-card` / `mb-card` / `mt-card`），不再散落 10 / 12 / 16px 的卡片间距。
-- **统一标题（滚动联动）**：每个工具的标题由 `app.js` 渲染在内容区上方的固定 `#tool-head-host` 中（标题取 `tools.<id>`、说明取 `toolDesc.<id>`），**永远固定在顶部、不随内容滚动**。常态标题 17px / 700、说明 11px。**仅当内容实际可滚动时**才启用收起行为：内容在最顶部时，第一次滚轮先把标题收起（内容保持不动），标题缩为 13px / 650、说明变为 10px 并**与标题同一行**（超出省略）；收起后继续滚动才滚动内容，标题始终独占一行、内容不会滚到标题下面。滚回顶部后自动恢复（在顶部继续向上滚也会先展开标题）；JSON 等内部滚动区实际产生滚动时同样收起，回到其顶部恢复；内容未填满、无法滚动时（如短 JSON / Hash / 2FA / 剪贴板）滚动不会收起标题。切换 TAB 时内容区自动滚动回顶部并恢复常态。
+- **卡片 / 输入框间距统一 12px**：唯一来源是 `constants.css` 的 `--space-card-gap`（默认 12px）；`.section`（`gap` / `margin-bottom`）、窗口模式工具网格、手风琴、设置卡片、工具列表与输入区块均使用它（Tailwind 暴露为 `gap-card` / `mb-card` / `mt-card`），不再散落 10 / 12 / 16px 的卡片间距；编码转换的 6 个连续输入框、进制转换的 4 个进制输入框使用更紧凑的 8px 字段间距。
+- **统一标题（滚动联动）**：每个工具的标题由 `app.js` 渲染在内容区上方的固定 `#tool-head-host` 中（标题取 `tools.<id>`、说明取 `toolDesc.<id>`），**永远固定在顶部、不随内容滚动**。常态标题 17px / 700、说明 11px。**仅当内容实际可滚动时**才启用收起行为：内容在最顶部时，先收起标题并**保持内容不动**（滚动输入在收起动画约 190ms 内被锁定），标题缩为 13px / 650、说明变为 10px 并**与标题同一行**（超出省略）；动画完成后继续滚动才滚动内容，标题始终独占一行、内容不会滚到标题下面。滚回顶部后自动恢复（在顶部继续向上滚也会先展开标题）；JSON 等内部滚动区实际产生滚动时同样收起，回到其顶部恢复；内容未填满、无法滚动时（如短 JSON / Hash / 2FA / 剪贴板）滚动不会收起标题。切换 TAB 时内容区自动滚动回顶部并恢复常态。
 - **内容填充（fill）**：工具注册项可设 `fill: true`（当前为 JSON 格式化）；`app.js` 给 `#content` 加 `.tool-fill`，使内容区变为纵向 flex、`.tool-body` 占满剩余高度，JSON 编辑器 / 结构树用 `flex: 1` 铺满剩余高度与整行宽度（不再固定 180px），下方状态行保持贴底；窗口模式下的多列网格也由该规则覆盖为单列纵向布局（并重置 `align-items: stretch`，避免从网格的 `start` 继承导致编辑器宽度塌缩）。
-- 自绘控件：下拉框默认**宽 120px**，菜单宽度与触发器一致（`select-trigger` / `select-menu` / `select-option`（`ShipsUI.createSelect`，替代系统 `<select>`；`.select-trigger.select-compact` 是头栏尺寸变体 —— 内边距 6px / 圆角取更紧凑的 `--radius-control-sm`（4px，比常规控件的 8px 小），字号与高度由 `#term-actions` 规则按头栏字号推导；终端窗口的下拉菜单同样与触发器同宽（120px）、条目高度与下拉本体一致，用于终端窗口头栏里的 SSH 主机下拉；支持 `{ header: true, label }` 形式的分组小标题 `select-group-title`（不可点、`pointer-events: none`，用于 SSH 下拉在两组之间区分，终端窗口内更紧凑））；**终端窗口自绘小红绿灯** `.traffic-light`（`.traffic-close` / `.traffic-minimize` / `.traffic-zoom`，9px 圆点 + 悬浮符号，见 §3.9-2）；悬浮提示 `ships-tip`（`ShipsUI.initTooltips`，元素加 `data-tip`，时间戳工具的偏移输入框用 `data-tip` 说明表达式语法）；JSON 覆盖式高亮编辑器 `json-editor` 与结构树 `json-tree`。
+- 自绘控件：下拉框默认**宽 120px**（`--control-width`），菜单宽度与触发器一致；二维码纠错等级 L / M / Q / H 分段控件同样为 **120px** 且按钮均分；下拉触发器只有可见的 120px 区域可点击（外层不使用 `<label>` 转发点击）（`select-trigger` / `select-menu` / `select-option`（`ShipsUI.createSelect`，替代系统 `<select>`；`.select-trigger.select-compact` 是头栏尺寸变体 —— 内边距 6px / 圆角取更紧凑的 `--radius-control-sm`（4px，比常规控件的 8px 小），字号与高度由 `#term-actions` 规则按头栏字号推导；终端窗口的下拉菜单同样与触发器同宽（120px）、条目高度与下拉本体一致，用于终端窗口头栏里的 SSH 主机下拉；支持 `{ header: true, label }` 形式的分组小标题 `select-group-title`（不可点、`pointer-events: none`，用于 SSH 下拉在两组之间区分，终端窗口内更紧凑））；**终端窗口自绘小红绿灯** `.traffic-light`（`.traffic-close` / `.traffic-minimize` / `.traffic-zoom`，9px 圆点 + 悬浮符号，见 §3.9-2）；悬浮提示 `ships-tip`（`ShipsUI.initTooltips`，元素加 `data-tip`，时间戳工具的偏移输入框用 `data-tip` 说明表达式语法）；JSON 覆盖式高亮编辑器 `json-editor` 与结构树 `json-tree`。
 - 输入校验态：普通输入框加 `.invalid` 时描红（`border-color: var(--color-danger)`），时间戳工具的两个偏移输入框即用它表示偏移表达式非法；`.field:disabled` 半透明 + `not-allowed` 光标（IP 工具网络测试在 ICMP / ARP / 扫描主机下禁用端口输入）。
 - 分段控件：`ShipsUI.segmented(options, value, onSelect, { className })` 支持选项 `disabled`（置灰不可点选，`.segment button:disabled` 透明 0.4）、`tip`（悬浮提示，配合 `data-tip`）与 `setOptions()`（原地重建，用于跟随状态变化）；`.segment-compact` 为单行多段变体（内边距 4px / 6px），设置 → 网络测试的类型切换即用它。
 - 文件管理路径行图标（分离为独立窗口 / 刷新 / 家目录）与列表头操作常驻显示，不做悬浮显隐。
@@ -827,7 +829,7 @@ flowchart TD
 
 ## 12. 其余要点
 
-- **数据位置**：应用数据在 `app.getPath('userData')`；日志在 **macOS：`~/Library/Logs/Ships`**（其它平台：`userData` 的 `logs/` 子目录），按天 `ships-YYYY-MM-DD.log`，保留天数由设置 `logRetentionDays` 决定，默认 7 天；SSH 配置在 `~/.ssh/config`。
-- **调试开关**：`SHIPS_DEBUG=1` 或 `--debug` 输出详细日志；`SHIPS_SSH_CONFIG` 可覆盖 SSH 配置文件路径（测试用）。
+- **数据位置**：应用数据在 `app.getPath('userData')`；日志在 **macOS：`~/Library/Logs/Vessel`**（其它平台：`userData` 的 `logs/` 子目录），按天 `vessel-YYYY-MM-DD.log`，保留天数由设置 `logRetentionDays` 决定，默认 7 天；SSH 配置在 `~/.ssh/config`。
+- **调试开关**：`VESSEL_DEBUG=1`（兼容旧 `SHIPS_DEBUG`） 或 `--debug` 输出详细日志；`VESSEL_SSH_CONFIG`（兼容旧 `SHIPS_SSH_CONFIG`） 可覆盖 SSH 配置文件路径（测试用）。
 - **开发辅助**：`scripts/capture.cjs` 可在 Electron 中加载真实界面、执行点击/输入并截图（环境变量 `OUT` / `SETTINGS_OUT` / `TAB` / `INPUT` / `PATCH` 等），不参与打包。
 - **协议与端口提示**：应用不监听端口；SSH 默认端口 22。

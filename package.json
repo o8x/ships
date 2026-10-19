@@ -1,8 +1,8 @@
 {
-  "name": "ships",
+  "name": "vessel",
   "version": "3.34.0",
   "description": "A macOS menu bar toolbox for developers.",
-  "author": "Ships",
+  "author": "Vessel",
   "license": "MIT",
   "private": true,
   "main": "src/main/main.js",
@@ -31,7 +31,7 @@
     "electron-builder": "^26.15.3",
     "tailwindcss": "^3.4.19"
   },
-  "ships": {
+  "vessel": {
     "showDockIcon": false,
     "window": {
       "width": 380,
@@ -93,8 +93,8 @@
     ]
   },
   "build": {
-    "appId": "com.ships.app",
-    "productName": "Ships",
+    "appId": "cn.com.stdout.vessel",
+    "productName": "Vessel",
     "directories": {
       "output": "release"
     },
@@ -139,7 +139,7 @@
       "gatekeeperAssess": false,
       "extendInfo": {
         "LSUIElement": true,
-        "NSLocalNetworkUsageDescription": "Ships 需要访问本地网络以探测和连接你的 SSH 主机。"
+        "NSLocalNetworkUsageDescription": "Vessel 需要访问本地网络以探测和连接你的 SSH 主机。"
       },
       "artifactName": "${productName}-v${version}-${arch}.${ext}"
     },
@@ -151,6 +151,7 @@
       "allowRootDirectory": true,
       "isRelocatable": false,
       "mustClose": [
+        "Vessel",
         "Ships"
       ],
       "artifactName": "${productName}-v${version}-${arch}.${ext}"

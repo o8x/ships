@@ -10,7 +10,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Ships version
+      label: Vessel version
       description: Shown at the bottom-left of the panel, or in About.
       placeholder: v3.1.0
     validations:

@@ -13,7 +13,7 @@
         logsFolder: '日志文件夹',
         logsFolderHint: '打开保存日志的文件夹',
         openConsole: '打开控制台 App',
-        openConsoleHint: '在系统「控制台」App 的「日志报告」中查看 Ships 日志',
+        openConsoleHint: '在系统「控制台」App 的「日志报告」中查看 Vessel 日志',
         open: '打开',
         days: '天',
       },
@@ -26,7 +26,7 @@
         logsFolder: 'Logs folder',
         logsFolderHint: 'Open the folder that holds the logs',
         openConsole: 'Open Console.app',
-        openConsoleHint: 'View Ships logs under Log Reports in the system Console app',
+        openConsoleHint: 'View Vessel logs under Log Reports in the system Console app',
         open: 'Open',
         days: 'days',
       },
@@ -72,7 +72,7 @@
       row(i18n.t('settingsPage.logsFolder'), i18n.t('settingsPage.logsFolderHint'), folderBtn)
     );
 
-    // 最下边：打开控制台 App（日志写在 ~/Library/Logs/Ships，Console.app 的「日志报告」会收录）。
+    // 最下边：打开控制台 App（日志写在 ~/Library/Logs/Vessel，Console.app 的「日志报告」会收录）。
     if (!info || info.platform === 'darwin') {
       const consoleBtn = el('button', { class: 'btn shrink-0', type: 'button' });
       consoleBtn.append(

@@ -7,7 +7,7 @@ let DATA_DIR;
 try {
   DATA_DIR = require('electron').app.getPath('userData');
 } catch (err) {
-  DATA_DIR = process.env.SHIPS_DATA_DIR || path.join(os.homedir(), '.ships');
+  DATA_DIR = process.env.VESSEL_DATA_DIR || process.env.SHIPS_DATA_DIR || path.join(os.homedir(), '.vessel');
 }
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const SSH_DETECTED_FILE = path.join(DATA_DIR, 'ssh-detected.json');
@@ -26,14 +26,14 @@ const FILE_WINDOW_LAYOUT_FILE = path.join(DATA_DIR, 'file-window-layout.json');
 const CD_HISTORY_FILE = path.join(DATA_DIR, 'cd-history.json');
 // 营养成分 / TDEE 工具保存的商品记录与 TDEE 输入（非机密 JSON）。
 const NUTRIENT_FILE = path.join(DATA_DIR, 'nutrient-records.json');
-// 日志按天写入 LOG_DIR 下的 ships-YYYY-MM-DD.log（见 logger.js）。
-// macOS 放到 ~/Library/Logs/Ships：Console.app 的「日志报告」会收录该目录（与 JetBrains/CLion 一致），
+// 日志按天写入 LOG_DIR 下的 vessel-YYYY-MM-DD.log（见 logger.js）。
+// macOS 放到 ~/Library/Logs/Vessel：Console.app 的「日志报告」会收录该目录（与 JetBrains/CLion 一致），
 // 与用户数据目录分离；其它平台退回应用数据目录下的 logs/。
 const LOG_DIR =
   process.platform === 'darwin'
-    ? path.join(os.homedir(), 'Library', 'Logs', 'Ships')
+    ? path.join(os.homedir(), 'Library', 'Logs', 'Vessel')
     : path.join(DATA_DIR, 'logs');
-const SSH_CONFIG_FILE = process.env.SHIPS_SSH_CONFIG || path.join(os.homedir(), '.ssh', 'config');
+const SSH_CONFIG_FILE = process.env.VESSEL_SSH_CONFIG || process.env.SHIPS_SSH_CONFIG || path.join(os.homedir(), '.ssh', 'config');
 
 function pad2(value) {
   return String(value).padStart(2, '0');
@@ -41,7 +41,7 @@ function pad2(value) {
 
 function logFileForDate(date) {
   const d = date instanceof Date ? date : new Date();
-  return path.join(LOG_DIR, `ships-${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}.log`);
+  return path.join(LOG_DIR, `vessel-${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}.log`);
 }
 
 function todayLogFile() {

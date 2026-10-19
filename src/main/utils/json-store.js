@@ -9,7 +9,7 @@ function readJson(file, fallback) {
     return JSON.parse(raw);
   } catch (err) {
     if (err.code !== 'ENOENT') {
-      console.warn('[ships][warn] read json failed:', file, err.message);
+      console.warn('[vessel][warn] read json failed:', file, err.message);
     }
     return fallback;
   }

@@ -1,6 +1,32 @@
 'use strict';
 
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { app, ipcMain } = require('electron');
+
+/* 应用从 Ships 更名为 Vessel：首次启动时把旧数据目录 / 日志目录迁移到新名字，
+   避免升级后丢失设置、SSH 密码、2FA、商品记录等。仅在目标不存在时执行。 */
+(function migrateLegacyData() {
+  if (!app.isPackaged) return;
+  try {
+    const newDataDir = app.getPath('userData');
+    const oldDataDir = path.join(app.getPath('appData'), 'ships');
+    if (oldDataDir !== newDataDir && !fs.existsSync(newDataDir) && fs.existsSync(oldDataDir)) {
+      fs.renameSync(oldDataDir, newDataDir);
+    }
+    if (process.platform === 'darwin') {
+      const newLogDir = path.join(os.homedir(), 'Library', 'Logs', 'Vessel');
+      const oldLogDir = path.join(os.homedir(), 'Library', 'Logs', 'Ships');
+      if (!fs.existsSync(newLogDir) && fs.existsSync(oldLogDir)) {
+        fs.renameSync(oldLogDir, newLogDir);
+      }
+    }
+  } catch (err) {
+    /* best-effort：迁移失败不阻止应用启动 */
+  }
+})();
+
 const { createTray } = require('./tray');
 const wm = require('./window-manager');
 const { registerAppIpc } = require('./ipc/app-ipc');
@@ -22,7 +48,7 @@ const { registerBackupIpc } = require('./ipc/backup-ipc');
 const { installApplicationMenu } = require('./menu');
 const logger = require('./utils/logger');
 const { DATA_FILES } = require('./utils/paths');
-const { APP_NAME, VERSION, ships } = require('../shared/constants');
+const { APP_NAME, VERSION, appConfig } = require('../shared/constants');
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -33,7 +59,7 @@ if (!gotLock) {
 }
 
 function onReady() {
-  if (process.platform === 'darwin' && app.dock && !ships.showDockIcon) {
+  if (process.platform === 'darwin' && app.dock && !appConfig.showDockIcon) {
     app.dock.hide();
   }
 

@@ -2,12 +2,12 @@
 
 // Dev-only UI capture helper (not part of the packaged app).
 // Usage:
-//   OUT=/tmp/ships.png SETTINGS_OUT=/tmp/ships-settings.png \
+//   OUT=/tmp/vessel.png SETTINGS_OUT=/tmp/vessel-settings.png \
 //     node_modules/.bin/electron hack/capture.cjs
 const fs = require('fs');
 const { app, ipcMain } = require('electron');
 
-app.setName('ships');
+app.setName('vessel');
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -99,7 +99,7 @@ app.whenReady().then(async () => {
     `document.querySelector('.tab-active') && document.querySelector('.tab-active').dataset.tool;`
   );
   console.log('[capture] active:', activeTool);
-  fs.writeFileSync(process.env.OUT || '/tmp/ships.png', image.toPNG());
+  fs.writeFileSync(process.env.OUT || '/tmp/vessel.png', image.toPNG());
 
   if (process.env.SETTINGS_OUT) {
     const settingsWin = wm.openSettingsWindow();

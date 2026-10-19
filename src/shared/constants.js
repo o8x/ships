@@ -2,8 +2,8 @@
 
 const pkg = require('../../package.json');
 
-const APP_NAME = 'Ships';
-const ships = pkg.ships || {};
+const APP_NAME = 'Vessel';
+const appConfig = pkg.vessel || pkg.ships || {};
 
 const IPC = {
   SETTINGS_GET: 'settings:get',
@@ -144,7 +144,7 @@ const WINDOW = Object.assign(
     gapBelowTray: 2,
     cornerRadius: 10,
   },
-  ships.window || {}
+  appConfig.window || {}
 );
 
 const SETTINGS_WINDOW = Object.assign(
@@ -152,7 +152,7 @@ const SETTINGS_WINDOW = Object.assign(
     width: 800,
     height: 600,
   },
-  ships.settingsWindow || {}
+  appConfig.settingsWindow || {}
 );
 
 // 窗口模式（非悬浮）的主窗口：固定 640×480 的标准窗口（不可缩放），仅位置可拖动。
@@ -161,7 +161,7 @@ const MAIN_WINDOW = Object.assign(
     width: 640,
     height: 480,
   },
-  ships.mainWindow || {}
+  appConfig.mainWindow || {}
 );
 
 // Always-on-top terminal window (floats above full-screen apps, Steam-style).
@@ -179,7 +179,7 @@ const TERMINAL_WINDOW = Object.assign(
     ballIcon: 'ball.svg',
     ballDark: true,
   },
-  ships.terminalWindow || {}
+  appConfig.terminalWindow || {}
 );
 
 // Detached file-manager window (floats like the terminal window).
@@ -191,7 +191,7 @@ const FILE_WINDOW = Object.assign(
     minHeight: 320,
     alwaysOnTop: true,
   },
-  ships.fileWindow || {}
+  appConfig.fileWindow || {}
 );
 
 // 更新下载窗口：小、不可关闭、置顶的前台窗口（仅进度 / 取消 / 重启安装）。
@@ -200,7 +200,7 @@ const UPDATE_WINDOW = Object.assign(
     width: 380,
     height: 150,
   },
-  ships.updateWindow || {}
+  appConfig.updateWindow || {}
 );
 
 // 更新下载完成后自动重启安装的倒计时（秒）。
@@ -218,10 +218,10 @@ const CENTER_SNAP = {
 };
 
 // 日志保留天数（按天写文件，惰性删除更早的日志）。
-const LOG_RETENTION_DAYS = Number.isFinite(ships.logRetentionDays) ? ships.logRetentionDays : 7;
+const LOG_RETENTION_DAYS = Number.isFinite(appConfig.logRetentionDays) ? appConfig.logRetentionDays : 7;
 
 // 文件面板：每个 ssh 目标（用户名@主机）记录最近 cd 到的目录数（去重、越新越靠前）。
-const CD_HISTORY_MAX = Number.isFinite(ships.cdHistoryMax) ? ships.cdHistoryMax : 10;
+const CD_HISTORY_MAX = Number.isFinite(appConfig.cdHistoryMax) ? appConfig.cdHistoryMax : 10;
 
 // macOS only: NSVisualEffectMaterial used when the native frosted glass is on.
 // 'hud' gives the strongly see-through, low-opacity look of the system HUD
@@ -232,9 +232,9 @@ const VIBRANCY = {
 };
 
 const DEFAULT_SETTINGS = {
-  locale: ships.defaultLocale || 'zh',
-  theme: ships.defaultTheme || 'system',
-  accent: ships.defaultAccent || '#2e6bfc',
+  locale: appConfig.defaultLocale || 'zh',
+  theme: appConfig.defaultTheme || 'system',
+  accent: appConfig.defaultAccent || '#2e6bfc',
   launchAtLogin: false,
   // 主界面模式：false = 窗口模式（默认，居中标准窗口）；true = 悬浮模式（托盘下方弹出面板）。
   floatMode: false,
@@ -247,9 +247,9 @@ const DEFAULT_SETTINGS = {
   clipboardLimit: 3,
   clipboardPollMs: 1200,
   // terminal window / network test terminal
-  terminalShell: (ships.terminalWindow && ships.terminalWindow.shell) || '',
-  terminalFontSize: (ships.terminalWindow && ships.terminalWindow.fontSize) || 12,
-  terminalScrollback: (ships.terminalWindow && ships.terminalWindow.scrollback) || 10000,
+  terminalShell: (appConfig.terminalWindow && appConfig.terminalWindow.shell) || '',
+  terminalFontSize: (appConfig.terminalWindow && appConfig.terminalWindow.fontSize) || 12,
+  terminalScrollback: (appConfig.terminalWindow && appConfig.terminalWindow.scrollback) || 10000,
   terminalWindowWidth: TERMINAL_WINDOW.width,
   terminalWindowHeight: TERMINAL_WINDOW.height,
   terminalAlwaysOnTop: TERMINAL_WINDOW.alwaysOnTop !== false,
@@ -258,7 +258,7 @@ const DEFAULT_SETTINGS = {
   // 全局快捷键（Electron accelerator，空字符串 = 不注册）：主窗口双击 / 终端单击
   mainWindowHotkey: TERMINAL_WINDOW.hotkey || 'CommandOrControl+Shift+Z',
   terminalHotkey: TERMINAL_WINDOW.hotkey || 'CommandOrControl+Shift+Z',
-  sshBuiltinTerminal: ships.sshBuiltinTerminal !== false,
+  sshBuiltinTerminal: appConfig.sshBuiltinTerminal !== false,
   // 终端窗口失焦缩成「悬浮球」：是否开启 + 延迟（毫秒）+ 球尺寸（px，宽高强制 1:1）
   terminalBallEnabled: TERMINAL_WINDOW.ballEnabled !== false,
   terminalBallDelayMs: Number.isFinite(TERMINAL_WINDOW.ballDelayMs) ? TERMINAL_WINDOW.ballDelayMs : 50,
@@ -268,10 +268,10 @@ const DEFAULT_SETTINGS = {
   // 悬浮球底色是否为暗色（浅色/暗色底）；默认开，不跟随全局主题。图标始终保留原色。
   terminalBallDark: TERMINAL_WINDOW.ballDark !== false,
   // 内置终端文件面板：下载保存目录（默认 ~/Downloads）
-  sftpDownloadDir: ships.sftpDownloadDir || '~/Downloads',
+  sftpDownloadDir: appConfig.sftpDownloadDir || '~/Downloads',
   // 独立文件窗口置顶
   fileWindowAlwaysOnTop: FILE_WINDOW.alwaysOnTop !== false,
-  // 日志：日志文件保留天数（macOS 下日志写到 ~/Library/Logs/Ships，Console.app 的
+  // 日志：日志文件保留天数（macOS 下日志写到 ~/Library/Logs/Vessel，Console.app 的
   //「日志报告」会直接收录，无需再做统一日志同步）。
   logRetentionDays: LOG_RETENTION_DAYS,
 };
@@ -279,7 +279,7 @@ const DEFAULT_SETTINGS = {
 module.exports = {
   APP_NAME,
   VERSION: pkg.version,
-  ships,
+  appConfig,
   IPC,
   WINDOW,
   MAIN_WINDOW,

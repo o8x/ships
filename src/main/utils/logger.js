@@ -6,9 +6,9 @@ const { LOG_DIR, todayLogFile } = require('./paths');
 const { LOG_RETENTION_DAYS } = require('../../shared/constants');
 
 const DEBUG =
-  process.env.SHIPS_DEBUG === '1' || process.argv.includes('--debug');
+  process.env.VESSEL_DEBUG === '1' || process.env.SHIPS_DEBUG === '1' || process.argv.includes('--debug');
 
-// 日志保留天数（可由设置覆盖，默认来自 package.json 的 ships.logRetentionDays）。
+// 日志保留天数（可由设置覆盖，默认来自 package.json 的 vessel.logRetentionDays）。
 let retentionDays = LOG_RETENTION_DAYS;
 
 function stringify(value) {
@@ -21,7 +21,7 @@ function stringify(value) {
 }
 
 /* 惰性清理：每天首次写日志时删掉保留期之前的日志文件。
-   文件名形如 ships-YYYY-MM-DD.log，按文件名里的日期判断。 */
+   文件名形如 vessel-YYYY-MM-DD.log，按文件名里的日期判断。 */
 let lastPruneDay = '';
 function pruneOldLogs() {
   const now = new Date();
@@ -36,7 +36,7 @@ function pruneOldLogs() {
     return;
   }
   for (const name of entries) {
-    const match = /^ships-(\d{4})-(\d{2})-(\d{2})\.log$/.exec(name);
+    const match = /^(?:ships|vessel)-(\d{4})-(\d{2})-(\d{2})\.log$/.exec(name);
     if (!match) continue;
     const stamp = new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00`).getTime();
     if (Number.isFinite(stamp) && stamp < cutoff) {
@@ -64,23 +64,23 @@ function file(...args) {
 
 function debug(...args) {
   if (DEBUG) {
-    console.log('[ships][debug]', ...args);
+    console.log('[vessel][debug]', ...args);
     file('[debug]', ...args);
   }
 }
 
 function info(...args) {
-  console.log('[ships]', ...args);
+  console.log('[vessel]', ...args);
   file('[info]', ...args);
 }
 
 function warn(...args) {
-  console.warn('[ships][warn]', ...args);
+  console.warn('[vessel][warn]', ...args);
   file('[warn]', ...args);
 }
 
 function error(...args) {
-  console.error('[ships][error]', ...args);
+  console.error('[vessel][error]', ...args);
   file('[error]', ...args);
 }
 

@@ -1,6 +1,6 @@
-# Contributing to Ships
+# Contributing to Vessel
 
-Thanks for your interest in improving Ships! This is a small macOS menu bar app
+Thanks for your interest in improving Vessel! This is a small macOS menu bar app
 built with Electron + Tailwind CSS. Contributions of all kinds are welcome —
 bug reports, feature ideas, docs and code.
 
