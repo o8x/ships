@@ -1,7 +1,7 @@
 'use strict';
 
 const fs = require('fs');
-const { app, shell, BrowserWindow, dialog, clipboard, nativeImage } = require('electron');
+const { app, shell, BrowserWindow, dialog, clipboard, ClipboardItem } = require('electron');
 const os = require('os');
 const { IPC, VERSION, TERMINAL_WINDOW } = require('../../shared/constants');
 const logger = require('../utils/logger');
@@ -125,13 +125,16 @@ function registerAppIpc(ipcMain) {
   });
 
   // 把 PNG data URL 写进系统剪贴板（二维码工具「复制二维码」）。
-  ipcMain.handle(IPC.COPY_IMAGE, (_event, dataUrl) => {
+  // Electron 44 的 clipboard 使用 W3C 风格 async write(ClipboardItem[])，不再有 writeImage。
+  ipcMain.handle(IPC.COPY_IMAGE, async (_event, dataUrl) => {
     const value = String(dataUrl || '');
     if (!/^data:image\/png;base64,/.test(value)) return { ok: false, error: 'invalid' };
     try {
-      const image = nativeImage.createFromDataURL(value);
-      if (image.isEmpty()) return { ok: false, error: 'empty' };
-      clipboard.writeImage(image);
+      const buffer = Buffer.from(value.split(',')[1] || '', 'base64');
+      if (!buffer.length) return { ok: false, error: 'empty' };
+      await clipboard.write([
+        new ClipboardItem({ 'image/png': new Blob([buffer], { type: 'image/png' }) }),
+      ]);
     } catch (err) {
       return { ok: false, error: (err && err.message) || 'error' };
     }
