@@ -1,0 +1,15 @@
+#!/bin/bash
+set -u
+
+APP="/Applications/Ships.app"
+[ -d "$APP" ] || exit 0
+
+# The installer runs as root; launch the app inside the logged-in user's GUI session.
+CONSOLE_USER="$(/usr/bin/stat -f '%Su' /dev/console 2>/dev/null || true)"
+CONSOLE_UID="$(/usr/bin/stat -f '%u' /dev/console 2>/dev/null || true)"
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ] && [ "$CONSOLE_USER" != "loginwindow" ] && [ -n "$CONSOLE_UID" ]; then
+  /bin/launchctl asuser "$CONSOLE_UID" /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/open "$APP" >/dev/null 2>&1 || \
+    /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/open "$APP" >/dev/null 2>&1 || true
+fi
+
+exit 0

@@ -16,11 +16,11 @@
         progress: '{done} / {total}',
         speed: '{speed}/s',
         countdown: '{s} 秒后自动重启更新',
-        countdownDmg: '{s} 秒后自动退出并挂载安装包',
+        countdownPkg: '{s} 秒后自动退出并打开安装器',
         readyHint: '下载完成，可立即重启更新（或等待自动重启）',
         cancel: '取消',
         install: '重启更新',
-        installDmg: '退出并安装',
+        installPkg: '退出并安装',
       },
     },
     en: {
@@ -32,11 +32,11 @@
         progress: '{done} / {total}',
         speed: '{speed}/s',
         countdown: 'Restarting to update in {s}s',
-        countdownDmg: 'Opening the installer in {s}s',
+        countdownPkg: 'Opening the installer in {s}s',
         readyHint: 'Download complete. Restart now or wait for the auto restart',
         cancel: 'Cancel',
         install: 'Restart & update',
-        installDmg: 'Quit & install',
+        installPkg: 'Quit & install',
       },
     },
   });
@@ -80,7 +80,7 @@
 
   function statusText(state) {
     if (state.phase === 'downloaded') {
-      const key = state.mode === 'dmg' ? 'updateWin.countdownDmg' : 'updateWin.countdown';
+      const key = state.mode === 'pkg' ? 'updateWin.countdownPkg' : 'updateWin.countdown';
       return i18n.t(key, { s: Math.max(0, Number(state.countdown) || 0) });
     }
     const done = formatBytes(state.transferred);
@@ -93,8 +93,8 @@
   function render(state) {
     if (!state) return;
     const version = state.version ? ` v${state.version}` : '';
-    // macOS（dmg）= 退出并挂载安装包；Windows（auto）= 重启并安装。
-    dom.install.textContent = i18n.t(state.mode === 'dmg' ? 'updateWin.installDmg' : 'updateWin.install');
+    // macOS（pkg）= 退出并打开系统安装器；Windows（auto）= 重启并安装。
+    dom.install.textContent = i18n.t(state.mode === 'pkg' ? 'updateWin.installPkg' : 'updateWin.install');
     // 重启进行中（点了安装按钮或倒计时到 0）：取消按钮一并禁用。
     const restarting = state.restarting === true;
     dom.cancel.disabled = restarting;

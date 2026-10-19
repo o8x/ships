@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the macOS arm64 DMG.
+# Build the macOS arm64 PKG installer (postinstall launches the app).
 #
 # Signing:
 #   - Formal signing (CSC_LINK / APPLE_ID / CSC_NAME) -> electron-builder signs
@@ -10,6 +10,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+rm -rf release
 pnpm run build:css
 
 if [ -n "${CSC_LINK:-}${APPLE_ID:-}${CSC_NAME:-}" ]; then

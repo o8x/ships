@@ -20,7 +20,7 @@ pnpm run dev        # launch without rebuilding the CSS
 pnpm run watch:css  # rebuild the Tailwind output on change
 ```
 
-Packaging (macOS arm64 DMG):
+Packaging (macOS arm64 PKG installer; postinstall launches the app):
 
 ```bash
 pnpm dist:mac
@@ -51,4 +51,4 @@ Version bumps use the fixed message `Bump vX.Y.Z`.
 
 Maintainers update the version (semantic versioning), commit it as
 `Bump vX.Y.Z`, tag it `vX.Y.Z`, and push. The macOS build workflow publishes the
-DMG to the GitHub release for that tag.
+PKG installer to the GitHub release for that tag.

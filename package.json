@@ -81,7 +81,11 @@
     },
     "defaultLocale": "zh",
     "defaultTheme": "system",
-    "defaultAccent": "#2e6bfc"
+    "defaultAccent": "#2e6bfc",
+    "updateRepo": {
+      "owner": "o8x",
+      "repo": "ships"
+    }
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -123,7 +127,7 @@
     "mac": {
       "target": [
         {
-          "target": "dmg",
+          "target": "pkg",
           "arch": [
             "arm64"
           ]
@@ -139,10 +143,17 @@
       },
       "artifactName": "${productName}-v${version}-${arch}.${ext}"
     },
-    "dmg": {
-      "sign": true,
-      "artifactName": "${productName}-v${version}-${arch}.${ext}",
-      "title": "${productName} v${version}"
+    "pkg": {
+      "scripts": "../scripts/pkg-scripts",
+      "installLocation": "/Applications",
+      "allowAnywhere": false,
+      "allowCurrentUserHome": false,
+      "allowRootDirectory": true,
+      "isRelocatable": false,
+      "mustClose": [
+        "Ships"
+      ],
+      "artifactName": "${productName}-v${version}-${arch}.${ext}"
     }
   }
 }
