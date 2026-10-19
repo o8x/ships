@@ -1144,6 +1144,7 @@ function openTerminalWindow() {
     win.__everFocused = true;
     lastTerminalWindow = win;
     clearBallTimer(win); // 延迟内焦点回来 → 取消缩球
+    win.webContents.send(IPC.TERMINAL_FOCUS_INPUT);
     // 窗口此刻就在活动桌面上 → 用「先 true 再 false」把它**明确绑定到本桌面**
     // （只置 false 有时仍是 MoveToActiveSpace 行为，切桌面时会被拉到新桌面；先 true 再 false
     // 会重置为默认的「固定在本桌面」）。之后变球时不再动它，避免球跟着切换桌面。
@@ -1175,6 +1176,7 @@ function openTerminalWindow() {
   win.once('ready-to-show', () => {
     win.show();
     win.focus();
+    win.webContents.send(IPC.TERMINAL_FOCUS_INPUT);
   });
   // 关闭按钮 / Cmd-W：按「关闭按钮行为」隐藏或销毁；隐藏时窗口还活着（会话保留），
   // 会话结束（exit）与 iTerm 交接走 destroyTerminalWindow()，不受这里拦截。

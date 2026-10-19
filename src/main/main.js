@@ -46,6 +46,7 @@ const { registerFileWindowIpc } = require('./ipc/file-window-ipc');
 const { registerUpdateIpc } = require('./ipc/update-ipc');
 const { registerBackupIpc } = require('./ipc/backup-ipc');
 const { installApplicationMenu } = require('./menu');
+const { requestLocalNetworkAccess } = require('./services/local-network-service');
 const logger = require('./utils/logger');
 const { DATA_FILES } = require('./utils/paths');
 const { APP_NAME, VERSION, appConfig } = require('../shared/constants');
@@ -93,6 +94,8 @@ function onReady() {
   wm.setTray(tray);
 
   printStartupInfo();
+  // 提前触发 macOS「本地网络」授权（macOS 15+ 首次访问局域网时才会弹窗）。
+  requestLocalNetworkAccess();
 }
 
 function printStartupInfo() {

@@ -75,6 +75,7 @@ const api = {
     onRecalibrate: (cb) => on(IPC.TERMINAL_RECALIBRATE, cb),
     onDragActive: (cb) => on(IPC.TERMINAL_DRAG_ACTIVE, cb),
     onZoom: (cb) => on(IPC.TERMINAL_ZOOM, cb),
+    onFocusInput: (cb) => on(IPC.TERMINAL_FOCUS_INPUT, cb),
     onData: (cb) => on(IPC.TERMINAL_DATA, cb),
     onExit: (cb) => on(IPC.TERMINAL_EXIT, cb),
     onSession: (cb) => on(IPC.TERMINAL_SESSION, cb),

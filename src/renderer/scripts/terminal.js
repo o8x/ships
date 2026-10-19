@@ -523,6 +523,9 @@
       theme: themeColors(),
     });
     term.open(host);
+    requestAnimationFrame(() => {
+      if (term) term.focus();
+    });
     if (window.FitAddon && window.FitAddon.FitAddon) {
       fit = new window.FitAddon.FitAddon();
       term.loadAddon(fit);
@@ -543,6 +546,9 @@
     term.onScroll(() => scheduleGutter());
     if (typeof term.onRender === 'function') term.onRender(() => scheduleGutter());
     startSession();
+    setTimeout(() => {
+      if (term) term.focus();
+    }, 0);
   }
 
   const offData = window.ships.terminal.onData((message) => {
@@ -573,6 +579,9 @@
   });
 
   const offZoom = window.ships.terminal.onZoom((direction) => zoomFont(direction));
+  const offFocusInput = window.ships.terminal.onFocusInput(() => {
+    if (term && !ballMode) term.focus();
+  });
   // 拖动结束后主进程请我们重新测量一次（拖动期间不允许改窗口尺寸）→ 重新 fit 并按实测余量对齐
   // 拖动结束（主进程在拖拽空闲后发）：清除「拖动中」标记再重新测量 + 按整格对齐，
   // 这样即便鼠标不再移动、行数也没变化，松手后也会收回到 lineHeight×rows（宽度同理）。
@@ -642,7 +651,10 @@
   lightMinimize.classList.add('traffic-disabled');
   lightMinimize.setAttribute('aria-disabled', 'true');
   lightZoom.addEventListener('click', () => window.ships.windowControl('zoom'));
-  window.addEventListener('focus', syncWindowFocus);
+  window.addEventListener('focus', () => {
+    syncWindowFocus();
+    if (term && !ballMode) term.focus();
+  });
   window.addEventListener('blur', syncWindowFocus);
   window.addEventListener('resize', onWindowResize);
   syncWindowFocus();

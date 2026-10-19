@@ -78,6 +78,7 @@ const IPC = {
   TERMINAL_RECALIBRATE: 'terminal:recalibrate',
   TERMINAL_DRAG_ACTIVE: 'terminal:drag-active',
   TERMINAL_ZOOM: 'terminal:zoom',
+  TERMINAL_FOCUS_INPUT: 'terminal:focus-input',
   TERMINAL_DATA: 'terminal:data',
   TERMINAL_EXIT: 'terminal:exit',
   TERMINAL_SESSION: 'terminal:session',
