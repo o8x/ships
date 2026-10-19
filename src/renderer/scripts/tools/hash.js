@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerHashTool() {
-  const { el, section, inputField, resultRow, segmented, debounce, Icons } = window.ShipsUI;
+  const { el, section, resultRow, segmented, debounce, Icons } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -55,8 +55,9 @@
         if (value === 'string') {
           if (textarea.value) computeText();
         } else {
-          fileLabel.textContent = i18n.t('hash.noFile');
-          chooseBtn.querySelector('.choose-label').textContent = i18n.t('hash.chooseFile');
+          chooseLabel.textContent = i18n.t('hash.chooseFile');
+          chooseHint.classList.add('hidden');
+          chooseBtn.removeAttribute('data-tip');
           delete textarea.dataset.file;
         }
       }
@@ -64,23 +65,35 @@
 
     // String panel
     const textarea = el('textarea', {
-      class: 'field font-mono',
-      rows: 3,
+      class: 'field h-full w-full resize-none font-mono',
       spellcheck: 'false',
       placeholder: i18n.t('hash.placeholder'),
     });
-    const stringPanel = el('div', { class: 'mb-2.5 flex flex-col gap-2.5' });
-    stringPanel.appendChild(inputField(null, textarea));
+    // 字符串 / 文件两种模式共用同一高度（--hash-source-height），切换时结果区不跳动。
+    const stringPanel = el('div', {
+      class: 'mb-card flex flex-col',
+      style: 'height: var(--hash-source-height)',
+    });
+    stringPanel.appendChild(textarea);
 
-    // File panel
-    const filePanel = el('div', { class: 'mb-2.5 flex flex-col gap-2.5 hidden' });
-    const fileLabel = el('div', { class: 'truncate text-[12px] text-fg-muted' }, i18n.t('hash.noFile'));
-    const chooseBtn = el('button', { class: 'btn', type: 'button' });
+    // File panel：整块即按钮，提示 / 文件名在同一行居中；不再额外占一行。
+    const filePanel = el('div', {
+      class: 'mb-card hidden flex-col',
+      style: 'height: var(--hash-source-height)',
+    });
+    const chooseLabel = el('span', { class: 'choose-label min-w-0 truncate' }, i18n.t('hash.chooseFile'));
+    const chooseHint = el('span', { class: 'hidden shrink-0 text-[11px] text-fg-muted' }, i18n.t('hash.changeFile'));
+    const chooseBtn = el('button', {
+      class:
+        'flex h-full w-full items-center justify-center gap-2 rounded-control border border-dashed border-border bg-control px-3 text-[12px] text-fg transition-colors hover:border-accent-line hover:text-accent',
+      type: 'button',
+    });
     chooseBtn.append(
-      el('span', { class: 'inline-flex' }, Icons.folder(14)),
-      el('span', { class: 'choose-label' }, i18n.t('hash.chooseFile'))
+      el('span', { class: 'inline-flex shrink-0' }, Icons.folder(14)),
+      chooseLabel,
+      chooseHint
     );
-    filePanel.append(chooseBtn, fileLabel);
+    filePanel.appendChild(chooseBtn);
 
     const rows = {
       md5: resultRow('MD5'),
@@ -113,16 +126,16 @@
       const info = await window.ships.openFile();
       if (!info) return;
       textarea.dataset.file = info.path;
-      fileLabel.textContent = `${info.name} · ${formatSize(info.size)}`;
-      chooseBtn.querySelector('.choose-label').textContent = i18n.t('hash.changeFile');
+      chooseHint.classList.remove('hidden');
+      chooseBtn.setAttribute('data-tip', i18n.t('hash.changeFile'));
       setHashes(null);
-      fileLabel.textContent = `${info.name} · ${formatSize(info.size)} · ${i18n.t('hash.hashing')}`;
+      chooseLabel.textContent = `${info.name} · ${formatSize(info.size)} · ${i18n.t('hash.hashing')}`;
       const result = await window.ships.hashFile(info.path);
       if (result && result.ok) {
-        fileLabel.textContent = `${result.info.name} · ${formatSize(result.info.size)}`;
+        chooseLabel.textContent = `${result.info.name} · ${formatSize(result.info.size)}`;
         setHashes(result.hashes);
       } else {
-        fileLabel.textContent = `${info.name} · ${i18n.t('hash.failed')}`;
+        chooseLabel.textContent = `${info.name} · ${i18n.t('hash.failed')}`;
         setHashes(null);
       }
     }

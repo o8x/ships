@@ -8,7 +8,6 @@ const { IPC, DEFAULT_SETTINGS } = require('../../shared/constants');
 const terminal = require('../services/terminal-service');
 const settings = require('../services/settings-service');
 const iterm = require('../services/iterm-service');
-const hotkey = require('../services/hotkey-service');
 const wm = require('../window-manager');
 const logger = require('../utils/logger');
 
@@ -20,7 +19,6 @@ const TERMINAL_SETTING_KEYS = [
   'terminalWindowWidth',
   'terminalWindowHeight',
   'terminalAlwaysOnTop',
-  'terminalHotkey',
   'terminalCloseAction',
   'sshBuiltinTerminal',
   'sftpDownloadDir',
@@ -89,7 +87,6 @@ function runInTerminal(command, secret) {
 }
 
 function registerTerminalIpc(ipcMain) {
-  hotkey.init();
   ipcMain.handle(IPC.TERMINAL_OPEN, () => ({ ok: Boolean(wm.openTerminalWindow()) }));
 
   ipcMain.handle(IPC.TERMINAL_START, (event, payload) => {
@@ -151,16 +148,6 @@ function registerTerminalIpc(ipcMain) {
   ipcMain.handle(IPC.TERMINAL_ENSURE_SIZE, (event, payload) => {
     if (!isOverlaySender(event)) return { ok: false };
     return wm.ensureTerminalContentSize(wm.getTerminalWindowForWebContents(event.sender.id), payload || {});
-  });
-
-  /* 全局快捷键：先试注册，成功了才写设置 —— 否则会存下一个按不出来（被占用 / 非法）的组合键。
-     写设置后 hotkey-service 的 settings 监听会再 apply 一次，同值直接返回。 */
-  ipcMain.handle(IPC.TERMINAL_SET_HOTKEY, (_event, payload) => {
-    const wanted = String((payload && payload.hotkey) || '').trim();
-    const result = hotkey.apply(wanted);
-    if (!result.ok) return result;
-    settings.set({ terminalHotkey: result.hotkey });
-    return { ok: true, hotkey: result.hotkey };
   });
 
   /* 重置：终端相关设置回到默认值（写设置即可让开着的终端窗口跟着变），并清掉记住的

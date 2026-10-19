@@ -264,15 +264,17 @@
 
   function mount(container) {
     const nowSection = section(i18n.t('timestamp.now'));
-    const bigTime = el('div', { class: 'font-mono text-[22px] font-semibold text-fg' }, '--:--:--');
-    const tzLine = el('div', { class: 'text-[11px] text-fg-muted' }, '');
+    const bigTime = el('div', { class: 'shrink-0 font-mono text-[22px] font-semibold text-fg' }, '--:--:--');
+    const tzLine = el('div', { class: 'min-w-0 truncate text-[11px] text-fg-muted' }, '');
+    const nowRow = el('div', { class: 'flex min-w-0 items-baseline gap-x-2' });
+    nowRow.append(bigTime, tzLine);
 
     const nowRows = {
       s: resultRow(i18n.t('timestamp.seconds')),
       ms: resultRow(i18n.t('timestamp.milliseconds')),
       ns: resultRow(i18n.t('timestamp.nanoseconds')),
     };
-    nowSection.append(bigTime, tzLine, nowRows.s.root, nowRows.ms.root, nowRows.ns.root);
+    nowSection.append(nowRow, nowRows.s.root, nowRows.ms.root, nowRows.ns.root);
 
     const toDateSection = section(i18n.t('timestamp.toDate'));
     const tsField = field(i18n.t('timestamp.timestamp'), {

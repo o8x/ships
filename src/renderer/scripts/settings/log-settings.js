@@ -88,10 +88,5 @@
     pane.append(logsSection);
   }
 
-  window.ShipsSettingsRegistry.register({
-    id: 'logs',
-    icon: 'doc',
-    labelKey: 'settingsPage.logs',
-    mount,
-  });
+  window.ShipsLogSettings = { mount };
 })();

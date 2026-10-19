@@ -638,40 +638,51 @@ function isWindowMode() {
   return !isFloatMode();
 }
 
-let mainWindowState = readJson(MAIN_WINDOW_FILE, null);
-let mainWindowGeometryTimer = null;
-
 // 窗口模式固定 640×480（不可缩放）。
 function mainWindowSize() {
   return { width: MAIN_WINDOW.width, height: MAIN_WINDOW.height };
 }
 
-/* 尺寸固定；**只记位置、不记桌面**：有位置记忆就沿用它（夹回当前屏幕工作区），
-   否则在当前屏幕（鼠标所在）居中。每次都在**当前桌面 / 当前屏幕**显示。 */
-function mainWindowBoundsForOpen() {
-  const size = mainWindowSize();
-  const display = anchorDisplay();
-  const saved = mainWindowState && mainWindowState.bounds ? mainWindowState.bounds : null;
-  const position = saved ? { x: saved.x, y: saved.y } : null;
-  return clampBounds(position, display, size, size);
+// 只持久化位置：{ x, y }（兼容旧版 { bounds: { x, y, width, height } }）。
+let mainWindowState = readJson(MAIN_WINDOW_FILE, null);
+let mainWindowGeometryTimer = null;
+
+function savedMainWindowPosition() {
+  if (!mainWindowState || typeof mainWindowState !== 'object') return null;
+  const source =
+    mainWindowState.bounds && typeof mainWindowState.bounds === 'object'
+      ? mainWindowState.bounds
+      : mainWindowState;
+  const x = Number(source.x);
+  const y = Number(source.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x: Math.trunc(x), y: Math.trunc(y) };
 }
 
-function saveMainWindowGeometry() {
+/* 只应用位置；屏幕 / 桌面不记忆 —— 在当前鼠标所在屏幕的工作区内夹取，
+   显示时再通过「先加入所有桌面、后固定当前桌面」避免被拉回旧桌面。 */
+function mainWindowBoundsForOpen() {
+  const size = mainWindowSize();
+  const position = savedMainWindowPosition();
+  return clampBounds(position, anchorDisplay(), size, size);
+}
+
+function saveMainWindowPosition() {
   if (!isWindowMode()) return;
   const win = getMainWindow();
   if (!win || win.isDestroyed() || win.isMinimized() || win.isFullScreen()) return;
   const b = win.getBounds();
-  const next = { bounds: { x: b.x, y: b.y, width: b.width, height: b.height } };
+  const next = { x: b.x, y: b.y };
   if (JSON.stringify(next) === JSON.stringify(mainWindowState)) return;
   mainWindowState = next;
   writeJson(MAIN_WINDOW_FILE, mainWindowState);
 }
 
-function scheduleMainWindowGeometrySave() {
+function scheduleMainWindowPositionSave() {
   if (mainWindowGeometryTimer) clearTimeout(mainWindowGeometryTimer);
   mainWindowGeometryTimer = setTimeout(() => {
     mainWindowGeometryTimer = null;
-    saveMainWindowGeometry();
+    saveMainWindowPosition();
   }, 400);
 }
 
@@ -688,12 +699,13 @@ function forgetMainWindowGeometry() {
   }
 }
 
-/* 拖动窗口时，窗口纵向中心与屏幕（工作区）纵向中心对齐就轻微「卡」一下（磁性吸附，带滞回）：
-   进入阈值内吸附到正中、拖动超过释放阈值才脱开。用于终端窗口与窗口模式的主窗口，
-   仅改 y 坐标（不动尺寸），作为对齐屏幕纵向中线的简单提示。 */
-const vCenterSnapped = new WeakMap();
+/* 拖动窗口时，窗口中心与屏幕（工作区）的**垂直中线**（x 方向）对齐就轻微「卡」一下
+   （磁性吸附，带滞回）：进入阈值内吸附到正中、拖动超过释放阈值才脱开。
+   用于终端窗口与窗口模式的主窗口，仅改 x 坐标（不动尺寸、也不要求上下居中），
+   左右拖动时即可感知。 */
+const xCenterSnapped = new WeakMap();
 
-function maybeSnapVerticalCenter(win) {
+function maybeSnapHorizontalCenter(win) {
   if (!win || win.isDestroyed() || win.isMinimized() || win.isFullScreen()) return;
   if (win.__ballActive) return; // 终端悬浮球模式：不参与
   const bounds = win.getBounds();
@@ -703,22 +715,22 @@ function maybeSnapVerticalCenter(win) {
   } catch (err) {
     return;
   }
-  const centeredY = Math.round(area.y + (area.height - bounds.height) / 2);
-  const diff = bounds.y + bounds.height / 2 - (area.y + area.height / 2);
+  const centeredX = Math.round(area.x + (area.width - bounds.width) / 2);
+  const diff = bounds.x + bounds.width / 2 - (area.x + area.width / 2);
   const abs = Math.abs(diff);
-  const snapped = vCenterSnapped.get(win) === true;
+  const snapped = xCenterSnapped.get(win) === true;
 
   if (snapped) {
-    if (abs > CENTER_SNAP.vRelease) {
-      vCenterSnapped.set(win, false);
+    if (abs > CENTER_SNAP.xRelease) {
+      xCenterSnapped.set(win, false);
       return;
     }
-    if (bounds.y !== centeredY) win.setPosition(bounds.x, centeredY, false);
+    if (bounds.x !== centeredX) win.setPosition(centeredX, bounds.y, false);
     return;
   }
-  if (abs <= CENTER_SNAP.vThreshold && bounds.y !== centeredY) {
-    vCenterSnapped.set(win, true);
-    win.setPosition(bounds.x, centeredY, false);
+  if (abs <= CENTER_SNAP.xThreshold && bounds.x !== centeredX) {
+    xCenterSnapped.set(win, true);
+    win.setPosition(centeredX, bounds.y, false);
   }
 }
 
@@ -837,7 +849,8 @@ function createWindowWindow() {
     },
   });
 
-  // 置顶到 screen-saver 层级（可浮在全屏应用之上）+ 固定在自己的桌面（不加入所有桌面）。
+  // 置顶到 screen-saver 层级（可浮在全屏应用之上）；先按单桌面窗口创建，
+  // 显示时再「临时加入所有桌面 → 绑定当前桌面」，避免被拉回旧 Space。
   mainWindow.setAlwaysOnTop(true, 'screen-saver');
   mainWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
   mainWindow.loadFile(path.join(RENDERER_DIR, 'index.html'));
@@ -853,22 +866,15 @@ function createWindowWindow() {
     const win = mainWindow;
     win.webContents.once('did-finish-load', () => applyLiquidGlass(win));
   }
-  // 获得焦点时重申「固定在自己的桌面」（此刻窗口就在活动桌面，与终端窗口一致）。
-  mainWindow.on('focus', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
-    }
-  });
-  mainWindow.on('resize', scheduleMainWindowGeometrySave);
   mainWindow.on('move', () => {
-    maybeSnapVerticalCenter(mainWindow);
-    scheduleMainWindowGeometrySave();
+    maybeSnapHorizontalCenter(mainWindow);
+    scheduleMainWindowPositionSave();
   });
   // 关闭按钮 = 隐藏（应用常驻托盘）；退出应用时才真正关闭。
   mainWindow.on('close', (event) => {
     if (isQuitting) return;
     event.preventDefault();
-    saveMainWindowGeometry();
+    saveMainWindowPosition();
     mainWindow.hide();
   });
   mainWindow.on('closed', function onClosed() {
@@ -911,25 +917,24 @@ function showMainWindow() {
   // Menu bar app: only open from the tray (ignore launch-time activation).
   if (!trayRef) return;
   if (isWindowMode()) {
-    // 窗口模式：显示并聚焦；若它在别的桌面，聚焦 / 激活会让系统切到它所在的桌面。
-    if (process.platform === 'darwin' && typeof app.focus === 'function') {
-      try {
-        app.focus({ steal: true });
-      } catch (err) {
-        /* ignore */
-      }
-    }
     const win = getMainWindow() || createMainWindow();
     if (win.isMinimized && win.isMinimized()) win.restore();
-    // 每次显示都放到**当前鼠标所在屏幕**（沿用记忆位置并夹回；无记忆则居中）。
-    win.setBounds(mainWindowBoundsForOpen(), false);
-    // 带到**当前桌面 / 空间**（与独立文件窗口同一技巧：先加入所有桌面再固定回当前桌面）。
+    // 显示前先临时加入所有桌面，让窗口能在当前 Space 直接浮出；show / focus 后
+    // 立刻绑定回当前桌面。之后切换桌面时窗口留在原桌面；再次从其它桌面打开
+    // （隐藏状态）时又会先展开到当前桌面，因此不会被拉回旧桌面。
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-    win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
+    // 每次都放到当前鼠标所在屏幕（沿用保存的位置并夹回工作区；无记录则居中）。
+    win.setBounds(mainWindowBoundsForOpen(), false);
     win.setAlwaysOnTop(true, 'screen-saver');
     win.show();
     win.focus();
+    // 不用 app.focus({ steal: true })：它会激活应用并可能把系统切回窗口原来的 Space。
     if (typeof win.moveTop === 'function') win.moveTop();
+    // 等窗口真正在当前 Space 上显示后再撤销「所有桌面」，把它绑定到当前桌面。
+    setTimeout(() => {
+      if (win.isDestroyed()) return;
+      win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
+    }, 60);
     return;
   }
   const win = getMainWindow() || createMainWindow();
@@ -1160,7 +1165,7 @@ function openTerminalWindow() {
   });
   win.on('resize', () => scheduleTerminalGeometrySave(win));
   win.on('move', () => {
-    maybeSnapVerticalCenter(win);
+    maybeSnapHorizontalCenter(win);
     scheduleTerminalGeometrySave(win);
   });
   // 只用来标记「正在拖动」：不拦截、不改尺寸，松手后再执行挂起的对齐请求

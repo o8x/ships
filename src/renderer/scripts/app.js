@@ -10,6 +10,7 @@
     brand: document.getElementById('brand'),
     brandName: document.getElementById('brand-name'),
     content: document.getElementById('content'),
+    headerHost: document.getElementById('tool-head-host'),
     version: document.getElementById('footer-version'),
     dev: document.getElementById('footer-dev'),
     terminal: document.getElementById('btn-terminal'),
@@ -42,7 +43,10 @@
     }
     state.cleanup = null;
     dom.content.innerHTML = '';
+    dom.headerHost.innerHTML = '';
+    dom.headerHost.classList.remove('is-compact');
     const tool = registry.get(id);
+    dom.content.classList.toggle('tool-fill', Boolean(tool && tool.fill === true));
     if (!tool) {
       dom.content.innerHTML = emptyState(i18n.t('emptyTools'));
       return;
@@ -51,7 +55,7 @@
     const header = el('div', { class: 'tool-head' });
     header.appendChild(el('h1', { class: 'tool-head-title' }, i18n.t(`tools.${id}`)));
     header.appendChild(el('div', { class: 'tool-head-desc' }, i18n.t(`toolDesc.${id}`)));
-    dom.content.appendChild(header);
+    dom.headerHost.appendChild(header);
 
     const body = el('div', { class: 'tool-body' });
     dom.content.appendChild(body);
@@ -65,7 +69,64 @@
     }
 
     dom.content.scrollTop = 0;
+    updateHeaderCompact();
   }
+
+  /* 工具标题固定在内容区上方；内容滚动后标题缩小、说明并到同一行。 */
+  let headerCompact = false;
+  let headerScrollFrame = 0;
+
+  function setHeaderCompact(compact) {
+    if (compact === headerCompact) return;
+    headerCompact = compact;
+    dom.headerHost.classList.toggle('is-compact', compact);
+  }
+
+  function updateHeaderCompact(scrolled) {
+    const compact = typeof scrolled === 'boolean' ? scrolled : dom.content.scrollTop > 0.5;
+    setHeaderCompact(compact);
+  }
+
+  function onContentScroll(event) {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target !== dom.content && !dom.content.contains(target)) return;
+    if (headerScrollFrame) return;
+    headerScrollFrame = requestAnimationFrame(() => {
+      headerScrollFrame = 0;
+      updateHeaderCompact(target.scrollTop > 0.5);
+    });
+  }
+
+  document.addEventListener('scroll', onContentScroll, true);
+
+  /* 内容在最顶部时，第一次滚轮先把标题收起（内容保持不动），之后才滚动内容；
+     回到顶部后向上滚则先展开标题。标题始终独占一行，内容不会滚到它下面。 */
+  function nearestScroller(node) {
+    let el = node instanceof Element ? node : null;
+    while (el) {
+      if (el === dom.content) return el;
+      const style = getComputedStyle(el);
+      if (/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight) return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  function onContentWheel(event) {
+    if (!event.deltaY || Math.abs(event.deltaY) < 0.5) return;
+    if (nearestScroller(event.target) !== dom.content) return;
+    if (dom.content.scrollTop > 0) return;
+    if (event.deltaY > 0 && !headerCompact) {
+      event.preventDefault();
+      setHeaderCompact(true);
+    } else if (event.deltaY < 0 && headerCompact) {
+      event.preventDefault();
+      setHeaderCompact(false);
+    }
+  }
+
+  dom.content.addEventListener('wheel', onContentWheel, { passive: false });
 
   function setActive(id) {
     state.activeId = id;

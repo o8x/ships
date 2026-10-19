@@ -17,6 +17,22 @@
     cursor: default;
   }
 
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.015em;
+  }
+
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-accent-fg);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent-line);
+    outline-offset: 2px;
+  }
+
   input,
   textarea,
   select {
@@ -50,12 +66,15 @@
 
 @layer components {
   .field {
-    @apply w-full rounded-control border border-border bg-surface-2 px-3 py-2 text-fg;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    @apply w-full rounded-control border border-border bg-control px-3 py-2 text-fg;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  }
+  .field:hover:not(:disabled) {
+    border-color: var(--color-border-strong);
   }
   .field:focus {
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+    box-shadow: var(--focus-ring);
   }
   .field:disabled {
     opacity: 0.45;
@@ -66,11 +85,14 @@
   }
   .btn {
     @apply inline-flex items-center justify-center gap-1 rounded-control border border-border
-      bg-surface-2 px-3 py-1.5 text-fg;
-    transition: background 0.15s ease, opacity 0.15s ease;
+      bg-control px-3 py-1.5 text-fg;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+      opacity 0.15s ease;
   }
   .btn:hover {
     background: var(--color-surface-3);
+    border-color: var(--color-accent-line);
+    color: var(--color-accent);
   }
   .btn:disabled {
     opacity: 0.5;
@@ -79,33 +101,67 @@
   /* 仅普通按钮在禁用悬浮时回退底色；强调按钮保持自身底色（否则会变成近白的 surface-2）。 */
   .btn:not(.btn-accent):disabled:hover {
     background: var(--color-surface-2);
+    border-color: var(--color-border);
+    color: var(--color-fg);
   }
   .btn-accent {
     background: var(--color-accent);
     border-color: transparent;
     color: var(--color-accent-fg);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--color-accent) 35%, transparent);
   }
   .btn-accent:hover {
-    background: var(--color-accent);
-    opacity: 0.9;
+    background: color-mix(in srgb, var(--color-accent) 88%, #000000);
+    border-color: transparent;
+    color: var(--color-accent-fg);
+    opacity: 1;
+  }
+  .btn-danger {
+    border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+    color: var(--color-danger);
+  }
+  .btn-danger:hover {
+    background: color-mix(in srgb, var(--color-danger) 10%, var(--color-surface-2));
+    border-color: var(--color-danger);
+    color: var(--color-danger);
   }
   .icon-btn {
     @apply inline-flex items-center justify-center rounded-control text-fg-muted;
     transition: background 0.15s ease, color 0.15s ease;
   }
   .icon-btn:hover {
-    background: var(--color-surface-2);
-    color: var(--color-fg);
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+  .icon-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .icon-btn:disabled:hover {
+    background: transparent;
+    color: var(--color-fg-muted);
   }
   .row-card {
     @apply flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-2;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .row-card:hover {
+    border-color: var(--color-accent-line);
+  }
+  .row-card:focus-within {
+    border-color: var(--color-accent);
+    box-shadow: var(--focus-ring);
   }
   /* SSH 分组手风琴（设置 · SSH 管理、主界面 SSH 管理）。默认全部展开。 */
   .accordion {
-    @apply flex flex-col gap-2.5;
+    @apply flex flex-col gap-card;
   }
   .accordion-item {
     @apply overflow-hidden rounded-card border border-border bg-surface;
+    transition: border-color 0.15s ease;
+  }
+  .accordion-item:hover {
+    border-color: var(--color-accent-line);
   }
   .accordion-header {
     display: flex;
@@ -156,7 +212,7 @@
     display: none;
   }
   .tab {
-    @apply icon-btn h-9 w-9;
+    @apply icon-btn relative h-9 w-9 rounded-control-sm;
   }
   .tab:focus,
   .tab:focus-visible {
@@ -165,10 +221,32 @@
   .tab-active,
   .tab-active:hover {
     color: var(--color-accent);
-    background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+    background: var(--color-accent-soft);
+    box-shadow: inset 0 0 0 1px var(--color-accent-line);
+  }
+  .tab-active::after {
+    content: '';
+    position: absolute;
+    left: 28%;
+    right: 28%;
+    bottom: 3px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--color-accent);
   }
   .tool-title {
-    @apply text-[15px] font-semibold tracking-tight text-fg;
+    @apply relative text-[12px] font-semibold tracking-tight text-fg;
+    padding-left: 10px;
+  }
+  .tool-title::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 2px;
+    bottom: 2px;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--color-accent);
   }
   .tool-label {
     @apply mb-1 block text-[11px] font-medium text-fg-muted;
@@ -177,7 +255,12 @@
     @apply font-mono text-[14px] break-all text-fg;
   }
   .chip {
-    @apply inline-flex items-center gap-1 rounded-pill border border-border bg-surface-2 px-2 py-0.5 text-[11px] text-fg-muted;
+    @apply inline-flex items-center gap-1 rounded-pill border border-border bg-control px-2 py-0.5 text-[11px] text-fg-muted;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  }
+  .chip:hover {
+    border-color: var(--color-accent-line);
+    color: var(--color-accent);
   }
 }
 
@@ -258,15 +341,16 @@
   color: var(--color-fg);
 }
 .settings-nav-item.active {
-  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  background: var(--color-accent-soft);
   color: var(--color-accent);
 }
 .segment {
   display: inline-flex;
+  align-self: flex-start;
   padding: 2px;
   border-radius: var(--radius-control);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-control);
 }
 .segment button {
   border: none;
@@ -278,9 +362,9 @@
   cursor: pointer;
 }
 .segment button.active {
-  background: var(--color-surface);
-  color: var(--color-fg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent-line);
 }
 .segment button:disabled {
   opacity: 0.4;
@@ -341,9 +425,10 @@
   height: 22px;
   border-radius: 999px;
   border: none;
-  background: var(--color-surface-3);
+  background: var(--color-control);
+  box-shadow: inset 0 0 0 1px var(--color-border);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
   flex-shrink: 0;
 }
 .switch::after {
@@ -360,6 +445,7 @@
 }
 .switch.on {
   background: var(--color-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 55%, transparent);
 }
 .switch.on::after {
   transform: translateX(16px);
@@ -373,7 +459,8 @@
   padding: 0;
 }
 .swatch.active {
-  border-color: var(--color-fg);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-soft-2);
 }
 input[type='color'].swatch {
   -webkit-appearance: none;
@@ -398,7 +485,7 @@ input[type='color'].swatch::-webkit-color-swatch {
   padding: 0 10px;
   border-radius: var(--radius-control);
   border: 1px solid var(--color-border);
-  background: var(--color-surface-2);
+  background: var(--color-control);
   color: var(--color-fg);
   font-size: 13px;
   cursor: pointer;
@@ -406,6 +493,7 @@ input[type='color'].swatch::-webkit-color-swatch {
 }
 .select-trigger:hover {
   background: var(--color-surface-3);
+  border-color: var(--color-accent-line);
 }
 /* 头栏尺寸变体：终端窗口小头栏里的 SSH 下拉（字号 / 高度由 #term-actions 规则按头栏字号推）。
    小头栏用更小的圆角，观感更紧凑。 */
@@ -416,7 +504,7 @@ input[type='color'].swatch::-webkit-color-swatch {
 }
 .select-trigger.open {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  box-shadow: var(--focus-ring);
 }
 .select-trigger .select-label {
   overflow: hidden;
@@ -438,7 +526,7 @@ input[type='color'].swatch::-webkit-color-swatch {
   overflow-y: auto;
   padding: 4px;
   border-radius: var(--radius-control);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
 }
@@ -463,6 +551,7 @@ input[type='color'].swatch::-webkit-color-swatch {
 }
 .select-option.active {
   color: var(--color-accent);
+  background: var(--color-accent-soft);
 }
 /* 下拉里的分组小标题（不可点，用于 SSH 下拉区分分组）。 */
 .select-group-title {
@@ -976,7 +1065,7 @@ body.term-window .select-menu .select-group-title {
   padding: 0 6px;
   border-radius: var(--radius-control-sm);
   border: 1px solid var(--color-border);
-  background: var(--color-surface-2);
+  background: var(--color-control);
   color: var(--color-fg);
   font-family: var(--font-mono);
   font-size: 0.92em;
@@ -1004,8 +1093,9 @@ body.term-window .select-menu .select-group-title {
   background: var(--color-surface-2);
 }
 .fm-tree-row.selected {
-  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  background: var(--color-accent-soft);
   color: var(--color-accent);
+  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 .fm-tree-caret {
   display: inline-flex;
@@ -1105,7 +1195,8 @@ body.term-window .select-menu .select-group-title {
   background: var(--color-surface-2);
 }
 .fm-row.selected {
-  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  background: var(--color-accent-soft);
+  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 .fm-cell-icon {
   display: inline-flex;
@@ -1350,6 +1441,33 @@ body.file-window {
 .json-editor.no-highlight .json-editor-highlight {
   display: none;
 }
+.json-editor:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+/* 内容较少的工具（例如 JSON）：占满内容区剩余高度，避免固定高度下方留白。
+   由 app.js 按工具注册项的 `fill: true` 给 #content 加 .tool-fill。 */
+#content.tool-fill {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#content.tool-fill > .tool-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 0;
+}
+#content.tool-fill .tool-body > * {
+  flex: 0 0 auto;
+}
+#content.tool-fill .json-editor,
+#content.tool-fill .json-tree {
+  height: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
 .json-tree {
   height: 180px;
   overflow: auto;
@@ -1394,6 +1512,15 @@ body.file-window {
 #panel {
   border-radius: var(--radius-window);
 }
+/* 头 / 底栏用极淡的表面色与内容区分，玻璃下保持透明。 */
+#tabbar,
+#panel > footer {
+  background: color-mix(in srgb, var(--color-surface) 52%, transparent);
+}
+[data-vibrancy='on'] #tabbar,
+[data-vibrancy='on'] #panel > footer {
+  background: transparent;
+}
 
 /* 窗口模式（设置 · 悬浮模式 = 关）：主界面是独立的普通窗口。
    - 顶部让出系统红绿灯位置，标题栏区域可拖动；
@@ -1408,11 +1535,9 @@ body.file-window {
   padding-left: 80px;
   -webkit-app-region: drag;
 }
-/* 品牌区（应用图标 + 名称）也可拖动：图标本身禁用原生图片拖拽，否则会抢走窗口拖动。 */
-[data-window-mode='window'] #brand {
-  -webkit-app-region: drag;
-}
-[data-window-mode='window'] #brand img {
+/* 品牌区（应用图标 + 名称）位于底部栏；固定悬浮时仍可拖动窗口，
+   图标本身禁用原生图片拖拽，否则会抢走窗口拖动。 */
+.brand-drag img {
   -webkit-user-drag: none;
   pointer-events: none;
 }
@@ -1423,13 +1548,16 @@ body.file-window {
 [data-window-mode='window'] #tablist .tab {
   -webkit-app-region: no-drag;
 }
+[data-window-mode='window'] #tool-head-host {
+  padding: 16px 20px 0;
+}
 [data-window-mode='window'] #content {
-  padding: 16px 20px 20px;
+  padding: 0 20px 20px;
 }
 [data-window-mode='window'] .tool-body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 12px;
+  gap: var(--space-card-gap);
   align-items: start;
 }
 [data-window-mode='window'] .tool-body > .section {
@@ -1440,13 +1568,46 @@ body.file-window {
 .section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: var(--space-card-gap);
+  margin-bottom: var(--space-card-gap);
 }
 
-/* Shared tool header (title + description). */
+/* 工具标题区：固定在内容区上方，不随内容滚动；滚动后切换为紧凑的单行标题。 */
+#tool-head-host {
+  transition: padding-top 0.18s ease;
+}
+#tool-head-host.is-compact {
+  padding-top: 8px;
+}
+[data-window-mode='window'] #tool-head-host.is-compact {
+  padding-top: 10px;
+}
 .tool-head {
-  margin-bottom: 10px;
+  margin-bottom: var(--space-card-gap);
+  transition: margin-bottom 0.18s ease;
+}
+#tool-head-host.is-compact .tool-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+#tool-head-host.is-compact .tool-head-title {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+#tool-head-host.is-compact .tool-head-desc {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-top: 0;
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Fixed-header tools (SSH directory browser): the content area becomes a column,
@@ -1467,14 +1628,19 @@ body.file-window {
   min-height: 0;
 }
 .tool-head-title {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
   color: var(--color-fg);
+  transition: font-size 0.18s ease, font-weight 0.18s ease;
 }
 .tool-head-desc {
-  margin-top: 2px;
+  margin-top: 3px;
   font-size: 11px;
+  letter-spacing: 0.01em;
   color: var(--color-fg-muted);
+  transition: font-size 0.18s ease, margin-top 0.18s ease;
 }
 
 /* Clipboard text preview: fixed two lines, truncate the rest. */
@@ -1539,7 +1705,8 @@ body.file-window {
 }
 
 /* Tool / settings section content enters with a soft rise. */
-#content > * {
+#content > *,
+#tool-head-host > * {
   animation: ships-fade-up 0.18s ease both;
 }
 #settings-pane > * {

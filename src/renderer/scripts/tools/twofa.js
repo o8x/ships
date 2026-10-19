@@ -64,11 +64,11 @@
       placeholder: i18n.t('twofa.placeholder'),
     });
     const addBtn = el('button', { class: 'btn btn-accent shrink-0', type: 'button' }, i18n.t('twofa.add'));
-    const inputRow = el('div', { class: 'mb-3 flex items-stretch gap-2' });
+    const inputRow = el('div', { class: 'mb-card flex items-stretch gap-2' });
     inputRow.append(input, addBtn);
 
-    const errorLine = el('div', { class: 'mb-2.5 hidden text-[11px] text-danger' }, '');
-    const list = el('div', { class: 'flex flex-col gap-2.5' });
+    const errorLine = el('div', { class: 'mb-card hidden text-[11px] text-danger' }, '');
+    const list = el('div', { class: 'flex flex-col gap-card' });
     container.append(inputRow, errorLine, list);
 
     function showError(code) {

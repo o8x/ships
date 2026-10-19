@@ -33,6 +33,12 @@ const api = {
     onChanged: (cb) => on(IPC.CLIPBOARD_CHANGED, cb),
   },
   hashText: (text) => ipcRenderer.invoke(IPC.HASH_TEXT, text),
+  nutrient: {
+    get: () => ipcRenderer.invoke(IPC.NUTRIENT_GET),
+    saveProduct: (product) => ipcRenderer.invoke(IPC.NUTRIENT_SAVE_PRODUCT, product),
+    deleteProduct: (name) => ipcRenderer.invoke(IPC.NUTRIENT_DELETE_PRODUCT, { name }),
+    saveTdee: (tdee) => ipcRenderer.invoke(IPC.NUTRIENT_SAVE_TDEE, tdee),
+  },
   hashFile: (file) => ipcRenderer.invoke(IPC.HASH_FILE, file),
   totp: {
     list: () => ipcRenderer.invoke(IPC.TOTP_LIST),

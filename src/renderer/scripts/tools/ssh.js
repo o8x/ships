@@ -66,8 +66,8 @@
       collapsed: new Set(),
     };
 
-    const status = el('div', { class: 'mb-2.5 hidden text-[11px]' }, '');
-    const list = el('div', { class: 'flex flex-col gap-2.5' }, '');
+    const status = el('div', { class: 'mb-card hidden text-[11px]' }, '');
+    const list = el('div', { class: 'flex flex-col gap-card' }, '');
     container.append(status, list);
 
     function showStatus(text, isError) {

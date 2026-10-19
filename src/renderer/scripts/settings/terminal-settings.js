@@ -22,22 +22,14 @@
         downloadDir: 'SFTP 下载目录',
         downloadDirHint: '终端窗口文件面板下载文件的保存位置，默认 ~/Downloads（重名自动加序号）',
         chooseDir: '选择目录',
-        hotkey: '打开终端的全局快捷键',
-        hotkeyHint: '在任意界面按下即可拉起置顶终端窗口；点一下右侧按钮再按新的组合键即可改绑（Backspace 清除、Esc 取消，至少含 Command / Control / Alt 之一）',
-        hotkeyEmpty: '未设置（点击后按组合键）',
-        hotkeyPress: '请按下组合键…',
-        hotkeyNeedModifier: '至少要含 Command / Control / Alt 之一',
-        hotkeyUnsupported: '不支持这个按键',
-        hotkeyTaken: '该组合键已被占用，换一个试试',
-        hotkeyFailed: '设置失败：{error}',
         builtinSsh: 'SSH 使用内置终端连接',
-        builtinSshHint: '开启后点「连接」、以及目录浏览里「在终端中打开」都在置顶终端里执行 ssh；关闭则改用 iTerm',
+        builtinSshHint: '开 = 在置顶终端执行，关 = 使用 iTerm',
         closeAction: '关闭按钮行为',
         closeActionHint: '点终端窗口左上角关闭按钮（或 Cmd-W）时：隐藏窗口保留会话，或直接销毁结束会话；在终端里输入 exit 结束 shell 时始终销毁窗口',
         closeActionHide: '隐藏窗口',
         closeActionDestroy: '销毁窗口',
         ballEnable: '自动缩成悬浮球',
-        ballEnableHint: '终端窗口失去焦点一段时间后缩成圆形悬浮球，点击球 / 按快捷键放大回来',
+        ballEnableHint: '失焦后缩成圆形悬浮球',
         ballDelay: '缩成悬浮球延迟',
         ballDelayHint: '失去焦点后多久缩成球（期间焦点回来则取消）',
         ballDelayImmediate: '立即',
@@ -46,7 +38,7 @@
         ballIcon: '悬浮球图标',
         ballIconHint: '从 assets/icons/ball 中选择悬浮球显示的图标，实时生效',
         ballDark: '终端暗色模式',
-        ballDarkHint: '开启 = 终端（含悬浮球）始终暗色（默认）；关闭 = 跟随全局主题；悬浮球图标始终保留原色',
+        ballDarkHint: '终端始终暗色，关闭则跟随主题',
         seconds: '秒',
         reset: '重置',
         resetHint: '恢复终端相关设置为默认值，并清除记住的窗口屏幕 / 位置 / 大小',
@@ -73,22 +65,14 @@
         downloadDir: 'SFTP download folder',
         downloadDirHint: 'Where the terminal file panel saves downloads, default ~/Downloads (duplicates get a number)',
         chooseDir: 'Choose folder',
-        hotkey: 'Global shortcut to open the terminal',
-        hotkeyHint: 'Works from any app; click the button and press a new combo to rebind (Backspace clears, Esc cancels, needs Command / Control / Alt)',
-        hotkeyEmpty: 'Not set (click, then press a combo)',
-        hotkeyPress: 'Press the shortcut…',
-        hotkeyNeedModifier: 'Include at least one of Command / Control / Alt',
-        hotkeyUnsupported: 'Unsupported key',
-        hotkeyTaken: 'That shortcut is already taken, try another',
-        hotkeyFailed: 'Cannot set: {error}',
         builtinSsh: 'Connect SSH in the built-in terminal',
-        builtinSshHint: 'On: Connect and the directory browser open ssh in the always-on-top terminal. Off: use iTerm',
+        builtinSshHint: 'On = built-in terminal, Off = iTerm',
         closeAction: 'Close button action',
         closeActionHint: 'When the close button (or Cmd-W) is used: hide the window and keep the session, or destroy it. Ending the shell with exit always destroys the window',
         closeActionHide: 'Hide window',
         closeActionDestroy: 'Destroy window',
         ballEnable: 'Auto floating ball',
-        ballEnableHint: 'Shrink the terminal into a round floating ball after it loses focus; click it or press the hotkey to bring it back',
+        ballEnableHint: 'Shrink into a floating ball after losing focus',
         ballDelay: 'Ball shrink delay',
         ballDelayHint: 'How long after losing focus before shrinking (cancelled if focus returns)',
         ballDelayImmediate: 'Immediate',
@@ -97,7 +81,7 @@
         ballIcon: 'Ball icon',
         ballIconHint: 'Pick the floating ball icon from assets/icons/ball (applies live)',
         ballDark: 'Dark terminal',
-        ballDarkHint: 'On = terminal (and ball) always dark (default); Off = follow the app theme; the ball icon keeps its colors',
+        ballDarkHint: 'Always dark; off follows the app theme',
         seconds: 's',
         reset: 'Reset',
         resetHint: 'Restore the terminal settings to their defaults and forget the remembered screen / position / size',
@@ -121,7 +105,7 @@
   }
 
   function row(labelText, hintText, control) {
-    const wrap = el('div', { class: 'row-card mb-2.5' });
+    const wrap = el('div', { class: 'row-card' });
     const text = el('div', { class: 'min-w-0 flex-1' });
     text.append(
       el('div', { class: 'text-[13px] text-fg' }, labelText),
@@ -129,74 +113,6 @@
     );
     wrap.append(text, control);
     return wrap;
-  }
-
-  /* ---------- 全局快捷键：按键 → Electron accelerator ---------- */
-  // Electron 的 accelerator 只认它自己的键名（字母 / 数字 / F1-F24 / Up / Space / …），
-  // 用 event.code（与键盘布局无关）查表；查不到就当作不支持的键。
-  const ACCEL_KEYS = {
-    Backquote: '`',
-    Minus: '-',
-    Equal: '=',
-    BracketLeft: '[',
-    BracketRight: ']',
-    Backslash: '\\',
-    Semicolon: ';',
-    Quote: "'",
-    Comma: ',',
-    Period: '.',
-    Slash: '/',
-    Space: 'Space',
-    Enter: 'Return',
-    NumpadEnter: 'Return',
-    Tab: 'Tab',
-    Delete: 'Delete',
-    Insert: 'Insert',
-    Home: 'Home',
-    End: 'End',
-    PageUp: 'PageUp',
-    PageDown: 'PageDown',
-    ArrowUp: 'Up',
-    ArrowDown: 'Down',
-    ArrowLeft: 'Left',
-    ArrowRight: 'Right',
-  };
-
-  function keyNameFromEvent(event) {
-    const code = event.code || '';
-    if (/^Key[A-Z]$/.test(code)) return code.slice(3);
-    if (/^Digit[0-9]$/.test(code)) return code.slice(5);
-    if (/^F([1-9]|1[0-9]|2[0-4])$/.test(code)) return code;
-    return ACCEL_KEYS[code] || '';
-  }
-
-  /* 返回 accelerator 字符串；'' = 不支持的键；'need-modifier' = 只有 Shift 这种弱修饰键。 */
-  function acceleratorFromEvent(event) {
-    const isMac = navigator.platform.toUpperCase().includes('MAC');
-    const parts = [];
-    if (event.metaKey) parts.push(isMac ? 'Command' : 'Super');
-    if (event.ctrlKey) parts.push('Control');
-    if (event.altKey) parts.push('Alt');
-    if (event.shiftKey) parts.push('Shift');
-    const key = keyNameFromEvent(event);
-    if (!key) return '';
-    if (!event.metaKey && !event.ctrlKey && !event.altKey) return 'need-modifier';
-    parts.push(key);
-    return parts.join('+');
-  }
-
-  const MAC_SYMBOLS = { CommandOrControl: '⌘', Command: '⌘', Cmd: '⌘', Control: '⌃', Ctrl: '⌃', Alt: '⌥', Option: '⌥', Shift: '⇧', Super: '⌘' };
-
-  /* 展示用：macOS 用 ⌘⇧Z 这样的符号，其它平台显示 CommandOrControl+Shift+Z 原样。 */
-  function prettyAccelerator(accelerator) {
-    const value = String(accelerator || '');
-    if (!value) return '';
-    const isMac = navigator.platform.toUpperCase().includes('MAC');
-    if (!isMac) return value.replace(/CommandOrControl/g, 'Ctrl');
-    return value
-      .split('+')
-      .map((part) => MAC_SYMBOLS[part] || (part.length === 1 ? part.toUpperCase() : part))
-      .join('');
   }
 
   function mount(pane, ctx) {
@@ -420,91 +336,6 @@
     wrap.appendChild(
       row(i18n.t('terminalSettings.ballDark'), i18n.t('terminalSettings.ballDarkHint'), termDarkSwitch)
     );
-
-    /* 全局快捷键：在任意界面按下即可拉起置顶终端窗口 */
-    const hotkeyBtn = el('button', {
-      class: 'btn w-[170px] shrink-0 justify-center font-mono text-[12px]',
-      type: 'button',
-    });
-    const hotkeyNote = el('div', { class: 'text-[10px] text-danger' });
-    const hotkeyControls = el('div', { class: 'flex shrink-0 flex-col items-end gap-1' });
-    hotkeyControls.append(hotkeyBtn, hotkeyNote);
-
-    let hotkeyValue = ctx.settings.terminalHotkey || '';
-    let capturing = false;
-
-    function renderHotkey() {
-      hotkeyBtn.textContent = capturing
-        ? i18n.t('terminalSettings.hotkeyPress')
-        : hotkeyValue
-          ? prettyAccelerator(hotkeyValue)
-          : i18n.t('terminalSettings.hotkeyEmpty');
-      hotkeyBtn.classList.toggle('btn-accent', capturing);
-    }
-
-    async function saveHotkey(accelerator) {
-      const result = await window.ships.terminal.setHotkey(accelerator || '');
-      if (!result || !result.ok) {
-        const reason = result && result.error === 'unavailable' ? i18n.t('terminalSettings.hotkeyTaken') : (result && result.error) || 'error';
-        hotkeyNote.textContent =
-          result && result.error === 'unavailable'
-            ? i18n.t('terminalSettings.hotkeyTaken')
-            : i18n.t('terminalSettings.hotkeyFailed', { error: reason });
-        capturing = false;
-        renderHotkey();
-        return;
-      }
-      hotkeyValue = result.hotkey || '';
-      hotkeyNote.textContent = '';
-      capturing = false;
-      renderHotkey();
-    }
-
-    hotkeyBtn.addEventListener('click', () => {
-      capturing = true;
-      hotkeyNote.textContent = '';
-      renderHotkey();
-      hotkeyBtn.focus();
-    });
-    hotkeyBtn.addEventListener('keydown', (event) => {
-      if (!capturing) return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.key === 'Escape') {
-        capturing = false;
-        hotkeyNote.textContent = '';
-        renderHotkey();
-        return;
-      }
-      if (event.code === 'Backspace' || event.code === 'Delete') {
-        saveHotkey('');
-        return;
-      }
-      const accelerator = acceleratorFromEvent(event);
-      if (accelerator === 'need-modifier') {
-        hotkeyNote.textContent = i18n.t('terminalSettings.hotkeyNeedModifier');
-        return;
-      }
-      if (!accelerator) {
-        hotkeyNote.textContent = i18n.t('terminalSettings.hotkeyUnsupported');
-        return;
-      }
-      saveHotkey(accelerator);
-    });
-    hotkeyBtn.addEventListener('blur', () => {
-      if (!capturing) return;
-      capturing = false;
-      renderHotkey();
-    });
-
-    renderHotkey();
-    syncers.push((next) => {
-      hotkeyValue = next.terminalHotkey || '';
-      capturing = false;
-      hotkeyNote.textContent = '';
-      renderHotkey();
-    });
-    wrap.appendChild(row(i18n.t('terminalSettings.hotkey'), i18n.t('terminalSettings.hotkeyHint'), hotkeyControls));
 
     /* 重置：终端相关设置回默认 + 清掉记住的屏幕 / 位置 / 尺寸（二次确认） */
     const resetControls = el('div', { class: 'flex shrink-0 flex-col items-end gap-1' });

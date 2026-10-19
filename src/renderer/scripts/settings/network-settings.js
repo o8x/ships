@@ -114,7 +114,7 @@
   function mount(pane, ctx) {
     const state = { type: TYPES.length ? TYPES[0].value : '', runId: '', hosts: [] };
 
-    const section = el('div', { class: 'flex h-full min-h-0 flex-col gap-2.5' });
+    const section = el('div', { class: 'flex h-full min-h-0 flex-col gap-card' });
     section.appendChild(el('div', { class: 'shrink-0 truncate text-[12px] text-fg-muted' }, i18n.t('netTest.subtitle')));
 
     const typeFor = (value) =>
@@ -160,9 +160,9 @@
     const runBtn = el('button', { class: 'btn btn-accent shrink-0 py-2', type: 'button' }, i18n.t('netTest.run'));
     const stopBtn = el('button', { class: 'btn shrink-0 py-2', type: 'button' }, i18n.t('netTest.stop'));
     stopBtn.disabled = true;
-    const row1 = el('div', { class: 'flex shrink-0 items-end gap-2.5' });
+    const row1 = el('div', { class: 'flex shrink-0 items-end gap-card' });
     row1.append(targetWrap, targetField.wrapper, portWrap);
-    const row2 = el('div', { class: 'flex shrink-0 items-end gap-2.5' });
+    const row2 = el('div', { class: 'flex shrink-0 items-end gap-card' });
     row2.append(typeWrap, runBtn, stopBtn);
 
     const termHost = el('div', { class: 'min-h-0 flex-1' });

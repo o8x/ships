@@ -151,10 +151,5 @@
     pane.append(backupSection);
   }
 
-  window.ShipsSettingsRegistry.register({
-    id: 'backup',
-    icon: 'download',
-    labelKey: 'settingsPage.backup',
-    mount,
-  });
+  window.ShipsBackupSettings = { mount };
 })();

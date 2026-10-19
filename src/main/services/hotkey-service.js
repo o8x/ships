@@ -1,65 +1,184 @@
 'use strict';
 
-// 全局快捷键（设置 → 终端 → 打开终端的全局快捷键）：在任意界面按下都能拉起置顶终端窗口。
-// 只维护「当前注册的那个」快捷键 —— 改设置 / 重置时先注销旧的再注册新的；注册失败
-// （组合键被别的 App 占用、格式非法）不落盘，由调用方提示用户。
+// 全局快捷键（设置 → 快捷键）：主窗口与置顶终端各绑定一个 accelerator。
+// - 终端：按一下触发 toggleTerminalWindow。
+// - 主窗口：快速按两下触发 toggleMainWindow。
+// 两者默认使用同一个组合键（CommandOrControl+Shift+Z）：此时单击 = 终端，
+// 双击 = 主窗口；单击会等待 SHORTCUT_DOUBLE_TAP_MS 以区分双击。
+// 绑定不同组合键时，各自按上述触发方式工作。
 
 const { globalShortcut } = require('electron');
 const settings = require('./settings-service');
 const logger = require('../utils/logger');
+const { SHORTCUT_DOUBLE_TAP_MS } = require('../../shared/constants');
 
-let registered = '';
+const TARGETS = {
+  main: 'mainWindowHotkey',
+  terminal: 'terminalHotkey',
+};
 
-function toggleTerminalWindow() {
-  // 延迟 require：避免加载期与 window-manager 形成循环依赖。
+function normalize(value) {
+  return String(value == null ? '' : value).trim();
+}
+
+let bindings = { main: '', terminal: '' };
+let registered = [];
+let pendingAccelerator = '';
+let pendingTimer = null;
+
+function clearPending() {
+  if (pendingTimer) clearTimeout(pendingTimer);
+  pendingTimer = null;
+  pendingAccelerator = '';
+}
+
+function toggleMain() {
+  require('../window-manager').toggleMainWindow();
+}
+
+function toggleTerminal() {
   require('../window-manager').toggleTerminalWindow();
 }
 
-/* 注册（或注销）快捷键；返回 { ok, hotkey, error? }。hotkey 为空字符串表示不注册。 */
-function apply(accelerator) {
-  const wanted = String(accelerator == null ? '' : accelerator).trim();
-  if (wanted === registered) return { ok: true, hotkey: registered };
-
-  if (registered) {
-    globalShortcut.unregister(registered);
-    registered = '';
-  }
-  if (!wanted) return { ok: true, hotkey: '' };
-
-  let ok = false;
+function registerOne(accelerator, wanted) {
+  const handler = () => onPress(accelerator, wanted);
   try {
-    ok = globalShortcut.register(wanted, toggleTerminalWindow);
+    const ok = globalShortcut.register(accelerator, handler);
+    if (!ok) {
+      logger.warn(`[hotkey] register "${accelerator}" rejected (可能已被其它 App 占用)`);
+      return { ok: false, error: 'unavailable' };
+    }
   } catch (err) {
-    logger.warn(`[hotkey] register "${wanted}" failed:`, err.message);
-    return { ok: false, hotkey: '', error: err.message };
+    logger.warn(`[hotkey] register "${accelerator}" failed:`, err.message);
+    return { ok: false, error: err.message };
   }
-  if (!ok) {
-    logger.warn(`[hotkey] register "${wanted}" rejected (可能已被其它 App 占用)`);
-    return { ok: false, hotkey: '', error: 'unavailable' };
+  return { ok: true };
+}
+
+function unregister(list) {
+  for (const accelerator of list) {
+    try {
+      globalShortcut.unregister(accelerator);
+    } catch (err) {
+      /* ignore */
+    }
   }
-  registered = wanted;
-  logger.file(`[hotkey] terminal hotkey registered: ${wanted}`);
-  return { ok: true, hotkey: registered };
+}
+
+function onPress(accelerator, wanted) {
+  const isMain = wanted.main === accelerator;
+  const isTerminal = wanted.terminal === accelerator;
+
+  if (isMain && isTerminal) {
+    // 同一个组合键：第一下等待，若在窗口内再按一下则主窗口；否则终端。
+    if (pendingTimer && pendingAccelerator === accelerator) {
+      clearPending();
+      toggleMain();
+      return;
+    }
+    clearPending();
+    pendingAccelerator = accelerator;
+    pendingTimer = setTimeout(() => {
+      pendingTimer = null;
+      pendingAccelerator = '';
+      toggleTerminal();
+    }, SHORTCUT_DOUBLE_TAP_MS);
+    return;
+  }
+
+  if (isTerminal) {
+    toggleTerminal();
+    return;
+  }
+
+  if (isMain) {
+    // 仅主窗口绑定：要求快速按两下，单击不触发。
+    if (pendingTimer && pendingAccelerator === accelerator) {
+      clearPending();
+      toggleMain();
+      return;
+    }
+    clearPending();
+    pendingAccelerator = accelerator;
+    pendingTimer = setTimeout(() => {
+      pendingTimer = null;
+      pendingAccelerator = '';
+    }, SHORTCUT_DOUBLE_TAP_MS);
+  }
+}
+
+function applyBindings(next) {
+  const wanted = { main: normalize(next && next.main), terminal: normalize(next && next.terminal) };
+  const previous = bindings;
+  const previousRegistered = registered;
+  const same = wanted.main === previous.main && wanted.terminal === previous.terminal;
+
+  if (same && previousRegistered.length) return { ok: true };
+
+  clearPending();
+  unregister(previousRegistered);
+  registered = [];
+
+  const unique = Array.from(new Set([wanted.main, wanted.terminal].filter(Boolean)));
+  for (const accelerator of unique) {
+    const result = registerOne(accelerator, wanted);
+    if (!result.ok) {
+      unregister(registered);
+      registered = [];
+      // 回滚到上一次成功的绑定，避免因一个失败导致全部快捷键失效。
+      for (const previousAccelerator of previousRegistered) {
+        registerOne(previousAccelerator, previous);
+      }
+      registered = previousRegistered;
+      bindings = previous;
+      return result;
+    }
+    registered.push(accelerator);
+  }
+
+  bindings = wanted;
+  if (registered.length) logger.file(`[hotkey] registered: ${registered.join(', ')}`);
+  return { ok: true };
+}
+
+/* 设置某一项：先试注册成功再写设置（由 IPC 调用方持久化），失败时恢复旧绑定。 */
+function setTarget(target, accelerator) {
+  const key = TARGETS[target];
+  if (!key) return { ok: false, error: 'invalid-target' };
+  const next = Object.assign({}, bindings, { [target]: normalize(accelerator) });
+  const result = applyBindings(next);
+  if (!result.ok) return result;
+  return { ok: true, hotkey: bindings[target] };
 }
 
 function current() {
-  return registered;
+  return Object.assign({}, bindings);
 }
 
 // 启动时按设置注册；改设置（含重置）时跟随。
 function init() {
-  const result = apply(settings.get('terminalHotkey'));
-  if (!result.ok) logger.warn(`[hotkey] terminal hotkey unavailable: ${settings.get('terminalHotkey')}`);
+  const result = applyBindings({
+    main: settings.get(TARGETS.main),
+    terminal: settings.get(TARGETS.terminal),
+  });
+  if (!result.ok) logger.warn('[hotkey] some shortcuts unavailable');
 }
 
 settings.on('changed', (_data, keys) => {
-  if (Array.isArray(keys) && !keys.includes('terminalHotkey')) return;
-  apply(settings.get('terminalHotkey'));
+  if (Array.isArray(keys) && !keys.includes(TARGETS.main) && !keys.includes(TARGETS.terminal)) return;
+  init();
 });
 
 function unregisterAll() {
-  globalShortcut.unregisterAll();
-  registered = '';
+  clearPending();
+  unregister(registered);
+  registered = [];
+  bindings = { main: '', terminal: '' };
+  try {
+    globalShortcut.unregisterAll();
+  } catch (err) {
+    /* ignore */
+  }
 }
 
-module.exports = { init, apply, current, unregisterAll };
+module.exports = { init, setTarget, current, unregisterAll };

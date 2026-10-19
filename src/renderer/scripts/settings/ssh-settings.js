@@ -140,7 +140,7 @@
     }
 
     function header(titleText, actions) {
-      const head = el('div', { class: 'mb-2.5 flex items-center justify-between gap-2' });
+      const head = el('div', { class: 'mb-card flex items-center justify-between gap-2' });
       const left = el('div', { class: 'min-w-0' });
       left.appendChild(el('h2', { class: 'tool-title mb-0' }, titleText));
       left.appendChild(el('div', { class: 'text-[11px] text-fg-muted' }, i18n.t('sshSettings.subtitle')));
@@ -182,10 +182,10 @@
         render();
       });
       actions.append(exportBtn, addBtn);
-      root.appendChild(el('div', { class: 'mb-2.5 flex items-center justify-end gap-2' })).appendChild(actions);
+      root.appendChild(el('div', { class: 'mb-card flex items-center justify-end gap-2' })).appendChild(actions);
 
       if (state.message) {
-        root.appendChild(el('div', { class: 'mb-2.5 text-[11px] text-success' }, state.message));
+        root.appendChild(el('div', { class: 'mb-card text-[11px] text-success' }, state.message));
       }
 
       if (!state.hosts.length) {
@@ -198,7 +198,7 @@
       const named = namedGroups();
       // 没有任何命名分组时保持扁平列表；有分组时按分组手风琴展示（默认全部展开）。
       if (!named.length) {
-        const list = el('div', { class: 'flex flex-col gap-2.5' });
+        const list = el('div', { class: 'flex flex-col gap-card' });
         for (const host of state.hosts) list.appendChild(buildRow(host));
         root.appendChild(list);
         return;
@@ -401,7 +401,7 @@
       const isNew = !editing.originalAlias;
       root.appendChild(header(isNew ? i18n.t('sshSettings.add') : i18n.t('sshSettings.edit'), null));
 
-      const form = el('div', { class: 'flex flex-col gap-2.5' });
+      const form = el('div', { class: 'flex flex-col gap-card' });
       const inputs = {};
 
       const defs = [

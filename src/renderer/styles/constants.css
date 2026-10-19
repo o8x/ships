@@ -11,10 +11,10 @@
   --font-mono: 'SF Mono', ui-monospace, Menlo, Monaco, 'JetBrains Mono', Consolas,
     'Liberation Mono', monospace;
 
-  /* 圆角 */
-  --radius-window: 12px;
-  --radius-card: 8px;
-  --radius-control: 8px;
+  /* 圆角：整体更锐利，窗口只保留轻微收边 */
+  --radius-window: 10px;
+  --radius-card: 6px;
+  --radius-control: 6px;
   --radius-control-sm: 4px;
   --radius-xs: 2px;
   --radius-pill: 999px;
@@ -25,6 +25,8 @@
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 20px;
+  /* 卡片 / 输入框 / 设置分区之间的统一间距（全局唯一来源）。 */
+  --space-card-gap: 12px;
 
   /* 尺寸 */
   --footer-height: 34px;
@@ -38,6 +40,8 @@
   --term-padding-y: 0px;
   /* 文件管理（内嵌面板 / 独立窗口）基础字号；终端窗口里由 terminal.js 跟随终端字号改写 */
   --file-font-size: 12px;
+  /* Hash 工具：字符串 / 文件两种输入模式共用同一高度，切换时下方结果不跳动。 */
+  --hash-source-height: 76px;
   /* 头栏里自绘小红绿灯（macOS 观感，比系统标准尺寸小） */
   --traffic-size: 9px;
   --traffic-glyph-size: 6px;
@@ -48,27 +52,38 @@
   /* 强调色（可被设置覆盖，脚本会写到 documentElement.style） */
   --color-accent: #2e6bfc;
   --color-accent-fg: #ffffff;
+
+  /* 由强调色派生的通用令牌：随 --color-accent 实时变化。
+     只使用 color-mix + transparent，避免在 Liquid Glass 下盖住原生材质。 */
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --color-accent-soft-2: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  --color-accent-line: color-mix(in srgb, var(--color-accent) 48%, transparent);
+  --focus-ring: 0 0 0 2px color-mix(in srgb, var(--color-accent) 14%, transparent);
 }
 
 /* 白天模式 */
 :root,
 [data-theme='light'] {
   color-scheme: light;
-  --color-bg: #ffffff;
+  --color-bg: #f4f5f8;
   --color-surface: #ffffff;
-  --color-surface-2: #fafafb;
-  --color-surface-3: #f1f1f3;
-  --color-border: rgba(0, 0, 0, 0.09);
-  --color-fg: #1d1d1f;
-  --color-fg-muted: #8a8a8f;
-  --color-danger: #e5484d;
-  --color-success: #2f9e44;
-  --color-json-key: #0b6ec2;
-  --color-json-str: #2f7d3b;
-  --color-json-num: #b5560a;
-  --color-json-bool: #8a3ffc;
-  --color-json-null: #8a8a8f;
-  --shadow-popover: 0 10px 34px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
+  --color-surface-2: #eef0f4;
+  --color-surface-3: #e3e6ec;
+  /* 输入框 / 分段 / 下拉等控件：与卡片一致的纯白。 */
+  --color-control: #ffffff;
+  --color-border: rgba(15, 18, 25, 0.1);
+  --color-border-strong: rgba(15, 18, 25, 0.18);
+  --color-fg: #101217;
+  --color-fg-muted: #687083;
+  --color-danger: #dc3d43;
+  --color-success: #1f8a4c;
+  --color-json-key: #0b66c3;
+  --color-json-str: #1f7a3a;
+  --color-json-num: #b45309;
+  --color-json-bool: #7c3aed;
+  --color-json-null: #687083;
+  --shadow-popover: 0 18px 44px rgba(12, 16, 24, 0.16), 0 2px 8px rgba(12, 16, 24, 0.08);
+  --shadow-raise: 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 2px rgba(12, 16, 24, 0.06);
   /* 窗口失焦时自绘红绿灯的灰底 */
   --traffic-inactive: rgba(0, 0, 0, 0.18);
 }
@@ -78,21 +93,24 @@
 [data-theme='dark'],
 [data-terminal-dark='on'] {
   color-scheme: dark;
-  --color-bg: #1c1c1e;
-  --color-surface: #2a2a2c;
-  --color-surface-2: #333336;
-  --color-surface-3: #3d3d41;
+  --color-bg: #0e1116;
+  --color-surface: #161a21;
+  --color-surface-2: #1d222b;
+  --color-surface-3: #262c37;
+  --color-control: #1d222b;
   --color-border: rgba(255, 255, 255, 0.1);
-  --color-fg: #f5f5f7;
-  --color-fg-muted: #98989f;
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+  --color-fg: #f3f5f9;
+  --color-fg-muted: #9aa3b5;
   --color-danger: #ff6369;
   --color-success: #4ade80;
   --color-json-key: #6cb6ff;
   --color-json-str: #7ee787;
   --color-json-num: #ffab70;
   --color-json-bool: #d2a8ff;
-  --color-json-null: #98989f;
-  --shadow-popover: 0 12px 40px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --color-json-null: #9aa3b5;
+  --shadow-popover: 0 20px 52px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-raise: 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.4);
   --traffic-inactive: rgba(255, 255, 255, 0.28);
 }
 
@@ -109,9 +127,16 @@
   --color-surface: var(--glass-surface, rgba(255, 255, 255, 0.08));
   --color-surface-2: var(--glass-surface-2, rgba(255, 255, 255, 0.12));
   --color-surface-3: var(--glass-surface-3, rgba(255, 255, 255, 0.22));
-  --color-border: rgba(0, 0, 0, 0.14);
-  --color-fg: #000000;
-  --color-fg-muted: rgba(0, 0, 0, 0.55);
+  --color-control: var(--glass-surface-2, rgba(255, 255, 255, 0.12));
+  --color-border: rgba(0, 0, 0, 0.16);
+  --color-border-strong: rgba(0, 0, 0, 0.28);
+  --color-fg: #05070b;
+  --color-fg-muted: rgba(5, 7, 11, 0.58);
+  /* 玻璃下提高强调色的可读性：只叠加透明底，不引入不透明填充。 */
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  --color-accent-soft-2: color-mix(in srgb, var(--color-accent) 26%, transparent);
+  --color-accent-line: color-mix(in srgb, var(--color-accent) 58%, transparent);
+  --shadow-raise: none;
 }
 
 [data-vibrancy='on'][data-theme='dark'] {
@@ -119,7 +144,10 @@
   --color-surface: var(--glass-surface, rgba(255, 255, 255, 0.08));
   --color-surface-2: var(--glass-surface-2, rgba(255, 255, 255, 0.12));
   --color-surface-3: var(--glass-surface-3, rgba(255, 255, 255, 0.2));
-  --color-border: rgba(255, 255, 255, 0.16);
+  --color-control: var(--glass-surface-2, rgba(255, 255, 255, 0.12));
+  --color-border: rgba(255, 255, 255, 0.18);
+  --color-border-strong: rgba(255, 255, 255, 0.32);
   --color-fg: #ffffff;
   --color-fg-muted: rgba(255, 255, 255, 0.62);
+  --shadow-raise: none;
 }

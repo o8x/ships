@@ -46,6 +46,11 @@ const IPC = {
 
   HASH_TEXT: 'hash:text',
   HASH_FILE: 'hash:file',
+
+  NUTRIENT_GET: 'nutrient:get',
+  NUTRIENT_SAVE_PRODUCT: 'nutrient:save-product',
+  NUTRIENT_DELETE_PRODUCT: 'nutrient:delete-product',
+  NUTRIENT_SAVE_TDEE: 'nutrient:save-tdee',
   DIALOG_OPEN_FILE: 'dialog:open-file',
 
   // 2FA（TOTP）动态验证码：列账号 / 解析并添加 / 删除 / 取当前验证码。
@@ -65,7 +70,7 @@ const IPC = {
   TERMINAL_EXPORT: 'terminal:export',
   TERMINAL_OPEN_ITERM: 'terminal:open-iterm',
   TERMINAL_SET_TOP: 'terminal:set-top',
-  TERMINAL_SET_HOTKEY: 'terminal:set-hotkey',
+  SHORTCUT_SET: 'shortcut:set',
   TERMINAL_DESTROY: 'terminal:destroy',
   TERMINAL_RESET: 'terminal:reset',
   TERMINAL_SNAP_SIZE: 'terminal:snap-size',
@@ -201,11 +206,15 @@ const UPDATE_WINDOW = Object.assign(
 // 更新下载完成后自动重启安装的倒计时（秒）。
 const UPDATE_COUNTDOWN_SECONDS = 60;
 
-// 拖动窗口时，窗口纵向中心与屏幕（工作区）纵向中心对齐的「磁性吸附」（px，滞回）：
-// 进入吸附的阈值 / 脱离吸附的释放阈值。用于终端窗口与窗口模式的主窗口（简单提示）。
+// 同一个全局快捷键同时绑定主窗口（双击）与终端（单击）时，用于区分单 / 双击的等待时间。
+const SHORTCUT_DOUBLE_TAP_MS = 260;
+
+// 拖动窗口时，窗口中心与屏幕（工作区）**垂直中线**（x 方向）对齐的「磁性吸附」（px，滞回）：
+// 进入吸附的阈值 / 脱离吸附的释放阈值。用于终端窗口与窗口模式的主窗口；
+// 只比较 x，不要求上下也居中。
 const CENTER_SNAP = {
-  vThreshold: 10,
-  vRelease: 26,
+  xThreshold: 10,
+  xRelease: 26,
 };
 
 // 日志保留天数（按天写文件，惰性删除更早的日志）。
@@ -246,7 +255,8 @@ const DEFAULT_SETTINGS = {
   terminalAlwaysOnTop: TERMINAL_WINDOW.alwaysOnTop !== false,
   // 终端窗口关闭按钮的行为：'hide' 只隐藏窗口（会话保留），'destroy' 直接销毁（结束会话）
   terminalCloseAction: TERMINAL_WINDOW.closeAction === 'hide' ? 'hide' : 'destroy',
-  // 打开置顶终端窗口的全局快捷键（Electron accelerator，空字符串 = 不注册）
+  // 全局快捷键（Electron accelerator，空字符串 = 不注册）：主窗口双击 / 终端单击
+  mainWindowHotkey: TERMINAL_WINDOW.hotkey || 'CommandOrControl+Shift+Z',
   terminalHotkey: TERMINAL_WINDOW.hotkey || 'CommandOrControl+Shift+Z',
   sshBuiltinTerminal: ships.sshBuiltinTerminal !== false,
   // 终端窗口失焦缩成「悬浮球」：是否开启 + 延迟（毫秒）+ 球尺寸（px，宽高强制 1:1）
@@ -278,6 +288,7 @@ module.exports = {
   FILE_WINDOW,
   UPDATE_WINDOW,
   UPDATE_COUNTDOWN_SECONDS,
+  SHORTCUT_DOUBLE_TAP_MS,
   CENTER_SNAP,
   LOG_RETENTION_DAYS,
   CD_HISTORY_MAX,

@@ -1,7 +1,7 @@
 'use strict';
 
 (function registerNutrientTool() {
-  const { el, section, inputField, copyText, Icons } = window.ShipsUI;
+  const { el, section, inputField, copyText, segmented, createSelect, debounce } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -10,6 +10,14 @@
         hint: '输入每 100g 的营养成分，实时换算为能量与运动消耗',
         name: '商品名',
         namePlaceholder: '商品的名称',
+        save: '保存',
+        saved: '已保存',
+        delete: '删除',
+        confirmDelete: '确认删除？',
+        deleted: '已删除',
+        selectRecord: '选择记录',
+        noRecords: '暂无记录',
+        nameRequired: '请先输入商品名',
         energy: '能量 (kJ)',
         protein: '蛋白质 (g)',
         fat: '脂肪 (g)',
@@ -30,9 +38,26 @@
         runRemark: '{minutes} 分钟',
         walkRemark: '{minutes} 分钟（{steps}步）',
         km: '约 {value} 公里',
-        clear: '清空',
         copy: '复制输入与结果',
         copied: '已复制',
+      },
+      tdee: {
+        title: 'TDEE 计算器',
+        sex: '性别',
+        male: '男',
+        female: '女',
+        age: '年龄（岁）',
+        height: '身高（cm）',
+        weight: '体重（kg）',
+        activity: '活动水平',
+        activitySedentary: '久坐（1.2）',
+        activityLight: '轻度（1.375）',
+        activityModerate: '中度（1.55）',
+        activityActive: '高度（1.725）',
+        activityVeryActive: '极高（1.9）',
+        bmr: '基础代谢（BMR）',
+        daily: '每日总消耗（TDEE）',
+        formula: 'Mifflin-St Jeor · {activity}',
       },
     },
     en: {
@@ -40,6 +65,14 @@
         hint: 'Enter nutrition per 100g to convert into energy and exercise',
         name: 'Product name',
         namePlaceholder: 'Name of the product',
+        save: 'Save',
+        saved: 'Saved',
+        delete: 'Delete',
+        confirmDelete: 'Delete?',
+        deleted: 'Deleted',
+        selectRecord: 'Select record',
+        noRecords: 'No records',
+        nameRequired: 'Enter a product name first',
         energy: 'Energy (kJ)',
         protein: 'Protein (g)',
         fat: 'Fat (g)',
@@ -60,9 +93,26 @@
         runRemark: '{minutes} min',
         walkRemark: '{minutes} min ({steps} steps)',
         km: 'about {value} km',
-        clear: 'Clear',
         copy: 'Copy input & result',
         copied: 'Copied',
+      },
+      tdee: {
+        title: 'TDEE calculator',
+        sex: 'Sex',
+        male: 'Male',
+        female: 'Female',
+        age: 'Age (years)',
+        height: 'Height (cm)',
+        weight: 'Weight (kg)',
+        activity: 'Activity level',
+        activitySedentary: 'Sedentary (1.2)',
+        activityLight: 'Light (1.375)',
+        activityModerate: 'Moderate (1.55)',
+        activityActive: 'Active (1.725)',
+        activityVeryActive: 'Very active (1.9)',
+        bmr: 'Basal metabolism (BMR)',
+        daily: 'Daily total (TDEE)',
+        formula: 'Mifflin-St Jeor · {activity}',
       },
     },
   });
@@ -76,17 +126,38 @@
     { key: 'total', label: 'nutrient.total', def: 100 },
   ];
 
+  const ACTIVITIES = [
+    { value: 'sedentary', factor: 1.2, label: 'tdee.activitySedentary' },
+    { value: 'light', factor: 1.375, label: 'tdee.activityLight' },
+    { value: 'moderate', factor: 1.55, label: 'tdee.activityModerate' },
+    { value: 'active', factor: 1.725, label: 'tdee.activityActive' },
+    { value: 'veryActive', factor: 1.9, label: 'tdee.activityVeryActive' },
+  ];
+
   function mount(container) {
+    const state = { products: [], tdee: null, ready: false, applying: false, activeName: null, confirmingDelete: false, deleteTimer: null };
+    let saveTdee = null;
+
     const nameInput = el('input', {
-      class: 'field',
+      class: 'field min-w-0 flex-1',
       type: 'text',
       spellcheck: 'false',
       placeholder: i18n.t('nutrient.namePlaceholder'),
     });
-    const nameWrap = inputField(i18n.t('nutrient.name'), nameInput);
+    const saveBtn = el('button', { class: 'btn shrink-0', type: 'button' }, i18n.t('nutrient.save'));
+    const recordSelect = createSelect({
+      options: [],
+      value: '',
+      align: 'right',
+      className: 'w-[128px] shrink-0',
+      placeholder: i18n.t('nutrient.selectRecord'),
+      onChange: (name) => loadProduct(name),
+    });
+    const nameRow = el('div', { class: 'flex items-center gap-2' });
+    nameRow.append(nameInput, saveBtn, recordSelect.el);
 
     const inputs = {};
-    const grid = el('div', { class: 'grid grid-cols-2 gap-x-2' });
+    const grid = el('div', { class: 'grid grid-cols-2 gap-2' });
     for (const field of FIELDS) {
       const input = el('input', { class: 'field font-mono', type: 'number', min: '0', spellcheck: 'false' });
       input.value = String(field.def);
@@ -95,10 +166,8 @@
     }
 
     const inputSection = section();
-    inputSection.appendChild(nameWrap);
-    inputSection.appendChild(grid);
+    inputSection.append(nameRow, grid);
 
-    // Results
     const resultSection = section(i18n.t('nutrient.results'));
     const resultRows = {
       salt: makeResultRow(i18n.t('nutrient.salt')),
@@ -110,15 +179,61 @@
     for (const key of Object.keys(resultRows)) resultSection.appendChild(resultRows[key].root);
 
     const actions = el('div', { class: 'flex items-center gap-2' });
-    const clearBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', 'data-tip': i18n.t('nutrient.clear') });
-    clearBtn.innerHTML = Icons.trash(15);
     const copyBtn = el('button', { class: 'btn', type: 'button' }, i18n.t('nutrient.copy'));
-    actions.append(clearBtn, copyBtn);
+    actions.append(copyBtn);
 
-    container.append(inputSection, resultSection, actions);
+    const tdeeSection = section(i18n.t('tdee.title'));
+    let sexValue = 'male';
+    const sexSegment = segmented(
+      [
+        { value: 'male', label: i18n.t('tdee.male') },
+        { value: 'female', label: i18n.t('tdee.female') },
+      ],
+      sexValue,
+      (value) => {
+        sexValue = value;
+        onTdeeChange();
+      }
+    );
+    const sexWrap = el('div', { class: 'col-span-2' });
+    sexWrap.appendChild(inputField(i18n.t('tdee.sex'), sexSegment.root));
+
+    const ageInput = numberField('tdee.age', '30');
+    const heightInput = numberField('tdee.height', '175');
+    const weightInput = numberField('tdee.weight', '70');
+    const activitySelect = createSelect({
+      options: ACTIVITIES.map((item) => ({ value: item.value, label: i18n.t(item.label) })),
+      value: 'moderate',
+      align: 'right',
+      className: 'w-full',
+      onChange: () => onTdeeChange(),
+    });
+
+    const tdeeGrid = el('div', { class: 'grid grid-cols-2 gap-2' });
+    tdeeGrid.append(
+      sexWrap,
+      inputField(i18n.t('tdee.age'), ageInput),
+      inputField(i18n.t('tdee.height'), heightInput),
+      inputField(i18n.t('tdee.weight'), weightInput),
+      inputField(i18n.t('tdee.activity'), activitySelect.el)
+    );
+
+    const tdeeRows = {
+      bmr: makeResultRow(i18n.t('tdee.bmr')),
+      daily: makeResultRow(i18n.t('tdee.daily')),
+    };
+    tdeeSection.append(tdeeGrid, tdeeRows.bmr.root, tdeeRows.daily.root);
+
+    container.append(inputSection, resultSection, actions, tdeeSection);
+
+    function numberField(labelKey, value) {
+      const input = el('input', { class: 'field font-mono', type: 'number', min: '0', spellcheck: 'false' });
+      input.value = value;
+      return input;
+    }
 
     function makeResultRow(labelText) {
-      const root = el('div', { class: 'mb-2.5 flex items-center justify-between gap-2 rounded-card border border-border bg-surface px-2.5 py-1.5' });
+      const root = el('div', { class: 'flex items-center justify-between gap-2 rounded-card border border-border bg-surface px-2.5 py-1.5' });
       const left = el('div', { class: 'min-w-0 flex-1' });
       left.appendChild(el('div', { class: 'text-[10px] uppercase tracking-wide text-fg-muted' }, labelText));
       const value = el('div', { class: 'result-value' }, '—');
@@ -146,7 +261,6 @@
       const salt = sodium * 2.5;
       const perKcal = energy * 0.2389 + protein / 4 + carbohydrate / 4 + fat / 9;
       const totalKcal = (perKcal / 100) * total;
-      const perKj = perKcal * 4.184;
       const totalKj = totalKcal * 4.184;
       const runKm = totalKcal / 90;
       const walkKm = totalKcal / 70;
@@ -186,9 +300,125 @@
       ];
     }
 
-    function flash(button) {
+    function activityFactor() {
+      const found = ACTIVITIES.find((item) => item.value === activitySelect.getValue());
+      return found ? found.factor : 1.55;
+    }
+
+    function calcTdee() {
+      const age = Number(ageInput.value);
+      const height = Number(heightInput.value);
+      const weight = Number(weightInput.value);
+      if (!(age > 0 && height > 0 && weight > 0)) return { bmr: null, tdee: null };
+      const bmr = 10 * weight + 6.25 * height - 5 * age + (sexValue === 'female' ? -161 : 5);
+      return { bmr, tdee: bmr * activityFactor() };
+    }
+
+    function tdeePayload() {
+      const result = calcTdee();
+      return {
+        sex: sexValue,
+        age: Number(ageInput.value) || 0,
+        height: Number(heightInput.value) || 0,
+        weight: Number(weightInput.value) || 0,
+        activity: activitySelect.getValue(),
+        bmr: result.bmr || 0,
+        tdee: result.tdee || 0,
+      };
+    }
+
+    function computeTdee() {
+      const result = calcTdee();
+      const activity = ACTIVITIES.find((item) => item.value === activitySelect.getValue());
+      const remark = activity ? i18n.t('tdee.formula', { activity: i18n.t(activity.label) }) : '';
+      if (result.bmr == null) {
+        tdeeRows.bmr.setValue('—');
+        tdeeRows.bmr.setRemark('');
+        tdeeRows.daily.setValue('—');
+        tdeeRows.daily.setRemark('');
+        return;
+      }
+      tdeeRows.bmr.setValue(`${result.bmr.toFixed(0)} kcal`);
+      tdeeRows.bmr.setRemark(remark);
+      tdeeRows.daily.setValue(`${result.tdee.toFixed(0)} kcal`);
+      tdeeRows.daily.setRemark(remark);
+    }
+
+    saveTdee = debounce(() => {
+      if (!state.ready || state.applying) return;
+      window.ships.nutrient.saveTdee(tdeePayload()).catch(() => {});
+    }, 350);
+
+    function onTdeeChange() {
+      computeTdee();
+      saveTdee();
+    }
+
+    function applyTdee(record) {
+      if (!record) return;
+      state.applying = true;
+      sexValue = record.sex === 'female' ? 'female' : 'male';
+      sexSegment.set(sexValue);
+      ageInput.value = String(record.age || 30);
+      heightInput.value = String(record.height || 175);
+      weightInput.value = String(record.weight || 70);
+      activitySelect.setValue(record.activity || 'moderate');
+      computeTdee();
+      state.applying = false;
+    }
+
+    function renderRecords(selected) {
+      const options = state.products.map((product) => ({ value: product.name, label: product.name }));
+      recordSelect.setOptions(options.length ? options : [{ header: true, label: i18n.t('nutrient.noRecords') }]);
+      recordSelect.setValue(selected || '');
+    }
+
+    function productPayload() {
+      const product = { name: nameInput.value.trim() };
+      for (const field of FIELDS) product[field.key] = Number(inputs[field.key].value) || 0;
+      return product;
+    }
+
+    function applyProduct(product) {
+      state.applying = true;
+      nameInput.value = product.name;
+      for (const field of FIELDS) {
+        inputs[field.key].value = String(Number.isFinite(product[field.key]) ? product[field.key] : field.def);
+      }
+      state.applying = false;
+      compute();
+    }
+
+    function loadProduct(name) {
+      const product = state.products.find((item) => item.name === name);
+      if (!product) return;
+      applyProduct(product);
+      state.activeName = product.name;
+      state.confirmingDelete = false;
+      if (state.deleteTimer) clearTimeout(state.deleteTimer);
+      state.deleteTimer = null;
+      updateActionButton();
+    }
+
+    function updateActionButton() {
+      saveBtn.classList.toggle('btn-danger', Boolean(state.activeName));
+      if (!state.activeName) saveBtn.textContent = i18n.t('nutrient.save');
+      else if (state.confirmingDelete) saveBtn.textContent = i18n.t('nutrient.confirmDelete');
+      else saveBtn.textContent = i18n.t('nutrient.delete');
+    }
+
+    function markEdited() {
+      if (state.deleteTimer) clearTimeout(state.deleteTimer);
+      state.deleteTimer = null;
+      state.activeName = null;
+      state.confirmingDelete = false;
+      recordSelect.setValue('');
+      updateActionButton();
+    }
+
+    function flash(button, key) {
       const original = button.textContent;
-      button.textContent = i18n.t('nutrient.copied');
+      button.textContent = i18n.t(key);
       button.style.color = 'var(--color-success)';
       setTimeout(() => {
         button.textContent = original;
@@ -196,11 +426,64 @@
       }, 1200);
     }
 
-    clearBtn.addEventListener('click', () => {
-      nameInput.value = '';
-      for (const field of FIELDS) inputs[field.key].value = String(field.def);
-      compute();
+    async function saveCurrentProduct() {
+      const name = nameInput.value.trim();
+      if (!name) {
+        nameInput.classList.add('invalid');
+        nameInput.focus();
+        return;
+      }
+      const result = await window.ships.nutrient.saveProduct(productPayload());
+      if (!result || !result.ok) return;
+      state.products = result.products || [];
+      renderRecords(name);
+      state.activeName = null;
+      state.confirmingDelete = false;
+      updateActionButton();
+      nameInput.classList.remove('invalid');
+      flash(saveBtn, 'nutrient.saved');
+    }
+
+    async function deleteCurrentProduct() {
+      if (!state.activeName) return;
+      if (!state.confirmingDelete) {
+        state.confirmingDelete = true;
+        updateActionButton();
+        state.deleteTimer = setTimeout(() => {
+          state.deleteTimer = null;
+          state.confirmingDelete = false;
+          updateActionButton();
+        }, 4000);
+        return;
+      }
+      if (state.deleteTimer) clearTimeout(state.deleteTimer);
+      state.deleteTimer = null;
+      const name = state.activeName;
+      const result = await window.ships.nutrient.deleteProduct(name);
+      if (!result || !result.ok) {
+        state.confirmingDelete = false;
+        updateActionButton();
+        return;
+      }
+      state.products = result.products || [];
+      renderRecords('');
+      state.activeName = null;
+      state.confirmingDelete = false;
+      updateActionButton();
+      flash(saveBtn, 'nutrient.deleted');
+    }
+
+    function onActionClick() {
+      if (state.activeName) deleteCurrentProduct();
+      else saveCurrentProduct();
+    }
+
+    nameInput.addEventListener('input', () => {
+      nameInput.classList.remove('invalid');
+      markEdited();
     });
+
+    saveBtn.addEventListener('click', onActionClick);
 
     copyBtn.addEventListener('click', async () => {
       const lines = [];
@@ -210,14 +493,35 @@
       for (const [label, row] of currentResults) {
         lines.push(`${label}: ${row.root.querySelector('.result-value').textContent}`);
       }
-      if (await copyText(lines.join('\n'))) flash(copyBtn);
+      if (await copyText(lines.join('\n'))) flash(copyBtn, 'nutrient.copied');
     });
 
     for (const field of FIELDS) {
-      inputs[field.key].addEventListener('input', compute);
+      inputs[field.key].addEventListener('input', () => {
+        compute();
+        if (!state.applying) markEdited();
+      });
+    }
+    for (const input of [ageInput, heightInput, weightInput]) {
+      input.addEventListener('input', onTdeeChange);
     }
 
+    updateActionButton();
     compute();
+    computeTdee();
+
+    window.ships.nutrient
+      .get()
+      .then((data) => {
+        state.products = (data && data.products) || [];
+        state.tdee = (data && data.tdee) || null;
+        renderRecords();
+        applyTdee(state.tdee);
+        state.ready = true;
+      })
+      .catch(() => {
+        state.ready = true;
+      });
   }
 
   window.ShipsToolRegistry.register({ id: 'nutrient', icon: 'nutrition', mount });

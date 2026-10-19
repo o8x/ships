@@ -106,7 +106,7 @@
     const state = { view: 'text', tooLarge: false };
 
     // ---- toolbar ----
-    const toolbar = el('div', { class: 'mb-2.5 flex items-center gap-2' });
+    const toolbar = el('div', { class: 'mb-card flex items-center gap-2' });
     const sortLabel = el('label', { class: 'chip shrink-0 cursor-pointer select-none' });
     const sortCheckbox = el('input', { type: 'checkbox', class: 'accent-[var(--color-accent)]' });
     sortLabel.append(sortCheckbox, el('span', {}, i18n.t('json.sortKeys')));
@@ -149,7 +149,7 @@
     // ---- tree view ----
     const tree = el('div', { class: 'json-tree select-text hidden' });
 
-    const status = el('div', { class: 'mt-2.5 text-[11px] text-fg-muted' }, i18n.t('json.empty'));
+    const status = el('div', { class: 'mt-card text-[11px] text-fg-muted' }, i18n.t('json.empty'));
 
     container.append(toolbar, editor, tree, status);
 
@@ -343,5 +343,5 @@
     refreshStatus();
   }
 
-  window.ShipsToolRegistry.register({ id: 'json', icon: 'braces', mount });
+  window.ShipsToolRegistry.register({ id: 'json', icon: 'braces', fill: true, mount });
 })();

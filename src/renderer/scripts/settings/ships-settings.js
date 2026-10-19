@@ -9,7 +9,7 @@
     zh: {
       settingsPage: {
         title: '设置',
-        ships: '应用设置',
+        ships: '应用',
         ssh: 'SSH',
         language: '语言',
         languageHint: '界面显示语言',
@@ -24,13 +24,13 @@
         launchAtLogin: '开机自启',
         launchAtLoginHint: '登录时自动启动 Ships',
         floatMode: '悬浮模式',
-        floatModeHint: '开 = 托盘下方弹出面板（悬浮）；关 = 独立的窗口模式（默认）',
+        floatModeHint: '开 = 悬浮面板，关 = 独立窗口',
         pin: '固定悬浮',
-        pinHint: '主界面置顶常驻，失焦不自动隐藏（仅悬浮模式）',
+        pinHint: '置顶常驻，失焦不隐藏（仅悬浮模式）',
         vibrancy: 'Liquid Glass',
-        vibrancyHint: '主界面使用 macOS 原生 Liquid Glass 背景（macOS 26+，旧系统回退毛玻璃）',
+        vibrancyHint: 'macOS 26+ 原生玻璃，旧系统回退毛玻璃',
         glassOpacity: 'Liquid Glass 透明度',
-        glassOpacityHint: '玻璃卡片 / 输入框的透明程度（越大越透明，实时生效）',
+        glassOpacityHint: '越高越透明（实时生效）',
         clipboardLimit: '剪贴板条数',
         clipboardLimitHint: '最多保留最近几条记录',
         clipboardPoll: '剪贴板轮询间隔',
@@ -47,7 +47,7 @@
         check: '检查',
         checking: '正在检查…',
         developerMode: '开发者模式',
-        developerModeHint: '开启后显示下方的开发者工具，并在主界面版本号旁标记',
+        developerModeHint: '显示开发者工具与主界面标记',
         developer: '开发者',
         devPopover: '悬浮界面开发者工具',
         devSettings: '设置界面开发者工具',
@@ -58,7 +58,7 @@
     en: {
       settingsPage: {
         title: 'Settings',
-        ships: 'Application',
+        ships: 'App',
         ssh: 'SSH',
         language: 'Language',
         languageHint: 'Interface language',
@@ -73,13 +73,13 @@
         launchAtLogin: 'Launch at login',
         launchAtLoginHint: 'Start Ships when you log in',
         floatMode: 'Floating mode',
-        floatModeHint: 'On = popover under the tray; Off = a standalone window (default)',
+        floatModeHint: 'On = floating panel, Off = standalone window',
         pin: 'Keep on top',
-        pinHint: 'Pin the popover and never auto-hide on blur (floating mode only)',
+        pinHint: 'Keep on top and stay visible on blur (floating mode only)',
         vibrancy: 'Liquid Glass',
-        vibrancyHint: 'Use the native macOS Liquid Glass background (macOS 26+, with fallback)',
+        vibrancyHint: 'Native glass on macOS 26+; frosted fallback on older systems',
         glassOpacity: 'Liquid Glass opacity',
-        glassOpacityHint: 'How transparent glass cards / inputs are (higher = more transparent, live)',
+        glassOpacityHint: 'Higher = more transparent (live)',
         clipboardLimit: 'Clipboard items',
         clipboardLimitHint: 'How many recent items to keep',
         clipboardPoll: 'Clipboard poll interval',
@@ -96,7 +96,7 @@
         check: 'Check',
         checking: 'Checking…',
         developerMode: 'Developer mode',
-        developerModeHint: 'Show the developer tools below, and mark it next to the version in the main panel',
+        developerModeHint: 'Show DevTools and the main-window badge',
         developer: 'Developer',
         devPopover: 'Popover DevTools',
         devSettings: 'Settings DevTools',
@@ -375,7 +375,11 @@
       opacityRow.style.display = next && next.vibrancy === true ? '' : 'none';
     });
 
-    pane.append(languageSection, appearanceSection, generalSection, aboutSection, devSection);
+    pane.append(languageSection, appearanceSection, generalSection);
+    // 日志与导入 / 导出合并到「应用」分区（不再单独占导航项）。
+    if (window.ShipsBackupSettings) window.ShipsBackupSettings.mount(pane, ctx);
+    if (window.ShipsLogSettings) window.ShipsLogSettings.mount(pane, ctx);
+    pane.append(aboutSection, devSection);
 
     return () => {
       if (typeof offSettings === 'function') offSettings();
