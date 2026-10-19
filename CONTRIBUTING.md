@@ -20,7 +20,7 @@ pnpm run dev        # launch without rebuilding the CSS
 pnpm run watch:css  # rebuild the Tailwind output on change
 ```
 
-Packaging (macOS arm64 PKG installer; postinstall launches the app):
+Packaging (macOS arm64 PKG installer; preinstall quits the running app, postinstall launches the new one):
 
 ```bash
 pnpm dist:mac

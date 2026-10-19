@@ -1,0 +1,25 @@
+#!/bin/bash
+set -u
+
+# The installer runs as root; ask the running Ships instance in the logged-in
+# user's GUI session to quit before replacing it.
+CONSOLE_USER="$(/usr/bin/stat -f '%Su' /dev/console 2>/dev/null || true)"
+CONSOLE_UID="$(/usr/bin/stat -f '%u' /dev/console 2>/dev/null || true)"
+
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ] && [ "$CONSOLE_USER" != "loginwindow" ] && [ -n "$CONSOLE_UID" ]; then
+  if /usr/bin/pgrep -x Ships >/dev/null 2>&1; then
+    /bin/launchctl asuser "$CONSOLE_UID" /usr/bin/sudo -u "$CONSOLE_USER" \
+      /usr/bin/osascript -e 'tell application "Ships" to quit' >/dev/null 2>&1 || true
+  fi
+
+  # Give the app a moment to exit, then force-quit if it is still running.
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    /usr/bin/pgrep -x Ships >/dev/null 2>&1 || break
+    /bin/sleep 0.25
+  done
+  if /usr/bin/pgrep -x Ships >/dev/null 2>&1; then
+    /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/killall -9 Ships >/dev/null 2>&1 || true
+  fi
+fi
+
+exit 0
