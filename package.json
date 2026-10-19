@@ -60,7 +60,7 @@
       "shell": "",
       "ballSize": 75,
       "ballEnabled": true,
-      "ballDelayMs": 200,
+      "ballDelayMs": 50,
       "ballIcon": "ball.svg",
       "ballDark": true
     },

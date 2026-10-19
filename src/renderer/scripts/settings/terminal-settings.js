@@ -40,6 +40,7 @@
         ballEnableHint: '终端窗口失去焦点一段时间后缩成圆形悬浮球，点击球 / 按快捷键放大回来',
         ballDelay: '缩成悬浮球延迟',
         ballDelayHint: '失去焦点后多久缩成球（期间焦点回来则取消）',
+        ballDelayImmediate: '立即',
         ballSize: '悬浮球大小',
         ballSizeHint: '圆形悬浮球的边长（宽高强制 1:1，40–200px）',
         ballIcon: '悬浮球图标',
@@ -90,6 +91,7 @@
         ballEnableHint: 'Shrink the terminal into a round floating ball after it loses focus; click it or press the hotkey to bring it back',
         ballDelay: 'Ball shrink delay',
         ballDelayHint: 'How long after losing focus before shrinking (cancelled if focus returns)',
+        ballDelayImmediate: 'Immediate',
         ballSize: 'Ball size',
         ballSizeHint: 'Edge length of the round ball (forced 1:1, 40–200px)',
         ballIcon: 'Ball icon',
@@ -341,18 +343,28 @@
       row(i18n.t('terminalSettings.ballEnable'), i18n.t('terminalSettings.ballEnableHint'), ballSwitch)
     );
 
+    // 0 = 立即；其余为毫秒。默认 50ms。
+    const normalizeBallDelay = (value) => {
+      const n = Number(value);
+      return Number.isFinite(n) && n >= 0 ? n : 50;
+    };
     const ballDelaySelect = window.ShipsUI.createSelect({
-      options: [200, 500, 1000, 5000, 10000, 15000, 30000, 60000].map((ms) => ({
+      options: [0, 50, 100, 200, 500, 1000, 5000, 10000, 15000, 30000, 60000].map((ms) => ({
         value: ms,
-        label: ms < 1000 ? `${ms} ms` : `${ms / 1000} ${i18n.t('terminalSettings.seconds')}`,
+        label:
+          ms === 0
+            ? i18n.t('terminalSettings.ballDelayImmediate')
+            : ms < 1000
+              ? `${ms} ms`
+              : `${ms / 1000} ${i18n.t('terminalSettings.seconds')}`,
       })),
-      value: Number(ctx.settings.terminalBallDelayMs) || 200,
+      value: normalizeBallDelay(ctx.settings.terminalBallDelayMs),
       align: 'right',
       className: 'w-[120px] shrink-0',
       onChange: (value) => ctx.patch({ terminalBallDelayMs: Number(value) }),
     });
     syncers.push((next) => {
-      ballDelaySelect.setValue(Number(next.terminalBallDelayMs) || 200);
+      ballDelaySelect.setValue(normalizeBallDelay(next.terminalBallDelayMs));
     });
     wrap.appendChild(
       row(i18n.t('terminalSettings.ballDelay'), i18n.t('terminalSettings.ballDelayHint'), ballDelaySelect.el)

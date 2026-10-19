@@ -422,7 +422,7 @@ function terminalBallEnabled() {
 }
 function terminalBallDelayMs() {
   const value = Number(settings.get('terminalBallDelayMs'));
-  return Number.isFinite(value) && value >= 0 ? value : 200;
+  return Number.isFinite(value) && value >= 0 ? value : 50;
 }
 
 function isBallMode(win) {

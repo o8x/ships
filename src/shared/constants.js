@@ -170,7 +170,7 @@ const TERMINAL_WINDOW = Object.assign(
     scrollback: 10000,
     ballSize: 75,
     ballEnabled: true,
-    ballDelayMs: 200,
+    ballDelayMs: 50,
     ballIcon: 'ball.svg',
     ballDark: true,
   },
@@ -251,7 +251,7 @@ const DEFAULT_SETTINGS = {
   sshBuiltinTerminal: ships.sshBuiltinTerminal !== false,
   // 终端窗口失焦缩成「悬浮球」：是否开启 + 延迟（毫秒）+ 球尺寸（px，宽高强制 1:1）
   terminalBallEnabled: TERMINAL_WINDOW.ballEnabled !== false,
-  terminalBallDelayMs: Number.isFinite(TERMINAL_WINDOW.ballDelayMs) ? TERMINAL_WINDOW.ballDelayMs : 200,
+  terminalBallDelayMs: Number.isFinite(TERMINAL_WINDOW.ballDelayMs) ? TERMINAL_WINDOW.ballDelayMs : 50,
   terminalBallSize: Number.isFinite(TERMINAL_WINDOW.ballSize) ? TERMINAL_WINDOW.ballSize : 75,
   // 悬浮球图标（assets/icons/ball/ 下的文件名）
   terminalBallIcon: TERMINAL_WINDOW.ballIcon || 'ball.svg',
