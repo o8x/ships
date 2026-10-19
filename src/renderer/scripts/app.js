@@ -102,12 +102,16 @@
 
   /* 内容在最顶部时，第一次滚轮先把标题收起（内容保持不动），之后才滚动内容；
      回到顶部后向上滚则先展开标题。标题始终独占一行，内容不会滚到它下面。 */
+  function canScroll(el) {
+    return Boolean(el) && el.scrollHeight > el.clientHeight + 1;
+  }
+
   function nearestScroller(node) {
     let el = node instanceof Element ? node : null;
     while (el) {
-      if (el === dom.content) return el;
+      if (el === dom.content) return canScroll(el) ? el : null;
       const style = getComputedStyle(el);
-      if (/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight) return el;
+      if (/(auto|scroll)/.test(style.overflowY) && canScroll(el)) return el;
       el = el.parentElement;
     }
     return null;
