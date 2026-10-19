@@ -84,7 +84,7 @@
     "defaultAccent": "#2e6bfc",
     "updateRepo": {
       "owner": "o8x",
-      "repo": "ships"
+      "repo": "vessel"
     }
   },
   "pnpm": {
@@ -102,7 +102,7 @@
       {
         "provider": "github",
         "owner": "o8x",
-        "repo": "ships"
+        "repo": "vessel"
       }
     ],
     "files": [
