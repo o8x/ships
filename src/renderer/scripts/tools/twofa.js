@@ -64,12 +64,14 @@
       placeholder: i18n.t('twofa.placeholder'),
     });
     const addBtn = el('button', { class: 'btn btn-accent shrink-0', type: 'button' }, i18n.t('twofa.add'));
-    const inputRow = el('div', { class: 'mb-card flex items-stretch gap-2' });
+    const inputRow = el('div', { class: 'flex items-stretch gap-2' });
     inputRow.append(input, addBtn);
 
-    const errorLine = el('div', { class: 'mb-card hidden text-[11px] text-danger' }, '');
+    const errorLine = el('div', { class: 'hidden text-[11px] text-danger' }, '');
     const list = el('div', { class: 'flex flex-col gap-card' });
-    container.append(inputRow, errorLine, list);
+    const stack = el('div', { class: 'flex flex-col gap-card' });
+    stack.append(inputRow, errorLine, list);
+    container.appendChild(stack);
 
     function showError(code) {
       errorLine.textContent = errorText(code);
@@ -174,7 +176,7 @@
       const card = { account, confirming: false, code: '', lastStep: -1, disposed: false, els: {} };
 
       const root = el('div', {
-        class: 'flex flex-col gap-3 rounded-card border border-border bg-surface px-3 pb-2.5 pt-2',
+        class: 'flex flex-col gap-card rounded-card border border-border bg-surface px-3 pb-2.5 pt-2',
       });
 
       const head = el('div', { class: 'flex items-center gap-2' });
