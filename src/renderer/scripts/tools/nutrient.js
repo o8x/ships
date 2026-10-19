@@ -35,6 +35,13 @@
         kcalOver: '每天推荐摄入 2250kcal，已超出：{value}kcal',
         kjRemark: '每天推荐摄入 9410kJ',
         kjOver: '每天推荐摄入 9410kJ，已超出：{value}kJ',
+        tdeeKcalRemark: '每日推荐（TDEE）{value}kcal',
+        tdeeKcalOver: '每日推荐（TDEE）{value}kcal，已超出：{over}kcal',
+        tdeeKjRemark: '每日推荐（TDEE）{value}kJ',
+        tdeeKjOver: '每日推荐（TDEE）{value}kJ，已超出：{over}kJ',
+        tdeeRatio: 'TDEE ÷ 每 100g',
+        tdeeRatioValue: '≈ {value} 份',
+        tdeeRatioHint: '填写 TDEE 后显示',
         runRemark: '{minutes} 分钟',
         walkRemark: '{minutes} 分钟（{steps}步）',
         km: '约 {value} 公里',
@@ -91,6 +98,13 @@
         kcalOver: 'Recommended 2250kcal, over by {value}kcal',
         kjRemark: 'Recommended daily intake 9410kJ',
         kjOver: 'Recommended 9410kJ, over by {value}kJ',
+        tdeeKcalRemark: 'TDEE recommendation {value}kcal',
+        tdeeKcalOver: 'TDEE recommendation {value}kcal, over by {over}kcal',
+        tdeeKjRemark: 'TDEE recommendation {value}kJ',
+        tdeeKjOver: 'TDEE recommendation {value}kJ, over by {over}kJ',
+        tdeeRatio: 'TDEE ÷ per 100g',
+        tdeeRatioValue: '≈ {value} servings',
+        tdeeRatioHint: 'Shown after TDEE is filled',
         runRemark: '{minutes} min',
         walkRemark: '{minutes} min ({steps} steps)',
         km: 'about {value} km',
@@ -175,6 +189,7 @@
       salt: makeResultRow(i18n.t('nutrient.salt')),
       kcal: makeResultRow(i18n.t('nutrient.kcal')),
       kj: makeResultRow(i18n.t('nutrient.kj')),
+      tdeeRatio: makeResultRow(i18n.t('nutrient.tdeeRatio')),
       run: makeResultRow(i18n.t('nutrient.run')),
       walk: makeResultRow(i18n.t('nutrient.walk')),
     };
@@ -272,19 +287,50 @@
       resultRows.salt.setValue(`${salt.toFixed(0)}mg (${(salt / 1000).toFixed(2)}g)`);
       resultRows.salt.setRemark(i18n.t('nutrient.saltRemark'));
 
-      resultRows.kcal.setValue(`${((totalKcal / total) * 100).toFixed(0)} / ${totalKcal.toFixed(0)}kcal`);
-      resultRows.kcal.setRemark(
-        totalKcal > 2250
-          ? i18n.t('nutrient.kcalOver', { value: (totalKcal - 2250).toFixed(0) })
-          : i18n.t('nutrient.kcalRemark')
-      );
+      const per100Kcal = (totalKcal / total) * 100;
+      const tdeeResult = calcTdee();
+      const tdeeKcal = tdeeResult.tdee == null ? null : Math.round(tdeeResult.tdee);
+      const tdeeKj = tdeeKcal == null ? null : Math.round(tdeeKcal * 4.184);
+
+      resultRows.kcal.setValue(`${per100Kcal.toFixed(0)} / ${totalKcal.toFixed(0)}kcal`);
+      if (tdeeKcal != null) {
+        resultRows.kcal.setRemark(
+          totalKcal > tdeeKcal
+            ? i18n.t('nutrient.tdeeKcalOver', { value: tdeeKcal, over: (totalKcal - tdeeKcal).toFixed(0) })
+            : i18n.t('nutrient.tdeeKcalRemark', { value: tdeeKcal })
+        );
+      } else {
+        resultRows.kcal.setRemark(
+          totalKcal > 2250
+            ? i18n.t('nutrient.kcalOver', { value: (totalKcal - 2250).toFixed(0) })
+            : i18n.t('nutrient.kcalRemark')
+        );
+      }
 
       resultRows.kj.setValue(`${((totalKj / total) * 100).toFixed(0)} / ${totalKj.toFixed(0)}kJ`);
-      resultRows.kj.setRemark(
-        totalKj > 9410
-          ? i18n.t('nutrient.kjOver', { value: (totalKj - 9410).toFixed(0) })
-          : i18n.t('nutrient.kjRemark')
-      );
+      if (tdeeKj != null) {
+        resultRows.kj.setRemark(
+          totalKj > tdeeKj
+            ? i18n.t('nutrient.tdeeKjOver', { value: tdeeKj, over: (totalKj - tdeeKj).toFixed(0) })
+            : i18n.t('nutrient.tdeeKjRemark', { value: tdeeKj })
+        );
+      } else {
+        resultRows.kj.setRemark(
+          totalKj > 9410
+            ? i18n.t('nutrient.kjOver', { value: (totalKj - 9410).toFixed(0) })
+            : i18n.t('nutrient.kjRemark')
+        );
+      }
+
+      if (tdeeKcal != null && per100Kcal > 0) {
+        resultRows.tdeeRatio.setValue(
+          i18n.t('nutrient.tdeeRatioValue', { value: (tdeeKcal / per100Kcal).toFixed(1) })
+        );
+        resultRows.tdeeRatio.setRemark('');
+      } else {
+        resultRows.tdeeRatio.setValue('—');
+        resultRows.tdeeRatio.setRemark(i18n.t('nutrient.tdeeRatioHint'));
+      }
 
       resultRows.run.setValue(i18n.t('nutrient.km', { value: runKm.toFixed(2) }));
       resultRows.run.setRemark(i18n.t('nutrient.runRemark', { minutes: (runKm * 7).toFixed(0) }));
@@ -298,6 +344,7 @@
         [i18n.t('nutrient.salt'), resultRows.salt],
         [i18n.t('nutrient.kcal'), resultRows.kcal],
         [i18n.t('nutrient.kj'), resultRows.kj],
+        [i18n.t('nutrient.tdeeRatio'), resultRows.tdeeRatio],
         [i18n.t('nutrient.run'), resultRows.run],
         [i18n.t('nutrient.walk'), resultRows.walk],
       ];
@@ -342,9 +389,11 @@
         tdeeRows.daily.setRemark('');
         return;
       }
-      tdeeRows.bmr.setValue(`${result.bmr.toFixed(0)} kcal`);
+      const bmrKcal = Math.round(result.bmr);
+      const tdeeKcal = Math.round(result.tdee);
+      tdeeRows.bmr.setValue(`${bmrKcal} kcal / ${Math.round(bmrKcal * 4.184)} kJ`);
       tdeeRows.bmr.setRemark(remark);
-      tdeeRows.daily.setValue(`${result.tdee.toFixed(0)} kcal`);
+      tdeeRows.daily.setValue(`${tdeeKcal} kcal / ${Math.round(tdeeKcal * 4.184)} kJ`);
       tdeeRows.daily.setRemark(remark);
     }
 
@@ -355,6 +404,7 @@
 
     function onTdeeChange() {
       computeTdee();
+      compute();
       saveTdee();
     }
 
@@ -368,6 +418,7 @@
       weightInput.value = record.weight != null ? String(record.weight) : '';
       activitySelect.setValue(record.activity || '');
       computeTdee();
+      compute();
       state.applying = false;
     }
 
