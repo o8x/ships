@@ -389,10 +389,13 @@
   height: 100%;
 }
 .qr-note {
-  margin-top: 8px;
+  margin-top: 0;
   text-align: center;
   font-size: 11px;
   color: var(--color-fg-muted);
+}
+.qr-note:empty {
+  display: none;
 }
 
 /* Liquid Glass 透明度滑块（设置 → 应用设置）。 */
@@ -1574,6 +1577,16 @@ body.file-window {
 .section.encode-fields,
 .section.radix-fields {
   gap: 8px;
+}
+/* 编码转换：字段、二维码 / Data Matrix 分区及标题统一 8px 间距。 */
+.encode-root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.encode-root > .section {
+  gap: var(--space-2);
+  margin-bottom: 0;
 }
 
 /* 工具标题区：固定在内容区上方，不随内容滚动；滚动后切换为紧凑的单行标题。 */

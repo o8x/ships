@@ -32,6 +32,7 @@
         qrVersion: '版本',
         qrVersionAuto: '自动',
         qrMargin: '边框',
+        qrCode: '二维码',
         dataMatrix: 'Data Matrix',
         dmFormat: '形状',
         dmSquare: '方形',
@@ -66,6 +67,7 @@
         qrVersion: 'Version',
         qrVersionAuto: 'Auto',
         qrMargin: 'Border',
+        qrCode: 'QR Code',
         dataMatrix: 'Data Matrix',
         dmFormat: 'Shape',
         dmSquare: 'Square',
@@ -199,6 +201,8 @@
   }
 
   function mount(container) {
+    container.classList.add('encode-root');
+
     function area(label, placeholder) {
       const input = el('textarea', {
         class: 'field font-mono',
@@ -460,7 +464,7 @@
     // 底部：左=二维码，右=参数（纠错 / 尺寸 / 边距）+「复制 / 下载到本地」按钮。
     const qrWrap = el('div', { class: 'flex items-start gap-3' });
     qrWrap.append(qrBox, qrParams);
-    const qrSection = section();
+    const qrSection = section(i18n.t('encode.qrCode'));
     qrSection.append(qrWrap, qrNote);
 
     // Data Matrix 区：与二维码相同的左图右参数布局，参数为形状 / 尺寸 / 版本 / 边框。
