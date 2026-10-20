@@ -18,6 +18,7 @@
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
+    "bwip-js": "^4.11.4",
     "electron-liquid-glass": "^1.1.1",
     "electron-updater": "^6.8.9",
     "qrcode-generator": "^2.0.4",

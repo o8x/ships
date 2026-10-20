@@ -32,6 +32,11 @@
         qrVersion: '版本',
         qrVersionAuto: '自动',
         qrMargin: '边框',
+        dataMatrix: 'Data Matrix',
+        dmFormat: '形状',
+        dmSquare: '方形',
+        dmRectangle: '矩形',
+        dmTooLong: '内容过长或版本过小',
       },
     },
     en: {
@@ -61,6 +66,11 @@
         qrVersion: 'Version',
         qrVersionAuto: 'Auto',
         qrMargin: 'Border',
+        dataMatrix: 'Data Matrix',
+        dmFormat: 'Shape',
+        dmSquare: 'Square',
+        dmRectangle: 'Rectangle',
+        dmTooLong: 'Content too long or version too small',
       },
     },
   });
@@ -147,6 +157,21 @@
   // 二维码：实时生成（矢量 SVG）。展示区固定 200×200；「尺寸」参数只决定导出 PNG 的边长。
   const QR_ERROR_CORRECTION = 'M';
   const QR_BOX_SIZE = 200;
+
+  const DM_SQUARE_VERSIONS = [
+    '10x10', '12x12', '14x14', '16x16', '18x18', '20x20', '22x22', '24x24', '26x26',
+    '32x32', '36x36', '40x40', '44x44', '48x48', '52x52', '64x64', '72x72', '80x80',
+    '88x88', '96x96', '104x104', '120x120', '132x132', '144x144',
+  ];
+  const DM_RECT_VERSIONS = ['8x18', '8x32', '12x26', '12x36', '16x36', '16x48'];
+
+  function dmVersionOptions(format) {
+    const list = format === 'rectangle' ? DM_RECT_VERSIONS : DM_SQUARE_VERSIONS;
+    return [
+      { value: '', label: i18n.t('encode.qrVersionAuto') },
+      ...list.map((value) => ({ value, label: value.replace('x', '×') })),
+    ];
+  }
 
   function svgToPngDataUrl(svg, size) {
     return new Promise((resolve, reject) => {
@@ -364,8 +389,9 @@
       if (field !== fields.urlDecode) fields.urlDecode.value = decodeUrl(text);
       if (field !== fields.ascii) fields.ascii.value = bytesToAscii(bytes);
       syncing = false;
-      // 二维码数据源固定取最上面的「字符串」框内容。
+      // 二维码 / Data Matrix 数据源固定取最上面的「字符串」框内容。
       renderQr(fields.text.value);
+      renderDm(fields.text.value);
     }
 
     function handle(field) {
@@ -379,6 +405,7 @@
         }
         syncing = false;
         renderQr('');
+        renderDm('');
         return;
       }
 
@@ -436,10 +463,164 @@
     const qrSection = section();
     qrSection.append(qrWrap, qrNote);
 
-    container.append(body, qrSection);
-    renderQr('');
+    // Data Matrix 区：与二维码相同的左图右参数布局，参数为形状 / 尺寸 / 版本 / 边框。
+    const dmParams = { format: 'square', size: 1024, version: '', margin: 1 };
+    const dmBox = el('div', { class: 'qr-box', style: `width:${QR_BOX_SIZE}px;height:${QR_BOX_SIZE}px` });
+    const dmNote = el('div', { class: 'qr-note' }, '');
+    const dmCopyBtn = el('button', { class: 'btn shrink-0', type: 'button' });
+    dmCopyBtn.append(el('span', { class: 'inline-flex' }, Icons.copy(14)), el('span', {}, i18n.t('encode.qrCopy')));
+    const dmDownloadBtn = el('button', { class: 'btn shrink-0', type: 'button' });
+    dmDownloadBtn.append(
+      el('span', { class: 'inline-flex' }, Icons.download(14)),
+      el('span', {}, i18n.t('encode.qrDownload'))
+    );
+    dmCopyBtn.disabled = true;
+    dmDownloadBtn.disabled = true;
+    let currentDmSvg = null;
+    let dmCopiedTimer = null;
+    let dmText = '';
 
-    return () => clearTimeout(qrCopiedTimer);
+    const dmFormatControl = segmented(
+      [
+        { value: 'square', label: i18n.t('encode.dmSquare') },
+        { value: 'rectangle', label: i18n.t('encode.dmRectangle') },
+      ],
+      dmParams.format,
+      (value) => {
+        dmParams.format = value;
+        dmParams.version = '';
+        dmVersionControl.setOptions(dmVersionOptions(value));
+        dmVersionControl.setValue('');
+        renderDm(dmText);
+      },
+      { className: 'segment-compact segment-even' }
+    );
+
+    const dmSizeControl = createSelect({
+      options: [256, 512, 1024, 2048].map((value) => ({ value, label: `${value}px` })),
+      value: dmParams.size,
+      align: 'right',
+      className: 'shrink-0',
+      onChange: (value) => {
+        dmParams.size = Number(value);
+      },
+    });
+
+    const dmVersionControl = createSelect({
+      options: dmVersionOptions(dmParams.format),
+      value: dmParams.version,
+      align: 'right',
+      className: 'shrink-0',
+      onChange: (value) => {
+        dmParams.version = String(value);
+        renderDm(dmText);
+      },
+    });
+
+    const dmMarginControl = createSelect({
+      options: [0, 1, 2, 3, 4, 6, 8].map((value) => ({ value, label: String(value) })),
+      value: dmParams.margin,
+      align: 'right',
+      className: 'shrink-0',
+      onChange: (value) => {
+        dmParams.margin = Number(value);
+        renderDm(dmText);
+      },
+    });
+
+    const dmActions = el('div', { class: 'mt-1 flex items-center gap-2' });
+    dmActions.append(dmCopyBtn, dmDownloadBtn);
+    const dmParamsBox = el('div', { class: 'flex min-w-0 flex-1 flex-col gap-2' });
+    dmParamsBox.append(
+      paramRow(i18n.t('encode.dmFormat'), dmFormatControl.root),
+      paramRow(i18n.t('encode.qrSize'), dmSizeControl.el),
+      paramRow(i18n.t('encode.qrVersion'), dmVersionControl.el),
+      paramRow(i18n.t('encode.qrMargin'), dmMarginControl.el),
+      dmActions
+    );
+
+    function renderDm(text) {
+      dmText = text;
+      dmBox.innerHTML = '';
+      currentDmSvg = null;
+      dmNote.textContent = '';
+      dmNote.style.color = '';
+      if (!text || !window.bwipjs || typeof window.bwipjs.toSVG !== 'function') {
+        dmCopyBtn.disabled = true;
+        dmDownloadBtn.disabled = true;
+        return;
+      }
+      try {
+        const svg = window.bwipjs.toSVG({
+          bcid: 'datamatrix',
+          text,
+          format: dmParams.format,
+          scale: 1,
+          padding: dmParams.margin,
+          ...(dmParams.version ? { version: dmParams.version } : {}),
+        });
+        dmBox.innerHTML = svg;
+        currentDmSvg = dmBox.querySelector('svg');
+        dmCopyBtn.disabled = false;
+        dmDownloadBtn.disabled = false;
+      } catch (err) {
+        dmCopyBtn.disabled = true;
+        dmDownloadBtn.disabled = true;
+        dmNote.textContent = i18n.t('encode.dmTooLong');
+        dmNote.style.color = 'var(--color-danger)';
+      }
+    }
+
+    async function copyDm() {
+      if (!currentDmSvg) return;
+      const label = dmCopyBtn.lastChild;
+      try {
+        const dataUrl = await svgToPngDataUrl(currentDmSvg, dmParams.size);
+        const res = await window.ships.copyImage(dataUrl);
+        if (!res || !res.ok) throw new Error((res && res.error) || 'error');
+      } catch (err) {
+        dmNote.textContent = i18n.t('encode.qrCopyFailed');
+        dmNote.style.color = 'var(--color-danger)';
+        return;
+      }
+      dmCopyBtn.classList.add('btn-accent');
+      if (label) label.textContent = i18n.t('encode.qrCopied');
+      clearTimeout(dmCopiedTimer);
+      dmCopiedTimer = setTimeout(() => {
+        dmCopyBtn.classList.remove('btn-accent');
+        if (label) label.textContent = i18n.t('encode.qrCopy');
+      }, 1200);
+    }
+
+    async function downloadDm() {
+      if (!currentDmSvg) return;
+      try {
+        const dataUrl = await svgToPngDataUrl(currentDmSvg, dmParams.size);
+        const res = await window.ships.saveImage({ dataUrl, name: 'datamatrix.png' });
+        if (res && res.canceled) return;
+        if (!res || !res.ok) throw new Error((res && res.error) || 'error');
+      } catch (err) {
+        dmNote.textContent = i18n.t('encode.qrSaveFailed', { error: (err && err.message) || 'error' });
+        dmNote.style.color = 'var(--color-danger)';
+      }
+    }
+
+    dmCopyBtn.addEventListener('click', copyDm);
+    dmDownloadBtn.addEventListener('click', downloadDm);
+
+    const dmWrap = el('div', { class: 'flex items-start gap-3' });
+    dmWrap.append(dmBox, dmParamsBox);
+    const dmSection = section(i18n.t('encode.dataMatrix'));
+    dmSection.append(dmWrap, dmNote);
+
+    container.append(body, qrSection, dmSection);
+    renderQr('');
+    renderDm('');
+
+    return () => {
+      clearTimeout(qrCopiedTimer);
+      clearTimeout(dmCopiedTimer);
+    };
   }
 
   window.ShipsToolRegistry.register({ id: 'encode', icon: 'swap', mount });
