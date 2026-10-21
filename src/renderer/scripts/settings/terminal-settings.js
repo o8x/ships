@@ -39,7 +39,7 @@
         ballDelayHint: '失去焦点后多久缩成球（期间焦点回来则取消）',
         ballDelayImmediate: '立即',
         ballSize: '悬浮球大小',
-        ballSizeHint: '圆形悬浮球的边长（宽高强制 1:1，40–200px）；可选择预设或直接输入',
+        ballSizeHint: '圆形悬浮球的边长（宽高强制 1:1，10–2048px，默认 90）',
         ballIcon: '悬浮球图标',
         ballIconHint: '从 assets/icons/ball 中选择悬浮球显示的图标，实时生效',
         ballDark: '终端暗色模式',
@@ -89,7 +89,7 @@
         ballDelayHint: 'How long after losing focus before shrinking (cancelled if focus returns)',
         ballDelayImmediate: 'Immediate',
         ballSize: 'Ball size',
-        ballSizeHint: 'Edge length of the round ball (forced 1:1, 40–200px); pick a preset or type a value',
+        ballSizeHint: 'Edge length of the round ball (forced 1:1, 10–2048px, default 90)',
         ballIcon: 'Ball icon',
         ballIconHint: 'Pick the floating ball icon from assets/icons/ball (applies live)',
         ballDark: 'Dark terminal',
@@ -353,31 +353,28 @@
       row(i18n.t('terminalSettings.ballDelay'), i18n.t('terminalSettings.ballDelayHint'), ballDelaySelect.el)
     );
 
-    const BALL_SIZE_PRESETS = [40, 50, 60, 75, 90, 100, 120, 150, 200];
-    const ballSizeListId = 'ball-size-presets';
+    const BALL_SIZE_MIN = 10;
+    const BALL_SIZE_MAX = 2048;
     const ballSizeField = field(null, {
       class: 'field w-[86px] shrink-0 font-mono',
-      type: 'text',
-      inputmode: 'numeric',
-      spellcheck: 'false',
+      type: 'number',
+      min: String(BALL_SIZE_MIN),
+      max: String(BALL_SIZE_MAX),
     });
-    ballSizeField.input.setAttribute('list', ballSizeListId);
-    const ballSizeList = el('datalist', { id: ballSizeListId });
-    for (const size of BALL_SIZE_PRESETS) {
-      ballSizeList.appendChild(el('option', { value: String(size) }));
-    }
-    ballSizeField.wrapper.appendChild(ballSizeList);
-    ballSizeField.input.value = String(ctx.settings.terminalBallSize || 75);
+    ballSizeField.input.value = String(ctx.settings.terminalBallSize || 90);
     ballSizeField.input.addEventListener('change', () => {
-      const value = Math.max(40, Math.min(200, Number(ballSizeField.input.value) || 75));
+      const raw = Number(ballSizeField.input.value);
+      const value = Number.isFinite(raw)
+        ? Math.max(BALL_SIZE_MIN, Math.min(BALL_SIZE_MAX, Math.round(raw)))
+        : 90;
       ballSizeField.input.value = String(value);
       ctx.patch({ terminalBallSize: value });
     });
     syncers.push((next) => {
-      ballSizeField.input.value = String(next.terminalBallSize || 75);
+      ballSizeField.input.value = String(next.terminalBallSize || 90);
     });
     wrap.appendChild(
-      row(i18n.t('terminalSettings.ballSize'), i18n.t('terminalSettings.ballSizeHint'), ballSizeField.wrapper)
+      row(i18n.t('terminalSettings.ballSize'), i18n.t('terminalSettings.ballSizeHint'), ballSizeField.input)
     );
 
     /* 悬浮球图标：assets/icons/ball/ 下可选，下拉里直接显示图标，实时生效 */
@@ -388,14 +385,14 @@
         label: '',
         icon: ballIconData.icons[name] || '',
       })),
-      value: ctx.settings.terminalBallIcon || 'ball.svg',
+      value: ctx.settings.terminalBallIcon || 'ball-11.svg',
       align: 'right',
       className: 'shrink-0',
       menuClassName: 'select-menu-icons',
       onChange: (value) => ctx.patch({ terminalBallIcon: value }),
     });
     syncers.push((next) => {
-      ballIconSelect.setValue(next.terminalBallIcon || 'ball.svg');
+      ballIconSelect.setValue(next.terminalBallIcon || 'ball-11.svg');
     });
     wrap.appendChild(
       row(i18n.t('terminalSettings.ballIcon'), i18n.t('terminalSettings.ballIconHint'), ballIconSelect.el)

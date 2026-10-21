@@ -850,12 +850,12 @@
   }
 
   /* 悬浮球图标：来自设置 settings.terminalBallIcon（assets/icons/ball/ 下的文件名），可实时切换。 */
-  let ballIconName = 'ball.svg';
+  let ballIconName = 'ball-11.svg';
   function applyBallIcon(name) {
-    ballIconName = name || 'ball.svg';
+    ballIconName = name || 'ball-11.svg';
     if (!ballIconEl) return;
     const data = window.shipsBallIcons || { icons: {} };
-    const svg = data.icons[ballIconName] || data.icons['ball.svg'] || (Icons.ships ? Icons.ships(46) : '');
+    const svg = data.icons[ballIconName] || data.icons['ball-11.svg'] || (Icons.ships ? Icons.ships(46) : '');
     ballIconEl.innerHTML = svg;
   }
   applyBallIcon(ballIconName);

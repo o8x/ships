@@ -60,10 +60,10 @@
       "fontSize": 14,
       "shell": "",
       "fontFamily": "",
-      "ballSize": 75,
+      "ballSize": 90,
       "ballEnabled": true,
       "ballDelayMs": 50,
-      "ballIcon": "ball.svg",
+      "ballIcon": "ball-11.svg",
       "ballDark": true,
       "ballTransparent": true
     },

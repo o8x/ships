@@ -38,7 +38,7 @@
   50% {
     transform: translate3d(
       0,
-      calc(var(--term-ball-size, 75px) * var(--ball-bounce-distance) * -1),
+      calc(var(--term-ball-size, 90px) * var(--ball-bounce-distance) * -1),
       0
     );
   }

@@ -694,8 +694,8 @@ input[type='color'].swatch::-webkit-color-swatch {
   position: fixed;
   top: 0;
   right: 0;
-  width: var(--term-ball-size, 75px);
-  height: var(--term-ball-size, 75px);
+  width: var(--term-ball-size, 90px);
+  height: var(--term-ball-size, 90px);
   display: none;
   align-items: center;
   justify-content: center;
@@ -732,8 +732,8 @@ input[type='color'].swatch::-webkit-color-swatch {
     var(--term-ball-icon-scale, 0.7),
     min(var(--term-ball-icon-scale-max, 0.8), var(--term-ball-icon-bounce-max))
   );
-  width: calc(var(--term-ball-size, 75px) * var(--term-ball-icon-effective-scale));
-  height: calc(var(--term-ball-size, 75px) * var(--term-ball-icon-effective-scale));
+  width: calc(var(--term-ball-size, 90px) * var(--term-ball-icon-effective-scale));
+  height: calc(var(--term-ball-size, 90px) * var(--term-ball-icon-effective-scale));
   /* 输出时的「正弦平滑弹跳」见 styles/ball-animations.css（独立文件，便于调整）。 */
 }
 /* SVG 填满图标容器，避免 SVG 自带的外层透明留白被额外算进尺寸。 */
@@ -763,7 +763,7 @@ input[type='color'].swatch::-webkit-color-swatch {
   display: none;
 }
 .term-ball-timer-hm {
-  font-size: calc(var(--term-ball-size, 75px) * 0.15);
+  font-size: calc(var(--term-ball-size, 90px) * 0.15);
   letter-spacing: -0.02em;
   opacity: 0.9;
 }
@@ -771,7 +771,7 @@ input[type='color'].swatch::-webkit-color-swatch {
   display: none;
 }
 .term-ball-timer-s {
-  font-size: calc(var(--term-ball-size, 75px) * 0.3);
+  font-size: calc(var(--term-ball-size, 90px) * 0.3);
   font-weight: 600;
 }
 /* 悬浮球底色：终端暗色模式开 = 始终暗色；关 = 跟随全局主题（依 data-theme）。
@@ -834,8 +834,8 @@ input[type='color'].swatch::-webkit-color-swatch {
   opacity: 0.9;
 }
 .term-ball-trash svg {
-  width: calc(var(--term-ball-size, 75px) * 0.36);
-  height: calc(var(--term-ball-size, 75px) * 0.36);
+  width: calc(var(--term-ball-size, 90px) * 0.36);
+  height: calc(var(--term-ball-size, 90px) * 0.36);
 }
 [data-ball-trash='on'] .term-ball-trash {
   display: flex;
@@ -934,18 +934,18 @@ body.show-lines #term-host {
 /* SSH 下拉：字号随头栏缩放；高度给上限，避免在大字号下占满整条头栏；
    宽度按字号放大并保持最小可读宽度（10px 头栏字号 → 150px，20px → 180px）。 */
 #term-actions .select-trigger {
-  font-size: var(--term-header-font-size);
+  font-size: var(--term-dropdown-font-size);
   height: clamp(14px, calc(var(--term-header-font-size) + 3px), 22px);
   width: clamp(170px, calc(var(--term-header-font-size) * 10), 260px);
 }
 /* 下拉框的箭头与字号一致 */
 #term-actions .select-trigger .select-chevron svg {
-  width: var(--term-header-font-size);
-  height: var(--term-header-font-size);
+  width: var(--term-dropdown-font-size);
+  height: var(--term-dropdown-font-size);
 }
 #file-actions .select-trigger .select-chevron svg {
-  width: var(--term-header-font-size);
-  height: var(--term-header-font-size);
+  width: var(--term-dropdown-font-size);
+  height: var(--term-dropdown-font-size);
 }
 
 /* 自绘小红绿灯（系统红绿灯已由主进程隐藏，见 window-manager）。
@@ -1015,6 +1015,10 @@ body.show-lines #term-host {
 
 /* 终端窗口头栏下拉的菜单（菜单挂在 body 上，用 body.term-window 限定范围）：
    固定 135px 宽（与下拉同宽、左右对齐），条目高 20px、四周留 3px（菜单 padding + 条目间距），无分隔线。 */
+body.term-window {
+  /* SSH 下拉 / 条目字号：头栏字号 - 2px（默认 14 → 12）。 */
+  --term-dropdown-font-size: calc(var(--term-header-font-size) - 2px);
+}
 body.term-window .select-menu {
   width: 120px;
   padding: 3px;
@@ -1022,11 +1026,11 @@ body.term-window .select-menu {
 }
 body.term-window .select-menu .select-option {
   width: 100%;
-  height: max(20px, calc(var(--term-header-font-size) + 6px));
+  height: max(22px, calc(var(--term-header-font-size) + 8px));
   margin: 0;
-  padding: 0 8px;
+  padding: 1px 8px;
   border-radius: 5px;
-  font-size: var(--term-header-font-size);
+  font-size: var(--term-dropdown-font-size);
 }
 body.term-window .select-menu .select-option .select-option-label {
   min-width: 0;
@@ -1036,16 +1040,16 @@ body.term-window .select-menu .select-option + .select-option {
   margin-top: 3px;
 }
 body.term-window .select-menu .select-option svg {
-  width: var(--term-header-font-size);
-  height: var(--term-header-font-size);
+  width: var(--term-dropdown-font-size);
+  height: var(--term-dropdown-font-size);
 }
 /* 终端窗口头栏的 SSH 下拉条目：与触发器同字号。 */
 body.term-window:not(.file-window) .select-menu .select-option {
-  font-size: var(--term-header-font-size);
+  font-size: var(--term-dropdown-font-size);
 }
 body.term-window:not(.file-window) .select-menu .select-option svg {
-  width: var(--term-header-font-size);
-  height: var(--term-header-font-size);
+  width: var(--term-dropdown-font-size);
+  height: var(--term-dropdown-font-size);
 }
 /* 终端窗口头栏 SSH 下拉里的分组小标题：更紧凑。 */
 body.term-window .select-menu .select-group-title {
@@ -1470,7 +1474,7 @@ body.term-window .select-menu .select-group-title {
   height: var(--term-header-font-size);
 }
 #file-actions .select-trigger {
-  font-size: var(--term-header-font-size);
+  font-size: var(--term-dropdown-font-size);
   height: max(18px, calc(var(--term-header-font-size) + 6px));
   width: 120px;
   min-width: 120px;

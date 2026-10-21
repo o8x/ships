@@ -23,10 +23,10 @@ const logger = require('./utils/logger');
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
 const PRELOAD_DIR = path.join(__dirname, '..', 'preload');
 
-// 终端窗口「悬浮球」尺寸（设置 → 终端，宽高强制 1:1，默认 75px，见 §3.9-12）。
-const BALL_SIZE_DEFAULT = Number(TERMINAL_WINDOW.ballSize) || 75;
-const BALL_SIZE_MIN = 40;
-const BALL_SIZE_MAX = 200;
+// 终端窗口「悬浮球」尺寸（设置 → 终端，宽高强制 1:1，默认 90px，见 §3.9-12）。
+const BALL_SIZE_DEFAULT = Number(TERMINAL_WINDOW.ballSize) || 90;
+const BALL_SIZE_MIN = 10;
+const BALL_SIZE_MAX = 2048;
 
 function ballSize() {
   const value = Number(settings.get('terminalBallSize'));

@@ -180,10 +180,10 @@ const TERMINAL_WINDOW = Object.assign(
     minHeight: 200,
     alwaysOnTop: true,
     scrollback: 10000,
-    ballSize: 75,
+    ballSize: 90,
     ballEnabled: true,
     ballDelayMs: 50,
-    ballIcon: 'ball.svg',
+    ballIcon: 'ball-11.svg',
     ballDark: true,
     ballTransparent: true,
   },
@@ -275,9 +275,9 @@ const DEFAULT_SETTINGS = {
   // 终端窗口失焦缩成「悬浮球」：是否开启 + 延迟（毫秒）+ 球尺寸（px，宽高强制 1:1）
   terminalBallEnabled: TERMINAL_WINDOW.ballEnabled !== false,
   terminalBallDelayMs: Number.isFinite(TERMINAL_WINDOW.ballDelayMs) ? TERMINAL_WINDOW.ballDelayMs : 50,
-  terminalBallSize: Number.isFinite(TERMINAL_WINDOW.ballSize) ? TERMINAL_WINDOW.ballSize : 75,
+  terminalBallSize: Number.isFinite(TERMINAL_WINDOW.ballSize) ? TERMINAL_WINDOW.ballSize : 90,
   // 悬浮球图标（assets/icons/ball/ 下的文件名）
-  terminalBallIcon: TERMINAL_WINDOW.ballIcon || 'ball.svg',
+  terminalBallIcon: TERMINAL_WINDOW.ballIcon || 'ball-11.svg',
   // 悬浮球底色是否为暗色（浅色/暗色底）；默认开，不跟随全局主题。图标始终保留原色。
   terminalBallDark: TERMINAL_WINDOW.ballDark !== false,
   // 悬浮球透明背景：默认开；开启后无底色 / 边框，拖动时显示一层淡背景。
