@@ -36,6 +36,8 @@ function ballSize() {
 
 let mainWindow = null;
 let settingsWindow = null;
+// 设置 → 终端 → 字体：非模态子窗口（挂在设置窗口上）。
+let fontPickerWindow = null;
 // 置顶终端窗口可以有多个（每次点主面板终端按钮都新开一个，落在当前桌面）。
 const terminalWindows = new Set();
 let lastTerminalWindow = null;
@@ -1055,9 +1057,71 @@ function openSettingsWindow(section) {
   });
   settingsWindow.on('closed', () => {
     settingsWindow = null;
+    closeFontPickerWindow();
   });
 
   return settingsWindow;
+}
+
+/* 设置 → 终端 → 字体：非模态子窗口。挂在设置窗口上，不阻塞设置窗口操作。 */
+function openFontPickerWindow() {
+  if (fontPickerWindow && !fontPickerWindow.isDestroyed()) {
+    fontPickerWindow.show();
+    fontPickerWindow.focus();
+    return fontPickerWindow;
+  }
+
+  fontPickerWindow = new BrowserWindow({
+    width: 480,
+    height: 620,
+    minWidth: 380,
+    minHeight: 420,
+    parent: settingsWindow && !settingsWindow.isDestroyed() ? settingsWindow : undefined,
+    modal: false,
+    show: false,
+    resizable: true,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    title: 'Vessel',
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 14, y: 16 },
+    backgroundColor: themeBackgroundColor(),
+    webPreferences: {
+      preload: path.join(PRELOAD_DIR, 'settings-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      spellcheck: false,
+    },
+  });
+
+  fontPickerWindow.loadFile(path.join(RENDERER_DIR, 'font-picker.html'));
+  fontPickerWindow.webContents.setZoomFactor(1);
+  fontPickerWindow.webContents.on('did-finish-load', () => {
+    try {
+      fontPickerWindow.webContents.setZoomFactor(1);
+    } catch (err) {
+      /* ignore */
+    }
+  });
+  fontPickerWindow.once('ready-to-show', () => {
+    fontPickerWindow.show();
+    fontPickerWindow.focus();
+  });
+  fontPickerWindow.on('closed', () => {
+    fontPickerWindow = null;
+  });
+
+  return fontPickerWindow;
+}
+
+function closeFontPickerWindow() {
+  if (fontPickerWindow && !fontPickerWindow.isDestroyed()) fontPickerWindow.close();
+}
+
+function getFontPickerWindow() {
+  return fontPickerWindow && !fontPickerWindow.isDestroyed() ? fontPickerWindow : null;
 }
 
 /* Always-on-top terminal: floats above other apps and above full-screen spaces
@@ -1549,6 +1613,9 @@ module.exports = {
   openSettingsWindow,
   closeSettingsWindow,
   getSettingsWindow,
+  openFontPickerWindow,
+  closeFontPickerWindow,
+  getFontPickerWindow,
   openUpdateWindow,
   closeUpdateWindow,
   getUpdateWindow,

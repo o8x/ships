@@ -10,7 +10,7 @@
   i18n.extend({
     zh: {
       terminalWin: {
-        sshPlaceholder: 'SSH',
+        sshPlaceholder: '连接到服务器',
         sshFailed: '连接失败：{error}',
         ungrouped: '未分组',
         linesOn: '隐藏行号',
@@ -24,7 +24,7 @@
     },
     en: {
       terminalWin: {
-        sshPlaceholder: 'SSH',
+        sshPlaceholder: 'Connect to server',
         sshFailed: 'Connect failed: {error}',
         ungrouped: 'Ungrouped',
         linesOn: 'Hide line numbers',
@@ -40,9 +40,14 @@
 
   const ANSI = { meta: '\u001b[90m', error: '\u001b[31m', reset: '\u001b[0m' };
 
-  const FONT_DEFAULT = 12;
-  const FONT_MIN = 8;
-  const FONT_MAX = 24;
+  const C = window.ShipsConstants || {};
+  const FONT_DEFAULT = C.TERMINAL_FONT_DEFAULT || 14;
+  const FONT_MIN = C.TERMINAL_FONT_MIN || 8;
+  const FONT_MAX = C.TERMINAL_FONT_MAX || 64;
+  const HEADER_FONT_MIN = C.TERMINAL_HEADER_FONT_MIN || 10;
+  const HEADER_FONT_MAX = C.TERMINAL_HEADER_FONT_MAX || 20;
+  const HEADER_HEIGHT_MIN = C.TERMINAL_HEADER_HEIGHT_MIN || 20;
+  const HEADER_HEIGHT_MAX = C.TERMINAL_HEADER_HEIGHT_MAX || 32;
 
   /* xterm 挂在 #term-fit（无内边距）里，留白由外层 #term-host（上下 5px、左右 0）提供：FitAddon 用
      「父元素的 border box 高度」算行数，父元素带内边距会把可用高度多算一份内边距，
@@ -77,6 +82,8 @@
   let lastRows = 0;
   let fontSize = FONT_DEFAULT;
   let settingsFontSize = FONT_DEFAULT;
+  let settingsFontFamily = '';
+  let fontBadge = null;
   let showLines = false; // 左侧行号（默认关闭）
   let shellPath = '';
   let sshPicker = null;
@@ -243,9 +250,7 @@
     snapExactSize();
     updateRowHeightVar();
     scheduleGutter();
-    if (sizeEl && !sizeEl.classList.contains('hidden')) {
-      sizeEl.textContent = `${term.cols}×${term.rows}`;
-    }
+    if (sizeEl && !sizeEl.classList.contains('hidden')) showSizeBadge();
   }
 
   /* 行号栏每行的高度 = 终端实测单元格高度（写 CSS 变量 --term-row-h）。 */
@@ -310,13 +315,25 @@
     if (typeof snap === 'function') snap(payload);
   }
 
-  /* iTerm 式：拖动 / 缩放期间在头栏中间显示「列 × 行」，停手 700ms 后隐藏。 */
-  function showSizeBadge() {
+  /* iTerm 式：拖动 / 缩放期间在头栏中间显示「列 × 行」，停手 700ms 后隐藏。
+     刚调过字号时同时带上字号（Cmd +/- 的反馈）。 */
+  function showBadge(text) {
     if (!sizeEl || !term) return;
-    sizeEl.textContent = `${term.cols}×${term.rows}`;
+    sizeEl.textContent = text;
     sizeEl.classList.remove('hidden');
     clearTimeout(sizeBadgeTimer);
     sizeBadgeTimer = setTimeout(() => sizeEl.classList.add('hidden'), 700);
+  }
+
+  function showSizeBadge() {
+    if (!sizeEl || !term) return;
+    const suffix = fontBadge && Date.now() < fontBadge.until ? ` · ${fontBadge.text}` : '';
+    showBadge(`${term.cols}×${term.rows}${suffix}`);
+  }
+
+  function showFontBadge(value) {
+    fontBadge = { text: `${value}px`, until: Date.now() + 900 };
+    showBadge(fontBadge.text);
   }
 
   function applyFontSize(value) {
@@ -327,31 +344,57 @@
     syncPtySize();
   }
 
-  /* 头栏（SSH 下拉等）字号 = 终端字号 + 1（永远比终端设置大 1px）；
-     文件面板文字字号 = 终端字号。Cmd +/-、设置里的字体大小都会作用到它们。 */
+  /* 头栏字号跟随终端字号，但夹在 10–20px；高度按字号线性映射并夹在 20–32px
+     （10px 字号 → 20px，20px 字号 → 32px）。文件面板文字 = 终端字号。 */
   function applyHeaderFontSize(value) {
-    document.documentElement.style.setProperty('--term-header-font-size', `${value + 1}px`);
+    const headerFont = Math.max(HEADER_FONT_MIN, Math.min(HEADER_FONT_MAX, value));
+    const headerHeight = Math.max(HEADER_HEIGHT_MIN, Math.min(HEADER_HEIGHT_MAX, Math.round(headerFont * 1.2 + 8)));
+    document.documentElement.style.setProperty('--term-header-font-size', `${headerFont}px`);
+    document.documentElement.style.setProperty('--term-header-height', `${headerHeight}px`);
     document.documentElement.style.setProperty('--file-font-size', `${value}px`);
   }
 
-  /* 字号来源有两处：设置 → 终端（写回设置，这里跟随）与 Cmd + / Cmd -（临时）。
-     只有设置里的值真的变化时才覆盖当前字号，免得别的设置变更把临时缩放顶掉。 */
+  function fontFamilyValue(family) {
+    const mono = getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() || 'monospace';
+    const name = String(family || '').trim();
+    return name ? `"${name.replace(/"/g, '\\"')}", ${mono}` : mono;
+  }
+
+  function applyFontFamily(family) {
+    if (!term) return;
+    const value = fontFamilyValue(family);
+    term.options.fontFamily = value;
+    document.documentElement.style.setProperty('--term-font-family', value);
+    fitIfNeeded(true);
+    syncPtySize();
+  }
+
+  /* 字号 / 字体来源是设置 → 终端（Cmd +/- 也写回设置，这里跟随）。
+     只有设置里的值真的变化时才覆盖当前值，免得别的设置变更把临时缩放顶掉。 */
   function syncFontSizeSetting(next) {
     const wanted = Math.max(FONT_MIN, Math.min(FONT_MAX, (next && next.terminalFontSize) || FONT_DEFAULT));
-    if (wanted === settingsFontSize) return;
-    settingsFontSize = wanted;
-    fontSize = wanted;
-    applyFontSize(fontSize);
+    if (wanted !== settingsFontSize) {
+      settingsFontSize = wanted;
+      fontSize = wanted;
+      applyFontSize(fontSize);
+    }
+    const wantedFamily = String((next && next.terminalFontFamily) || '');
+    if (wantedFamily !== settingsFontFamily) {
+      settingsFontFamily = wantedFamily;
+      applyFontFamily(settingsFontFamily);
+    }
   }
 
   /* Cmd +/+/-（menu.js / zoom-changed 路由到这里）：直接修改**设置里的字号**（写回 settings，
-     持久化，重开终端也生效），不改页面缩放因子 —— 页面缩放固定为 1，头栏与图标尺寸不变。 */
+     持久化，重开终端也生效），不改页面缩放因子 —— 页面缩放固定为 1；头栏/图标随字号缩放。
+     同时在头栏中间显示新字号。 */
   function zoomFont(direction) {
     let value;
     if (direction === 'reset') value = FONT_DEFAULT;
     else value = fontSize + (direction === 'in' ? 1 : -1);
     value = Math.max(FONT_MIN, Math.min(FONT_MAX, value));
     if (value === fontSize) return;
+    showFontBadge(value);
     window.ships.setSettings({ terminalFontSize: value });
   }
 
@@ -519,7 +562,7 @@
       cursorBlink: true,
       scrollback: opts.scrollback || 10000,
       fontSize: opts.fontSize || FONT_DEFAULT,
-      fontFamily: mono || 'monospace',
+      fontFamily: opts.fontFamily || mono || 'monospace',
       theme: themeColors(),
     });
     term.open(host);
@@ -946,12 +989,16 @@
     // 设置页增删改 SSH 主机 / 分组后实时刷新下拉。
     window.ships.ssh.onConfigChanged(() => refreshSshPicker());
     settingsFontSize = Math.max(FONT_MIN, Math.min(FONT_MAX, (settings && settings.terminalFontSize) || FONT_DEFAULT));
+    settingsFontFamily = String((settings && settings.terminalFontFamily) || '');
     fontSize = settingsFontSize;
     applyHeaderFontSize(fontSize);
+    const initialFontFamily = fontFamilyValue(settingsFontFamily);
+    document.documentElement.style.setProperty('--term-font-family', initialFontFamily);
     shellPath = (settings && settings.terminalShell) || '';
     initTerminal({
       scrollback: (settings && settings.terminalScrollback) || (info && info.terminalScrollback) || 10000,
       fontSize: fontSize,
+      fontFamily: initialFontFamily,
     });
     window.ships.onSettingsChanged((next) => {
       i18n.setLocale((next && next.locale) || 'zh');

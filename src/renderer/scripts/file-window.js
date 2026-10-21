@@ -10,14 +10,14 @@
   i18n.extend({
     zh: {
       fileWin: {
-        sshPlaceholder: 'SSH',
+        sshPlaceholder: '连接到服务器',
         listFailed: '读取主机失败',
         ungrouped: '未分组',
       },
     },
     en: {
       fileWin: {
-        sshPlaceholder: 'SSH',
+        sshPlaceholder: 'Connect to server',
         listFailed: 'Cannot read hosts',
         ungrouped: 'Ungrouped',
       },
@@ -25,9 +25,14 @@
   });
 
   // 独立文件窗口字号最小值 13px：终端字体更小时不再跟随（需求）。
+  const C = window.ShipsConstants || {};
   const FONT_DEFAULT = 13;
   const FONT_MIN = 13;
-  const FONT_MAX = 24;
+  const FONT_MAX = C.TERMINAL_FONT_MAX || 64;
+  const HEADER_FONT_MIN = C.TERMINAL_HEADER_FONT_MIN || 10;
+  const HEADER_FONT_MAX = C.TERMINAL_HEADER_FONT_MAX || 20;
+  const HEADER_HEIGHT_MIN = C.TERMINAL_HEADER_HEIGHT_MIN || 20;
+  const HEADER_HEIGHT_MAX = C.TERMINAL_HEADER_HEIGHT_MAX || 32;
 
   const lightClose = document.getElementById('light-close');
   const lightMinimize = document.getElementById('light-minimize');
@@ -43,6 +48,13 @@
   function applyFontSize(value) {
     fontSize = Math.max(FONT_MIN, Math.min(FONT_MAX, value));
     document.documentElement.style.setProperty('--file-font-size', `${fontSize}px`);
+    const headerFont = Math.max(HEADER_FONT_MIN, Math.min(HEADER_FONT_MAX, fontSize));
+    const headerHeight = Math.max(
+      HEADER_HEIGHT_MIN,
+      Math.min(HEADER_HEIGHT_MAX, Math.round(headerFont * 1.2 + 8))
+    );
+    document.documentElement.style.setProperty('--term-header-font-size', `${headerFont}px`);
+    document.documentElement.style.setProperty('--term-header-height', `${headerHeight}px`);
   }
 
   function zoomFont(direction) {

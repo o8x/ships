@@ -83,6 +83,9 @@
         i18n.setLocale(next.locale);
         drawNav();
         setActive(state.activeId);
+      } else {
+        const active = registry.get(state.activeId);
+        if (active && typeof active.sync === 'function') active.sync(next);
       }
     });
 

@@ -3,6 +3,16 @@
 window.ShipsConstants = {
   FALLBACK_VERSION: '0.0.0',
   COPY_FEEDBACK_MS: 1200,
+  // 终端字号范围（Cmd +/- 与 设置 → 终端 共用）。
+  TERMINAL_FONT_MIN: 8,
+  TERMINAL_FONT_MAX: 64,
+  TERMINAL_FONT_DEFAULT: 14,
+  // 终端窗口标题栏：字号取自终端字号并夹在 10–20px；
+  // 高度按字号线性映射并夹在 20–32px（10px 字号 → 20px，20px 字号 → 32px）。
+  TERMINAL_HEADER_FONT_MIN: 10,
+  TERMINAL_HEADER_FONT_MAX: 20,
+  TERMINAL_HEADER_HEIGHT_MIN: 20,
+  TERMINAL_HEADER_HEIGHT_MAX: 32,
   // 工具标题收起动画期间先锁住内容滚动，动画完成后再滚动内容。
   HEADER_COLLAPSE_LOCK_MS: 190,
   // Liquid Glass 表面透明度：glassOpacity(0–100，越大越透明) 映射到表面填充 alpha。

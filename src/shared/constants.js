@@ -12,6 +12,7 @@ const IPC = {
   SETTINGS_OPEN_SECTION: 'settings:open-section',
 
   APP_INFO: 'app:info',
+  APP_LIST_FONTS: 'app:list-fonts',
   OPEN_DATA_FOLDER: 'app:open-data-folder',
   OPEN_LOG: 'app:open-log',
   OPEN_CONSOLE: 'app:open-console',
@@ -30,6 +31,8 @@ const IPC = {
   WINDOW_HIDE: 'window:hide',
   WINDOW_OPEN_SETTINGS: 'window:open-settings',
   WINDOW_CLOSE_SETTINGS: 'window:close-settings',
+  FONT_PICKER_OPEN: 'font-picker:open',
+  FONT_PICKER_CLOSE: 'font-picker:close',
   WINDOW_CONTROL: 'window:control',
   LOG_WRITE: 'log:write',
   COPY_IMAGE: 'app:copy-image',
@@ -250,6 +253,8 @@ const DEFAULT_SETTINGS = {
   // terminal window / network test terminal
   terminalShell: (appConfig.terminalWindow && appConfig.terminalWindow.shell) || '',
   terminalFontSize: (appConfig.terminalWindow && appConfig.terminalWindow.fontSize) || 12,
+  // 终端字体家族（空 = 使用系统等宽字体栈）。设置页通过 macOS 系统字体选择框选取。
+  terminalFontFamily: (appConfig.terminalWindow && appConfig.terminalWindow.fontFamily) || '',
   terminalScrollback: (appConfig.terminalWindow && appConfig.terminalWindow.scrollback) || 10000,
   terminalWindowWidth: TERMINAL_WINDOW.width,
   terminalWindowHeight: TERMINAL_WINDOW.height,

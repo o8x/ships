@@ -13,8 +13,13 @@
         shellHint: '留空使用系统默认（$SHELL）；例如 /bin/zsh',
         shellPlaceholder: '如 /bin/zsh',
         chooseShell: '选择文件',
+        fontFamily: '字体',
+        fontFamilyHint: '从系统已安装的字体中选择；默认使用系统等宽字体',
+        fontFamilyDefault: '系统默认',
+        chooseFont: '选择字体',
+        resetFont: '默认',
         fontSize: '字体大小',
-        fontSizeHint: '8–24px，默认 12px（Cmd + / Cmd - 临时调整，不写回设置）',
+        fontSizeHint: '8–64px，默认 14px（Cmd + / Cmd - 调整并写回设置；标题栏会显示字号）',
         windowSize: '窗口大小',
         windowSizeHint: '宽 × 高，最小 350 × 200，默认 1024 × 768；拖动窗口也会写回这里。终端会记住所在屏幕与位置：同一块屏幕沿用记忆，换屏或没有记录时按这里居中显示',
         scrollback: '缓冲区大小',
@@ -56,8 +61,13 @@
         shellHint: 'Empty = system default ($SHELL); e.g. /bin/zsh',
         shellPlaceholder: 'e.g. /bin/zsh',
         chooseShell: 'Choose file',
+        fontFamily: 'Font',
+        fontFamilyHint: 'Pick from installed system fonts; default is the system monospace stack',
+        fontFamilyDefault: 'System default',
+        chooseFont: 'Choose font',
+        resetFont: 'Default',
         fontSize: 'Font size',
-        fontSizeHint: '8–24px, default 12px (Cmd + / Cmd - adjust temporarily)',
+        fontSizeHint: '8–64px, default 12px (Cmd + / Cmd - adjust and persist; the title bar shows the size)',
         windowSize: 'Window size',
         windowSizeHint: 'width × height, min 350 × 200, default 1024 × 768; resizing the window writes back here. The terminal remembers its screen and position: the same screen restores it, otherwise this size is used, centered',
         scrollback: 'Scrollback',
@@ -115,10 +125,24 @@
     return wrap;
   }
 
+  function cssFontFamily(family) {
+    const name = String(family || '')
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"');
+    return name ? `"${name}", monospace` : 'inherit';
+  }
+
+  let activeSyncers = null;
+
+  function syncSettings(next) {
+    if (activeSyncers) for (const sync of activeSyncers) sync(next || {});
+  }
+
   function mount(pane, ctx) {
     const wrap = section();
     // 「重置」后要把每个控件的显示值同步回默认值（pane 不会自动重建）。
     const syncers = [];
+    activeSyncers = syncers;
     wrap.appendChild(el('div', { class: 'text-[12px] text-fg-muted' }, i18n.t('terminalSettings.subtitle')));
 
     /* default shell */
@@ -143,16 +167,55 @@
     shellControls.append(shellField.input, chooseBtn);
     wrap.appendChild(row(i18n.t('terminalSettings.shell'), i18n.t('terminalSettings.shellHint'), shellControls));
 
+    /* font family (system font list chooser) */
+    const fontFamilyLabel = el('span', { class: 'max-w-[240px] truncate font-mono text-[12px] text-fg-muted' });
+    const chooseFontBtn = el(
+      'button',
+      { class: 'btn shrink-0 px-2 py-1.5 text-[12px]', type: 'button' },
+      i18n.t('terminalSettings.chooseFont')
+    );
+    const resetFontBtn = el(
+      'button',
+      { class: 'btn shrink-0 px-2 py-1.5 text-[12px]', type: 'button' },
+      i18n.t('terminalSettings.resetFont')
+    );
+    let currentFontFamily = ctx.settings.terminalFontFamily || '';
+    const renderFontFamily = (value) => {
+      currentFontFamily = value || '';
+      fontFamilyLabel.textContent = currentFontFamily || i18n.t('terminalSettings.fontFamilyDefault');
+      fontFamilyLabel.style.fontFamily = currentFontFamily ? cssFontFamily(currentFontFamily) : '';
+      resetFontBtn.disabled = !currentFontFamily;
+    };
+    renderFontFamily(currentFontFamily);
+    chooseFontBtn.addEventListener('click', () => {
+      if (typeof window.ships.openFontPicker === 'function') window.ships.openFontPicker();
+    });
+    resetFontBtn.addEventListener('click', () => ctx.patch({ terminalFontFamily: '' }));
+    const fontControls = el('div', { class: 'flex min-w-0 shrink-0 items-center gap-2' });
+    fontControls.append(fontFamilyLabel, chooseFontBtn, resetFontBtn);
+    syncers.push((next) => renderFontFamily(next.terminalFontFamily || ''));
+    wrap.appendChild(
+      row(i18n.t('terminalSettings.fontFamily'), i18n.t('terminalSettings.fontFamilyHint'), fontControls)
+    );
+
     /* font size */
-    const fontField = field(null, { class: 'field w-[90px] shrink-0 font-mono', type: 'number', min: '8', max: '24' });
-    fontField.input.value = String(ctx.settings.terminalFontSize || 12);
+    const C = window.ShipsConstants || {};
+    const fontMin = C.TERMINAL_FONT_MIN || 8;
+    const fontMax = C.TERMINAL_FONT_MAX || 64;
+    const fontField = field(null, {
+      class: 'field w-[90px] shrink-0 font-mono',
+      type: 'number',
+      min: String(fontMin),
+      max: String(fontMax),
+    });
+    fontField.input.value = String(ctx.settings.terminalFontSize || 14);
     fontField.input.addEventListener('change', () => {
-      const value = Math.max(8, Math.min(24, Number(fontField.input.value) || 12));
+      const value = Math.max(fontMin, Math.min(fontMax, Number(fontField.input.value) || 12));
       fontField.input.value = String(value);
       ctx.patch({ terminalFontSize: value });
     });
     syncers.push((next) => {
-      fontField.input.value = String(next.terminalFontSize || 12);
+      fontField.input.value = String(next.terminalFontSize || 14);
     });
     wrap.appendChild(row(i18n.t('terminalSettings.fontSize'), i18n.t('terminalSettings.fontSizeHint'), fontField.input));
 
@@ -391,6 +454,10 @@
     wrap.appendChild(row(i18n.t('terminalSettings.reset'), i18n.t('terminalSettings.resetHint'), resetControls));
 
     pane.appendChild(wrap);
+
+    return () => {
+      if (activeSyncers === syncers) activeSyncers = null;
+    };
   }
 
   window.ShipsSettingsRegistry.register({
@@ -398,5 +465,6 @@
     icon: 'terminal',
     labelKey: 'terminalSettings.title',
     mount,
+    sync: syncSettings,
   });
 })();

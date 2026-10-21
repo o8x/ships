@@ -19,6 +19,7 @@ const {
   shrinkTerminalToBall,
   getFileWindow,
   openFileWindow,
+  openFontPickerWindow,
 } = require('../window-manager');
 
 function registerWindowIpc(ipcMain) {
@@ -79,6 +80,15 @@ function registerWindowIpc(ipcMain) {
     openSettingsWindow(typeof section === 'string' ? section : '');
   });
   ipcMain.on(IPC.WINDOW_CLOSE_SETTINGS, () => closeSettingsWindow());
+
+  ipcMain.handle(IPC.FONT_PICKER_OPEN, () => {
+    openFontPickerWindow();
+    return { ok: true };
+  });
+  ipcMain.on(IPC.FONT_PICKER_CLOSE, (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && !win.isDestroyed()) win.close();
+  });
 
   ipcMain.handle(IPC.DEVTOOLS_OPEN, (_event, target) => {
     // target: 'main'（悬浮面板）/ 'settings' / 'terminal'（置顶终端窗口）/ 'file'（独立文件窗口）；

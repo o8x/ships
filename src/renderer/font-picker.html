@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    />
+    <title>Vessel</title>
+    <link rel="stylesheet" href="./styles/constants.css" />
+    <link rel="stylesheet" href="./styles/tailwind.build.css" />
+  </head>
+  <body style="background: var(--color-bg)">
+    <div class="font-picker-window">
+      <header class="font-picker-titlebar">
+        <h1 id="font-picker-title" class="font-picker-title"></h1>
+      </header>
+      <div id="font-picker-preview" class="font-picker-preview"></div>
+      <input id="font-picker-search" class="field" type="search" spellcheck="false" />
+      <div id="font-picker-list" class="font-picker-list"></div>
+      <div class="font-picker-actions">
+        <button id="font-picker-cancel" class="btn" type="button"></button>
+        <button id="font-picker-apply" class="btn btn-accent" type="button"></button>
+      </div>
+    </div>
+
+    <script src="./scripts/theme.js"></script>
+    <script src="./scripts/constants.js"></script>
+    <script src="./scripts/i18n.js"></script>
+    <script src="./scripts/ui.js"></script>
+    <script src="./scripts/font-picker-window.js"></script>
+  </body>
+</html>

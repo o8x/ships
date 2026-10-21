@@ -205,12 +205,16 @@
     if (window.Terminal) {
       const mono = getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim();
       const cfg = (ctx && ctx.settings) || {};
+      const C = window.ShipsConstants || {};
+      const fontMin = C.TERMINAL_FONT_MIN || 8;
+      const fontMax = C.TERMINAL_FONT_MAX || 64;
+      const family = String(cfg.terminalFontFamily || '').trim();
       term = new window.Terminal({
         convertEol: true,
         cursorBlink: true,
         scrollback: cfg.terminalScrollback || 10000,
-        fontSize: Math.max(8, Math.min(24, cfg.terminalFontSize || 12)),
-        fontFamily: mono || 'monospace',
+        fontSize: Math.max(fontMin, Math.min(fontMax, cfg.terminalFontSize || 14)),
+        fontFamily: family ? `"${family.replace(/"/g, '\\"')}", ${mono || 'monospace'}` : mono || 'monospace',
         theme: terminalTheme(),
       });
       term.open(termHost);

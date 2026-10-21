@@ -6,6 +6,7 @@ const os = require('os');
 const { IPC, VERSION, TERMINAL_WINDOW } = require('../../shared/constants');
 const logger = require('../utils/logger');
 const updater = require('../services/updater-service');
+const fontService = require('../services/font-service');
 const {
   DATA_DIR,
   LOG_DIR,
@@ -28,6 +29,9 @@ function registerAppIpc(ipcMain) {
     dataFiles: describeDataFiles(),
     terminalScrollback: TERMINAL_WINDOW.scrollback,
   }));
+
+  // 系统字体列表（设置 → 终端 → 字体）。
+  ipcMain.handle(IPC.APP_LIST_FONTS, () => fontService.listFonts());
 
   ipcMain.handle(IPC.OPEN_DATA_FOLDER, async () => {
     const err = await shell.openPath(DATA_DIR);

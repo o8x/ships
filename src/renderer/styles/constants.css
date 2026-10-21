@@ -35,8 +35,8 @@
   --footer-height: 34px;
   --tabbar-height: 46px;
 
-  /* 终端窗口头栏：高 22px（刚好放下自绘的小红绿灯），字号 = 终端字号 + 1
-     —— terminal.js 的 applyFontSize() 会改写 --term-header-font-size（默认终端 12 → 13）。 */
+  /* 终端窗口头栏：字号 = 终端字号夹在 10–20px，高度 = 该字号线性映射并夹在 20–32px
+     —— terminal.js 的 applyHeaderFontSize() 会改写这两个变量（默认终端 14 → 头栏 14px / 25px）。 */
   --term-header-height: 22px;
   --term-header-font-size: 13px;
   /* 终端内容与窗口四边的留白：0 = 终端铺满窗口（vim 等全屏程序四周不留白） */

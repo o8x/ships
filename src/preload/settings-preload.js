@@ -33,6 +33,9 @@ const api = {
   sshGetDetected: () => ipcRenderer.invoke(IPC.SSH_GET_DETECTED),
   openFile: (options) => ipcRenderer.invoke(IPC.DIALOG_OPEN_FILE, options),
   openDirectory: (options) => ipcRenderer.invoke(IPC.DIALOG_OPEN_DIR, options),
+  listFonts: () => ipcRenderer.invoke(IPC.APP_LIST_FONTS),
+  openFontPicker: () => ipcRenderer.invoke(IPC.FONT_PICKER_OPEN),
+  closeFontPicker: () => ipcRenderer.send(IPC.FONT_PICKER_CLOSE),
   terminal: {
     start: (cols, rows, shell) => ipcRenderer.invoke(IPC.TERMINAL_START, { cols, rows, shell }),
     input: (id, data) => ipcRenderer.invoke(IPC.TERMINAL_INPUT, { id, data }),
