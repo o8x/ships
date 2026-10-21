@@ -90,7 +90,7 @@ Vessel/
     │   ├── window-manager.js    # 主面板 / 设置窗口 / 置顶终端窗口的创建、定位、几何记忆、显隐、广播
     │   ├── ipc/                 # IPC 处理器（app / settings / window / shortcut / ssh / geo / clipboard / hash / nutrient / twofa / net-test / terminal / sftp / file-window / update）
     │   ├── scripts/             # pty-bridge.py（PTY 桥接，交互终端用；打包时经 build.asarUnpack 解包到 app.asar.unpacked）
-    │   ├── services/            # settings / ssh-config / ssh / iterm / terminal / sftp（文件管理 SFTP 会话）/ layout（文件管理布局）/ cd-history（cd 历史）/ vscode（用 VS Code 打开本地文件）/ hotkey / geo / clipboard / hash / nutrient（营养成分 / TDEE 记录）/ local-network（启动时请求本地网络权限）/ totp（2FA 动态验证码，密钥加密存储）/ updater（自动更新）服务
+    │   ├── services/            # settings / ssh-config / ssh / iterm / terminal / sftp（文件管理 SFTP 会话）/ layout（文件管理布局）/ cd-history（cd 历史）/ vscode（用 VS Code 打开本地文件）/ hotkey / geo / clipboard / hash / nutrient（营养成分 / TDEE 记录）/ local-network（启动 / 窗口聚焦 / 连接时请求本地网络权限，长持有 + 重试）/ totp（2FA 动态验证码，密钥加密存储）/ updater（自动更新）服务
     │   └── utils/               # logger / json-store / paths / utf8（UTF-8 保真解码 + 非法字节转义）/ net-test（网络测试命令与校验）/ window-geometry（终端窗口几何记忆的纯计算）/ process-tree（终端会话进程树里找 ssh 目标）
     ├── preload/                 # main-preload.js / settings-preload.js / update-preload.js（更新下载窗口，仅暴露更新能力）/ icons.js（assets/icons/*.svg）/ flags.js（assets/flags/*.svg）
     └── renderer/
@@ -129,7 +129,7 @@ Vessel/
 2. `app.whenReady()` 后：按需隐藏 Dock → 注册全部 IPC → 创建主面板（`show:false`）→ 创建托盘。
 3. 打印版本、平台与数据文件清单。
 4. 不显示任何窗口，仅托盘图标可见。
-5. **提前请求本地网络权限**：主进程向本机各网卡广播地址与 mDNS 组播（`224.0.0.251:5353`）发送一次空 UDP 包，触发 macOS 15+ 的「本地网络」授权弹窗；失败静默忽略。
+5. **提前请求本地网络权限**：主进程向本机各网卡广播地址与 mDNS 组播（`224.0.0.251:5353`）发送空 UDP 包，触发 macOS 15+ 的「本地网络」授权弹窗。每次请求会先 `app.focus({ steal: true })` 让菜单栏应用成为前台（否则系统可能不展示授权框），创建保持 `30000ms` 的 socket，并在 `0 / 2500 / 5000ms` 重试 3 次；`2000ms` 内的重复调用会合并。除启动外，**窗口获得焦点（`browser-window-focus` / `activate`）、发起 SSH 连接 / 系统探测 / 网络测试时都会再次请求**，因此弹窗被忽略或自动消失后，下次操作可重新弹出；失败静默忽略。
 
 ### 3.2 主界面显示 / 隐藏（点击托盘）
 
@@ -176,7 +176,7 @@ Vessel/
 4. 结果（`{ os, family, label, at }`）写入 `ssh-detected.json` 并广播 `ssh:detected` 事件；渲染层据此更新左侧彩色系统图标与提示。
 5. 表单内探测期间按钮显示「探测中…」且禁用；**探测成功后**才启用「保存」。**探测失败不清空表单**：已填写的别名 / 地址 / 用户 / 端口 / 私钥 / 跳板机 / 分组 / 密码都会保留，便于原地修改后直接重新探测（密码为内存草稿，不落盘）。
 6. **日志**：探测的每一步（开始、目标、认证方式、执行命令、stdout/stderr、解析结果、连接报错）都会追加写入**当天的日志文件** `~/Library/Logs/Vessel/vessel-YYYY-MM-DD.log`（设置 → 日志 → 日志文件夹可打开所在目录）；便于排查本地网络 / 权限问题。
-7. **macOS 本地网络权限**：Info.plist 含 `NSLocalNetworkUsageDescription`。**应用启动时会主动请求一次**（广播 + mDNS），macOS 15+ 首次访问局域网（如 192.168.x / 10.x）时会弹「本地网络」授权，需允许 Vessel，否则连接会被系统拦截（表现即“没有本地 SSH 探测权限”）；可在「系统设置 → 隐私与安全性 → 本地网络」中开启。
+7. **macOS 本地网络权限**：主 `Info.plist` 与 **4 个 Electron Helper 的 `Info.plist`** 都含 `NSLocalNetworkUsageDescription`（打包时由 `afterPack` 统一写入，见 §7）。应用在启动、窗口聚焦、发起 SSH / 探测 / 网络测试时会主动请求（广播 + mDNS，长持有 + 重试）；macOS 15+ 首次访问局域网（如 192.168.x / 10.x / 172.16.x）时会弹「本地网络」授权，需允许 Vessel，否则连接会被系统拦截（表现即 `No route to host` / `EHOSTUNREACH`）。可在「系统设置 → 隐私与安全性 → 本地网络」中开启。注意：该授权按 bundle id 记录，**更换 appId 会得到一条全新的、未授权的记录**；`tccutil` 无法重置本地网络授权。
 
 ### 3.6 修改设置
 
@@ -607,18 +607,18 @@ flowchart TD
   - `dist:mac`：执行 `scripts/dist-mac.sh` —— 先清理旧 `release/` 再 `build:css`，自动选择签名身份并 `electron-builder --mac --arm64 --publish never`（实际调用 `npx electron-builder`），产出 **PKG**；`--publish never` 时发布由 CI 完成（见下）。
   - `pack:mac`：同上但加 `--dir`，仅产出 `.app`（调试用）。
 - **打包配置**（`package.json` 的 `build` 段，electron-builder）：
-  - `appId = cn.com.stdout.vessel`，`productName = Vessel`；产物目录 `release/`。
+  - `appId = cn.com.stdout.vessel`，`productName = Vessel`；产物目录 `release/`。**appId 是本地网络授权的键**：更换 appId 会得到一条全新的未授权记录；当前正式 appId 保持为 `cn.com.stdout.vessel`，不要随意改（旧 `com.ships.app` 的授权记录仍在系统里，但不影响新 id）。
   - `publish`：`[{ provider: 'github', owner: 'o8x', repo: 'vessel' }]`；macOS 检测更新不依赖 `latest-mac.yml`，使用 `package.json` 的 `vessel.updateRepo`（不会被 electron-builder 裁剪）调用 GitHub Releases API。
   - `files`：`src/**/*`、`assets/**/*`、`package.json`；依赖由 electron-builder 自动收集（`asar: true`）—— 渲染层直接从 `node_modules/@xterm/…` 加载终端资源，因此 `@xterm/xterm` 与 `@xterm/addon-fit` 放在 `dependencies`（不是 devDependencies）；`electron-updater` 同样放在 `dependencies`。
   - **原生依赖 `electron-liquid-glass`**：N-API 预编译（含 `darwin-arm64` / `darwin-x64`），故 `npmRebuild: false` 无需重编；`build.asarUnpack` 把 `**/*.node` 与 `node_modules/electron-liquid-glass/**` 解包到 `app.asar.unpacked` 供加载（Liquid Glass 仅运行时 macOS 26+ 生效，旧系统由主进程回退）。
   - **`build.asarUnpack` 另含 `src/main/scripts/*`**：`pty-bridge.py` 要作为文件被 `python3` 打开，而 `app.asar` 是归档不是目录（否则打包后报 `can't open file '…/app.asar/src/main/scripts/pty-bridge.py': [Errno 20] Not a directory`），解包后由 `terminal-service` 把路径改写到 `app.asar.unpacked` 再 `spawn`。
   - `npmRebuild: false`（`ssh2` 使用纯 JS 回退，无需重编原生模块）。
   - `compression: 'maximum'`；`electronLanguages: ['en', 'zh_CN']`（仅保留中英文 Electron 语言包，剔除约 220 个语言包、解包体积减少约 48MB）。
-  - `mac.target`：**仅 arm64 的 pkg**。`build.pkg` 固定安装到 `/Applications`（`installLocation`），禁止安装到任意位置 / 当前用户 Home，`isRelocatable = false`；`pkg.scripts = ../scripts/pkg-scripts`：`preinstall` 先在登录用户会话中让已运行的 Vessel（以及旧名 Ships）正常退出（5 秒未退出则强制结束），并删除旧的 `/Applications/Ships.app`；替换完成后 `postinstall` 在登录用户会话中 `open /Applications/Vessel.app` 自动启动新版本。不产出 dmg / zip / `latest-mac.yml`。`mac.icon = assets/imgs/icon.icns`；`hardenedRuntime = true`、`gatekeeperAssess = false`；`extendInfo` 含 `LSUIElement = true`（纯菜单栏 Agent，无 Dock）与 `NSLocalNetworkUsageDescription`（本地网络授权说明）。
+  - `mac.target`：**仅 arm64 的 pkg**。`build.pkg` 固定安装到 `/Applications`（`installLocation`），禁止安装到任意位置 / 当前用户 Home，`isRelocatable = false`；`pkg.scripts = ../scripts/pkg-scripts`：`preinstall` 先在登录用户会话中让已运行的 Vessel（以及旧名 Ships）正常退出（5 秒未退出则强制结束），并删除旧的 `/Applications/Ships.app`；替换完成后 `postinstall` 在登录用户会话中 `open /Applications/Vessel.app` 自动启动新版本。不产出 dmg / zip / `latest-mac.yml`。`mac.icon = assets/imgs/icon.icns`；`hardenedRuntime = true`、`gatekeeperAssess = false`；`extendInfo` 含 `LSUIElement = true`（纯菜单栏 Agent，无 Dock）与 `NSLocalNetworkUsageDescription`（本地网络授权说明）。**`afterPack` 会把同一个 `NSLocalNetworkUsageDescription` 写入 4 个 Helper bundle 的 `Info.plist`**（`Vessel Helper` / `.helper` / `.helper.Renderer` / `.helper.GPU` / `.helper.Plugin`）：macOS 会把部分 Electron 网络流量归属到 helper，缺少该 key 的 helper 会被静默默认拒绝且永不弹窗。
 - **签名 / 公证（打包时自动）**：
   - 由 `scripts/dist-mac.sh` 判断：设置了 `CSC_LINK` / `APPLE_ID` / `CSC_NAME` 之一 → 视为**正式签名**，交给 electron-builder 在打包阶段用 Developer ID 签名 `.app`；PKG 安装器签名需要额外的 **Developer ID Installer** 证书（缺失时产出的 PKG 未签名，但可安装）。否则设 `CSC_IDENTITY_AUTO_DISCOVERY=false`（避免误用钥匙串里的无关证书而失败）。
   - **ad-hoc 兜底**：`afterPack` 钩子 `scripts/after-pack.cjs` 调用 `scripts/adhoc-sign.sh`：仅当未配置正式签名（同上三个环境变量都为空）时执行 `codesign --force --deep --sign -` 并对 `.app` 校验，保证**未签名环境下应用仍可运行**；配置了正式签名时跳过，以免覆盖。
-- **打包加固**（`afterPack` 内，顺序固定：**asar → 二进制 → 签名**）：
+- **打包加固**（`afterPack` 内，顺序固定：**asar → 二进制 → helper Info.plist → 签名**）：
   - **asar 保护**：用 `asarmor` 给 `app.asar` 打 **bloat 补丁**（约 100GB 假条目），使 `asar extract` 解包时写出大量数据而失败（现代 `asar` 已使传统补丁失效，故采用 bloat 策略）。
   - **Electron Fuses**（`@electron/fuses`）：`RunAsNode=false`、`EnableNodeOptionsEnvironmentVariable=false`、`EnableNodeCliInspectArguments=false`、`EnableCookieEncryption=true`、`OnlyLoadAppFromAsar=true`；`EnableEmbeddedAsarIntegrityValidation=false`（与 asar 改写冲突）。
   - 加固依赖 `asarmor`、`@electron/fuses` 位于 `devDependencies`。

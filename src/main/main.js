@@ -96,6 +96,10 @@ function onReady() {
   printStartupInfo();
   // 提前触发 macOS「本地网络」授权（macOS 15+ 首次访问局域网时才会弹窗）。
   requestLocalNetworkAccess();
+
+  // 弹窗可能被忽略 / 自动消失；用户每次切回窗口时再请求一次。
+  app.on('browser-window-focus', () => requestLocalNetworkAccess());
+  app.on('activate', () => requestLocalNetworkAccess());
 }
 
 function printStartupInfo() {

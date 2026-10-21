@@ -8,6 +8,7 @@ const sshService = require('../services/ssh-service');
 const credentials = require('../services/ssh-credentials-service');
 const { broadcast, getMainWindow } = require('../window-manager');
 const { runInTerminal } = require('./terminal-ipc');
+const { requestLocalNetworkAccess } = require('../services/local-network-service');
 const logger = require('../utils/logger');
 
 function findHost(alias) {
@@ -31,6 +32,7 @@ function registerSshIpc(ipcMain) {
   // `inTerminal: true`（终端窗口头部的 SSH 下拉）明确要求在「当前终端」里执行，
   // 不受「SSH 使用内置终端连接」开关影响。
   ipcMain.handle(IPC.SSH_CONNECT, (_event, payload) => {
+    requestLocalNetworkAccess();
     const host = findHost(payload && payload.alias);
     if (!host) return { ok: false, error: 'host not found' };
     const command = sshService.buildCommand(host);
@@ -49,6 +51,7 @@ function registerSshIpc(ipcMain) {
   });
 
   ipcMain.handle(IPC.SSH_DETECT, (_event, payload) => {
+    requestLocalNetworkAccess();
     const host = findHost(payload && payload.alias);
     if (!host) return { queued: false };
     sshService.detect(host);
@@ -58,6 +61,7 @@ function registerSshIpc(ipcMain) {
   // Detect an arbitrary host (used by the settings form before the host exists).
   // 支持密码认证：优先用表单里填的密码；留空则回退到该别名已保存的密码（除非表单点了「清除密码」）。
   ipcMain.handle(IPC.SSH_DETECT_HOST, async (_event, payload) => {
+    requestLocalNetworkAccess();
     const host = payload || {};
     if (!host.hostName) return { ok: false, error: 'hostName required' };
     const alias = host.alias || host.hostName;
