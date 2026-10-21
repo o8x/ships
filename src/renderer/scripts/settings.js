@@ -61,6 +61,21 @@
 
   async function boot() {
     if (!window.ships) return;
+
+    // 主面板 SSH 条目的「编辑」图标：等设置页完成初始化后再切到 SSH 分区并打开表单。
+    let pendingSshEdit = null;
+    window.ships.onEditSsh((payload) => {
+      const alias = String((payload && payload.alias) || '');
+      if (!alias) return;
+      if (state.activeId === null) {
+        pendingSshEdit = alias;
+        return;
+      }
+      if (state.activeId !== 'ssh') setActive('ssh');
+      const sshSection = registry.get('ssh');
+      if (sshSection && typeof sshSection.editHost === 'function') sshSection.editHost(alias);
+    });
+
     const [settings, info] = await Promise.all([window.ships.getSettings(), window.ships.getInfo()]);
     state.settings = settings || {};
     state.info = info;
@@ -70,6 +85,14 @@
     drawNav();
     const sections = registry.all();
     if (sections.length) setActive(sections[0].id);
+
+    if (pendingSshEdit) {
+      const alias = pendingSshEdit;
+      pendingSshEdit = null;
+      if (state.activeId !== 'ssh') setActive('ssh');
+      const sshSection = registry.get('ssh');
+      if (sshSection && typeof sshSection.editHost === 'function') sshSection.editHost(alias);
+    }
 
     window.ships.onOpenSection((id) => {
       if (id && registry.get(id)) setActive(id);

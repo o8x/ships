@@ -10,6 +10,7 @@ const IPC = {
   SETTINGS_SET: 'settings:set',
   SETTINGS_CHANGED: 'settings:changed',
   SETTINGS_OPEN_SECTION: 'settings:open-section',
+  SETTINGS_EDIT_SSH: 'settings:edit-ssh',
 
   APP_INFO: 'app:info',
   APP_LIST_FONTS: 'app:list-fonts',
@@ -122,6 +123,7 @@ const IPC = {
   DIALOG_OPEN_FILES: 'dialog:open-files',
 
   SSH_LIST: 'ssh:list',
+  SSH_EDIT: 'ssh:edit',
   SSH_CONNECT: 'ssh:connect',
   SSH_DETECT: 'ssh:detect',
   SSH_DETECT_HOST: 'ssh:detect-host',
@@ -182,6 +184,7 @@ const TERMINAL_WINDOW = Object.assign(
     ballDelayMs: 50,
     ballIcon: 'ball.svg',
     ballDark: true,
+    ballTransparent: true,
   },
   appConfig.terminalWindow || {}
 );
@@ -276,6 +279,8 @@ const DEFAULT_SETTINGS = {
   terminalBallIcon: TERMINAL_WINDOW.ballIcon || 'ball.svg',
   // 悬浮球底色是否为暗色（浅色/暗色底）；默认开，不跟随全局主题。图标始终保留原色。
   terminalBallDark: TERMINAL_WINDOW.ballDark !== false,
+  // 悬浮球透明背景：默认开；开启后无底色 / 边框，拖动时显示一层淡背景。
+  terminalBallTransparent: TERMINAL_WINDOW.ballTransparent !== false,
   // 内置终端文件面板：下载保存目录（默认 ~/Downloads）
   sftpDownloadDir: appConfig.sftpDownloadDir || '~/Downloads',
   // 独立文件窗口置顶

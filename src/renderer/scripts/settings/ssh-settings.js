@@ -91,6 +91,8 @@
     },
   });
 
+  let activeEditHost = null;
+
   function mount(pane, ctx) {
     const state = {
       hosts: [],
@@ -115,6 +117,8 @@
       passwordDraft: '',
       // 表单里「清除已保存密码」的开关状态（同样跨重渲染保留）。
       passwordClear: false,
+      // 从主面板「编辑」图标进来时待打开的主机别名（等 hosts 加载完再打开）。
+      pendingEditAlias: null,
     };
     const root = el('div', {});
     pane.appendChild(root);
@@ -126,8 +130,38 @@
       } catch (err) {
         state.detectedMap = {};
       }
+      maybeOpenPendingEdit();
       render();
     }
+
+    function openHostEditor(host) {
+      state.editing = Object.assign({ originalAlias: host.alias }, host);
+      state.error = '';
+      state.detectError = '';
+      state.detected = state.detectedMap[host.alias] || null;
+      state.passwordDraft = '';
+      state.passwordClear = false;
+    }
+
+    function maybeOpenPendingEdit() {
+      if (!state.pendingEditAlias) return false;
+      const host = state.hosts.find((item) => item.alias === state.pendingEditAlias);
+      if (!host) return false;
+      state.pendingEditAlias = null;
+      openHostEditor(host);
+      return true;
+    }
+
+    function editHost(alias) {
+      const value = String(alias || '');
+      if (!value) return;
+      // 同一条主机已经在编辑中时不重置表单（主进程可能重发一次事件兜底）。
+      if (state.editing && state.editing.originalAlias === value) return;
+      state.pendingEditAlias = value;
+      if (maybeOpenPendingEdit()) render();
+    }
+    activeEditHost = editHost;
+
 
     function showMessage(text) {
       state.message = text;
@@ -747,6 +781,11 @@
     }
 
     reload();
+
+    return () => {
+      if (activeEditHost === editHost) activeEditHost = null;
+      clearTimeout(state.messageTimer);
+    };
   }
 
   window.ShipsSettingsRegistry.register({
@@ -754,5 +793,8 @@
     icon: 'terminal',
     labelKey: 'settingsPage.ssh',
     mount,
+    editHost(alias) {
+      if (activeEditHost) activeEditHost(alias);
+    },
   });
 })();

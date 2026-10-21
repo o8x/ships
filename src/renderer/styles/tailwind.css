@@ -732,11 +732,15 @@ input[type='color'].swatch::-webkit-color-swatch {
     var(--term-ball-icon-scale, 0.7),
     min(var(--term-ball-icon-scale-max, 0.8), var(--term-ball-icon-bounce-max))
   );
-  /* 输出时的「正弦平滑弹跳」见 styles/ball-animations.css（独立文件，便于调整）。 */
-}
-.term-ball-icon svg {
   width: calc(var(--term-ball-size, 75px) * var(--term-ball-icon-effective-scale));
   height: calc(var(--term-ball-size, 75px) * var(--term-ball-icon-effective-scale));
+  /* 输出时的「正弦平滑弹跳」见 styles/ball-animations.css（独立文件，便于调整）。 */
+}
+/* SVG 填满图标容器，避免 SVG 自带的外层透明留白被额外算进尺寸。 */
+.term-ball-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 /* 悬浮球：跳动的状态 + 悬停时，球内显示本轮累计跳动时长；停止跳动即隐藏并清空。
    两行：上行 h/m（仅非 0 才显示，字号为 S 的一半），下行 S（更大）。 */
@@ -841,6 +845,19 @@ input[type='color'].swatch::-webkit-color-swatch {
 }
 [data-ball-trash='on'] #term-ball {
   background: color-mix(in srgb, var(--color-danger) 30%, #2a2a2c);
+}
+/* 悬浮球透明背景：无底色 / 无边框；拖动时显示一层淡淡的圆形背景。 */
+:root[data-ball-transparent='on'] #term-ball {
+  border-color: transparent;
+}
+:root[data-ball-transparent='on']:not([data-ball-trash='on']):not([data-ball-drag='on']) #term-ball {
+  background: transparent;
+}
+:root[data-ball-transparent='on'][data-ball-drag='on'] #term-ball {
+  background: var(--ball-drag-bg);
+}
+:root[data-ball-transparent='on'] .term-ball-timer {
+  color: var(--color-fg-muted);
 }
 @keyframes ships-ball-in {
   from {

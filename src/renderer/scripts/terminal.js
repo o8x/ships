@@ -756,6 +756,10 @@
   function applyTerminalDark(forceDark) {
     document.documentElement.dataset.terminalDark = forceDark ? 'on' : 'auto';
   }
+  // 悬浮球透明背景：开启后无底色 / 边框，拖动时由 CSS 显示淡背景。
+  function applyBallTransparent(enabled) {
+    document.documentElement.dataset.ballTransparent = enabled ? 'on' : 'off';
+  }
   // 终端持续有输出时，悬浮球图标做流畅的上下弹跳；2s 内无输出则停止。
   const BALL_IDLE_STOP_MS = 2000;
   // 弹跳一个完整循环的时长（读 styles/ball-animations.css 的 --ball-bounce-duration，带兜底）。
@@ -892,6 +896,7 @@
       event.preventDefault();
       dragging = true;
       moved = false;
+      document.documentElement.dataset.ballDrag = 'on';
       startX = event.screenX;
       startY = event.screenY;
       try {
@@ -911,6 +916,7 @@
     const endDrag = (event) => {
       if (!dragging) return;
       dragging = false;
+      document.documentElement.dataset.ballDrag = 'off';
       try {
         ballEl.releasePointerCapture(event.pointerId);
       } catch (err) {
@@ -983,6 +989,7 @@
     window.ShipsTheme.set(settings || {});
     applyBallIcon(settings && settings.terminalBallIcon);
     applyTerminalDark((settings && settings.terminalBallDark) !== false);
+    applyBallTransparent((settings && settings.terminalBallTransparent) !== false);
     renderHeader();
     sshPicker = setupSshPicker();
     refreshSshPicker();
@@ -1005,6 +1012,7 @@
       window.ShipsTheme.set(next || {});
       applyBallIcon(next && next.terminalBallIcon);
       applyTerminalDark((next && next.terminalBallDark) !== false);
+      applyBallTransparent((next && next.terminalBallTransparent) !== false);
       renderHeader();
       refreshSshPicker();
       if (term) term.options.theme = themeColors();

@@ -1010,11 +1010,21 @@ function toggleMainWindow() {
   }
 }
 
-function openSettingsWindow(section) {
+function openSettingsWindow(section, editSshAlias) {
+  const targetSection = editSshAlias ? 'ssh' : section;
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.show();
     settingsWindow.focus();
-    if (section) settingsWindow.webContents.send(IPC.SETTINGS_OPEN_SECTION, section);
+    if (targetSection) settingsWindow.webContents.send(IPC.SETTINGS_OPEN_SECTION, targetSection);
+    if (editSshAlias) {
+      const sendEdit = () => {
+        if (settingsWindow && !settingsWindow.isDestroyed()) {
+          settingsWindow.webContents.send(IPC.SETTINGS_EDIT_SSH, { alias: editSshAlias });
+        }
+      };
+      setTimeout(sendEdit, 80);
+      setTimeout(sendEdit, 400);
+    }
     return settingsWindow;
   }
 
@@ -1053,7 +1063,16 @@ function openSettingsWindow(section) {
   settingsWindow.once('ready-to-show', () => {
     settingsWindow.show();
     settingsWindow.focus();
-    if (section) settingsWindow.webContents.send(IPC.SETTINGS_OPEN_SECTION, section);
+    if (targetSection) settingsWindow.webContents.send(IPC.SETTINGS_OPEN_SECTION, targetSection);
+    if (editSshAlias) {
+      const sendEdit = () => {
+        if (settingsWindow && !settingsWindow.isDestroyed()) {
+          settingsWindow.webContents.send(IPC.SETTINGS_EDIT_SSH, { alias: editSshAlias });
+        }
+      };
+      setTimeout(sendEdit, 400);
+      setTimeout(sendEdit, 900);
+    }
   });
   settingsWindow.on('closed', () => {
     settingsWindow = null;

@@ -8,6 +8,8 @@ const logger = require('../utils/logger');
 
 function applyLaunchAtLogin(enabled) {
   if (process.platform !== 'darwin') return;
+  // 调试模式（--debug / 环境变量）或未打包运行时不注册开机自启，避免开发机被写入登录项。
+  if (logger.DEBUG || !app.isPackaged) return;
   try {
     const next = Boolean(enabled);
     if (app.getLoginItemSettings().openAtLogin === next) return;

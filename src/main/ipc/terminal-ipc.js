@@ -27,6 +27,7 @@ const TERMINAL_SETTING_KEYS = [
   'terminalBallSize',
   'terminalBallIcon',
   'terminalBallDark',
+  'terminalBallTransparent',
 ];
 
 function terminalDefaults() {

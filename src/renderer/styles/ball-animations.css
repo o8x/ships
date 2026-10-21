@@ -25,7 +25,7 @@
      实际比例 = clamp(min, scale, min(max, 弹跳上限))，
      其中「弹跳上限 = 1 - 2 × --ball-bounce-distance」保证图标上移到最高点时仍在圆内、
      不会被窗口裁切（弹跳幅度越大，允许的图标比例越小）。 */
-  --term-ball-icon-scale: 0.63;
+  --term-ball-icon-scale: 0.8;
   --term-ball-icon-scale-min: 0.5;
   --term-ball-icon-scale-max: 0.8;
 }

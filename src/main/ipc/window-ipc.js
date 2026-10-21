@@ -79,6 +79,13 @@ function registerWindowIpc(ipcMain) {
     hideMainWindow();
     openSettingsWindow(typeof section === 'string' ? section : '');
   });
+  ipcMain.handle(IPC.SSH_EDIT, (_event, payload) => {
+    const alias = String((payload && payload.alias) || '');
+    if (!alias) return { ok: false, error: 'alias required' };
+    hideMainWindow();
+    openSettingsWindow('ssh', alias);
+    return { ok: true };
+  });
   ipcMain.on(IPC.WINDOW_CLOSE_SETTINGS, () => closeSettingsWindow());
 
   ipcMain.handle(IPC.FONT_PICKER_OPEN, () => {

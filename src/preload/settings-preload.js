@@ -16,6 +16,7 @@ const api = {
   setSettings: (patch) => ipcRenderer.invoke(IPC.SETTINGS_SET, patch),
   onSettingsChanged: (cb) => on(IPC.SETTINGS_CHANGED, cb),
   onOpenSection: (cb) => on(IPC.SETTINGS_OPEN_SECTION, cb),
+  onEditSsh: (cb) => on(IPC.SETTINGS_EDIT_SSH, cb),
   onThemeChanged: (cb) => on(IPC.THEME_CHANGED, cb),
   openDataFolder: () => ipcRenderer.invoke(IPC.OPEN_DATA_FOLDER),
   openLog: () => ipcRenderer.invoke(IPC.OPEN_LOG),

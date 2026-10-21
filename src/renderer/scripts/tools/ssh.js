@@ -11,6 +11,7 @@
         refresh: '刷新',
         empty: '未找到主机，请检查 ~/.ssh/config',
         connect: '连接',
+        edit: '编辑',
         detect: '探测操作系统',
         detecting: '探测中…',
         notDetected: '未探测',
@@ -29,6 +30,7 @@
         refresh: 'Refresh',
         empty: 'No hosts found. Check ~/.ssh/config',
         connect: 'Connect',
+        edit: 'Edit',
         detect: 'Detect OS',
         detecting: 'Detecting…',
         notDetected: 'Not detected',
@@ -104,6 +106,12 @@
       }
 
       const actions = el('div', { class: 'flex shrink-0 items-center gap-1' });
+      const editBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', 'data-tip': i18n.t('ssh.edit') });
+      editBtn.innerHTML = Icons.edit(15);
+      editBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        window.ships.ssh.edit(host.alias);
+      });
       const filesBtn = el('button', {
         class: 'icon-btn h-7 w-7',
         type: 'button',
@@ -117,7 +125,7 @@
       const connectBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', 'data-tip': i18n.t('ssh.connect') });
       connectBtn.innerHTML = Icons.plug(15);
       connectBtn.addEventListener('click', () => connect(host));
-      actions.append(filesBtn, connectBtn);
+      actions.append(editBtn, filesBtn, connectBtn);
 
       row.append(icon, info, actions);
       return row;

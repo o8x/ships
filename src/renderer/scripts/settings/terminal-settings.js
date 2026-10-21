@@ -39,11 +39,13 @@
         ballDelayHint: '失去焦点后多久缩成球（期间焦点回来则取消）',
         ballDelayImmediate: '立即',
         ballSize: '悬浮球大小',
-        ballSizeHint: '圆形悬浮球的边长（宽高强制 1:1，40–200px）',
+        ballSizeHint: '圆形悬浮球的边长（宽高强制 1:1，40–200px）；可选择预设或直接输入',
         ballIcon: '悬浮球图标',
         ballIconHint: '从 assets/icons/ball 中选择悬浮球显示的图标，实时生效',
         ballDark: '终端暗色模式',
         ballDarkHint: '终端始终暗色，关闭则跟随主题',
+        ballTransparent: '透明背景',
+        ballTransparentHint: '悬浮球不显示底色和边框；拖动时显示淡淡的圆形背景',
         seconds: '秒',
         reset: '重置',
         resetHint: '恢复终端相关设置为默认值，并清除记住的窗口屏幕 / 位置 / 大小',
@@ -87,11 +89,13 @@
         ballDelayHint: 'How long after losing focus before shrinking (cancelled if focus returns)',
         ballDelayImmediate: 'Immediate',
         ballSize: 'Ball size',
-        ballSizeHint: 'Edge length of the round ball (forced 1:1, 40–200px)',
+        ballSizeHint: 'Edge length of the round ball (forced 1:1, 40–200px); pick a preset or type a value',
         ballIcon: 'Ball icon',
         ballIconHint: 'Pick the floating ball icon from assets/icons/ball (applies live)',
         ballDark: 'Dark terminal',
         ballDarkHint: 'Always dark; off follows the app theme',
+        ballTransparent: 'Transparent background',
+        ballTransparentHint: 'No background or border; a faint circle appears while dragging',
         seconds: 's',
         reset: 'Reset',
         resetHint: 'Restore the terminal settings to their defaults and forget the remembered screen / position / size',
@@ -349,12 +353,20 @@
       row(i18n.t('terminalSettings.ballDelay'), i18n.t('terminalSettings.ballDelayHint'), ballDelaySelect.el)
     );
 
+    const BALL_SIZE_PRESETS = [40, 50, 60, 75, 90, 100, 120, 150, 200];
+    const ballSizeListId = 'ball-size-presets';
     const ballSizeField = field(null, {
       class: 'field w-[86px] shrink-0 font-mono',
-      type: 'number',
-      min: '40',
-      max: '200',
+      type: 'text',
+      inputmode: 'numeric',
+      spellcheck: 'false',
     });
+    ballSizeField.input.setAttribute('list', ballSizeListId);
+    const ballSizeList = el('datalist', { id: ballSizeListId });
+    for (const size of BALL_SIZE_PRESETS) {
+      ballSizeList.appendChild(el('option', { value: String(size) }));
+    }
+    ballSizeField.wrapper.appendChild(ballSizeList);
     ballSizeField.input.value = String(ctx.settings.terminalBallSize || 75);
     ballSizeField.input.addEventListener('change', () => {
       const value = Math.max(40, Math.min(200, Number(ballSizeField.input.value) || 75));
@@ -365,7 +377,7 @@
       ballSizeField.input.value = String(next.terminalBallSize || 75);
     });
     wrap.appendChild(
-      row(i18n.t('terminalSettings.ballSize'), i18n.t('terminalSettings.ballSizeHint'), ballSizeField.input)
+      row(i18n.t('terminalSettings.ballSize'), i18n.t('terminalSettings.ballSizeHint'), ballSizeField.wrapper)
     );
 
     /* 悬浮球图标：assets/icons/ball/ 下可选，下拉里直接显示图标，实时生效 */
@@ -398,6 +410,21 @@
     });
     wrap.appendChild(
       row(i18n.t('terminalSettings.ballDark'), i18n.t('terminalSettings.ballDarkHint'), termDarkSwitch)
+    );
+
+    /* 悬浮球透明背景（默认开）：无底色 / 边框，拖动时显示淡背景。 */
+    const ballTransparentSwitch = switchControl(ctx.settings.terminalBallTransparent !== false, (value) =>
+      ctx.patch({ terminalBallTransparent: value })
+    );
+    syncers.push((next) => {
+      ballTransparentSwitch.classList.toggle('on', next.terminalBallTransparent !== false);
+    });
+    wrap.appendChild(
+      row(
+        i18n.t('terminalSettings.ballTransparent'),
+        i18n.t('terminalSettings.ballTransparentHint'),
+        ballTransparentSwitch
+      )
     );
 
     /* 重置：终端相关设置回默认 + 清掉记住的屏幕 / 位置 / 尺寸（二次确认） */
