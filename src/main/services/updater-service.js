@@ -7,6 +7,7 @@ const https = require('https');
 const { spawn } = require('child_process');
 const { app, dialog } = require('electron');
 const settings = require('./settings-service');
+const proxyService = require('./proxy-service');
 const logger = require('../utils/logger');
 const wm = require('../window-manager');
 const { IPC, UPDATE_COUNTDOWN_SECONDS, APP_NAME } = require('../../shared/constants');
@@ -252,17 +253,27 @@ async function resolvePkgUrl(version) {
    原因：`net` 走 Chromium 网络栈，会触及加密的 Cookie 存储（打包时翻转了
    EnableCookieEncryption fuse），从而弹出 macOS「钥匙串」访问授权框；Node 原生请求
    完全不碰 Chromium 会话 / Cookie，因此更新检查 / 下载不再触发该弹框。 */
-function requestStream(url, redirects = 0, onRequest) {
+async function requestStream(url, redirects = 0, onRequest) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch (err) {
+    throw err;
+  }
+  const mod = parsed.protocol === 'http:' ? http : https;
+  let agent = null;
+  try {
+    // 「遵循系统代理」开启时按系统代理 / PAC 走 SOCKS5 或 HTTP CONNECT；
+    // 关闭或解析失败时保持直连。
+    agent = await proxyService.agentForUrl(parsed);
+  } catch (err) {
+    logger.file('[updater] proxy resolve failed:', (err && err.message) || err);
+  }
+
   return new Promise((resolve, reject) => {
-    let parsed;
-    try {
-      parsed = new URL(url);
-    } catch (err) {
-      reject(err);
-      return;
-    }
-    const mod = parsed.protocol === 'http:' ? http : https;
-    const req = mod.get(parsed, { headers: { 'User-Agent': 'Vessel-Updater', Accept: '*/*' } }, (res) => {
+    const options = { headers: { 'User-Agent': 'Vessel-Updater', Accept: '*/*' } };
+    if (agent) options.agent = agent;
+    const req = mod.get(parsed, options, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects < 5) {
         res.resume();
         resolve(requestStream(new URL(res.headers.location, parsed).toString(), redirects + 1, onRequest));

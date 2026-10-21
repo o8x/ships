@@ -260,6 +260,9 @@ const DEFAULT_SETTINGS = {
   mainWindowHotkey: TERMINAL_WINDOW.hotkey || 'CommandOrControl+Shift+Z',
   terminalHotkey: TERMINAL_WINDOW.hotkey || 'CommandOrControl+Shift+Z',
   sshBuiltinTerminal: appConfig.sshBuiltinTerminal !== false,
+  // 遵循 macOS 系统代理 / PAC：开启后终端、SSH / SFTP、更新请求按系统代理转发；
+  // 默认关闭，保持直连。SSH / SFTP 仅支持 SOCKS5 代理。
+  followSystemProxy: false,
   // 终端窗口失焦缩成「悬浮球」：是否开启 + 延迟（毫秒）+ 球尺寸（px，宽高强制 1:1）
   terminalBallEnabled: TERMINAL_WINDOW.ballEnabled !== false,
   terminalBallDelayMs: Number.isFinite(TERMINAL_WINDOW.ballDelayMs) ? TERMINAL_WINDOW.ballDelayMs : 50,

@@ -47,6 +47,7 @@ const { registerUpdateIpc } = require('./ipc/update-ipc');
 const { registerBackupIpc } = require('./ipc/backup-ipc');
 const { installApplicationMenu } = require('./menu');
 const { requestLocalNetworkAccess } = require('./services/local-network-service');
+const proxyService = require('./services/proxy-service');
 const logger = require('./utils/logger');
 const { DATA_FILES } = require('./utils/paths');
 const { APP_NAME, VERSION, appConfig } = require('../shared/constants');
@@ -96,6 +97,8 @@ function onReady() {
   printStartupInfo();
   // 提前触发 macOS「本地网络」授权（macOS 15+ 首次访问局域网时才会弹窗）。
   requestLocalNetworkAccess();
+  // 系统代理开关（默认关闭）：只在开启时解析 / 使用系统代理。
+  proxyService.init();
 
   // 弹窗可能被忽略 / 自动消失；用户每次切回窗口时再请求一次。
   app.on('browser-window-focus', () => requestLocalNetworkAccess());

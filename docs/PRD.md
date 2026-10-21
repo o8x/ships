@@ -92,7 +92,7 @@ Vessel/
     │   ├── window-manager.js    # 主面板 / 设置窗口 / 置顶终端窗口的创建、定位、几何记忆、显隐、广播
     │   ├── ipc/                 # IPC 处理器（app / settings / window / shortcut / ssh / geo / clipboard / hash / nutrient / twofa / net-test / terminal / sftp / file-window / update）
     │   ├── scripts/             # pty-bridge.py（PTY 桥接，交互终端用；打包时经 build.asarUnpack 解包到 app.asar.unpacked）
-    │   ├── services/            # settings / ssh-config / ssh / iterm / terminal / sftp（文件管理 SFTP 会话）/ layout（文件管理布局）/ cd-history（cd 历史）/ vscode（用 VS Code 打开本地文件）/ hotkey / geo / clipboard / hash / nutrient（营养成分 / TDEE 记录）/ local-network（启动 / 窗口聚焦 / 连接时请求本地网络权限，长持有 + 重试）/ totp（2FA 动态验证码，密钥加密存储）/ updater（自动更新）服务
+    │   ├── services/            # settings / ssh-config / ssh / iterm / terminal / sftp（文件管理 SFTP 会话）/ layout（文件管理布局）/ cd-history（cd 历史）/ vscode（用 VS Code 打开本地文件）/ hotkey / geo / clipboard / hash / nutrient（营养成分 / TDEE 记录）/ local-network（启动 / 窗口聚焦 / 连接时请求本地网络权限，长持有 + 重试）/ proxy（可选的系统代理 / PAC 解析、SOCKS5 / HTTP CONNECT 隧道）/ totp（2FA 动态验证码，密钥加密存储）/ updater（自动更新）服务
     │   └── utils/               # logger / json-store / paths / utf8（UTF-8 保真解码 + 非法字节转义）/ net-test（网络测试命令与校验）/ window-geometry（终端窗口几何记忆的纯计算）/ process-tree（终端会话进程树里找 ssh 目标）
     ├── preload/                 # main-preload.js / settings-preload.js / update-preload.js（更新下载窗口，仅暴露更新能力）/ icons.js（assets/icons/*.svg）/ flags.js（assets/flags/*.svg）
     └── renderer/
@@ -166,7 +166,7 @@ Vessel/
 
 1. 工具列表点击某主机的连接图标 → `ssh:connect`（仅传 `alias`）。
 2. 主进程按 alias 查询 `~/.ssh/config`，拼装命令：`ssh [-p 端口] [-i 私钥] [-J 跳板机] [user@]host`（端口为 22 时省略 `-p`）；当私钥为默认的 `~/.ssh/id_ed25519` 或 `~/.ssh/id_rsa`（含展开后的绝对路径）时**省略 `-i`**（ssh 会自动使用默认密钥）。
-3. 命令交给**置顶终端窗口**（§3.9）执行：窗口未打开则先打开，然后把 `ssh …` 注入其 shell（不再调用 iTerm，因此不会切换桌面 / 空间）。**设置 → 终端** 里的「SSH 使用内置终端连接」关掉后，退回原来的 iTerm 方式。
+3. 命令交给**置顶终端窗口**（§3.9）执行：窗口未打开则先打开，然后把 `ssh …` 注入其 shell（不再调用 iTerm，因此不会切换桌面 / 空间）。**设置 → 终端** 里的「SSH 使用内置终端连接」关掉后，退回原来的 iTerm 方式。开启「遵循系统代理」（§3.10）且系统代理为 SOCKS5 时，命令会追加 `ProxyCommand`，ssh2 探测 / SFTP 也会走 SOCKS5。
 4. **密码自动输入**：若该主机在设置里存过密码，注入命令时把解密出的密码交给终端会话；`terminal-service` 监听 PTY 输出，出现 `…password:` 提示时自动写入一次（60s 内有效、用后即清，不会在命令行参数 / 环境变量里出现）。仅**内置终端**支持（iTerm 方式不自动输入）。首次连接某主机时的**主机密钥确认**不是密码提示，仍需用户手动确认一次。密码加密存于本地（见 §5.1）。
 5. 成功 / 失败在主面板顶部临时提示。
 
@@ -283,6 +283,20 @@ Vessel/
 
 ---
 
+### 3.10 系统代理（`settings.followSystemProxy`，默认关闭）
+
+1. **开关**：设置 → 应用 → 「遵循系统代理」，写入 `settings.json` 的 `followSystemProxy`（布尔，默认 `false`）。关闭时所有连接直连；开启后由主进程按 macOS 系统代理 / PAC 转发。
+2. **解析**：通过 Electron `session.resolveProxy()` 读取系统代理 / PAC 的解析结果（含静态代理与 PAC 脚本）。支持 `SOCKS5`、`PROXY` / `HTTP` / `HTTPS` 与 `DIRECT`；`SOCKS4` / 未知类型按直连处理。结果按目标 `host:port` 缓存 **30s**；改动开关时清空缓存并预热一个通用结果。
+3. **内置终端**：创建 PTY 时注入 `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY`（大小写各一份），供 `curl` / `git` 等命令行工具使用。静态系统代理优先；只有 PAC 时使用启动 / 开关变化时预热得到的通用结果。已打开的会话不回溯修改，重启会话后生效。
+4. **SSH**：
+   - 系统代理为 SOCKS5 时，内置终端 / iTerm 的 `ssh` 命令追加 `-o ProxyCommand='/usr/bin/nc -X 5 -x <proxy-host:port> %h %p'`；`ssh2` 探测通过预连接的 SOCKS5 socket（`sock`）连接。
+   - 系统代理是 HTTP / HTTPS 时 **SSH 直连**（不为 SSH 实现 HTTP CONNECT）。
+   - `ProxyJump` 优先：同时配置时不叠加系统代理。
+5. **SFTP**：与 `ssh2` 探测一致，仅 SOCKS5；失败时连接报错，不回退到无代理的静默重试。
+6. **更新**：`updater-service` 的 Node `http(s)` 请求按系统代理走 **SOCKS5** 或 **HTTP CONNECT** 隧道；代理不可用 / 解析失败时回退直连（不阻断更新，错误写日志）。
+7. **不支持**：代理认证（需要用户名密码的代理视为不可用）、SOCKS4；PAC 的按 URL 细粒度规则在终端环境变量里只能用通用结果近似（SSH / SFTP / 更新按具体目标解析，支持 PAC）。
+8. **日志**：解析失败、隧道建立失败、SOCKS5 连不上时分别写 `[proxy]` / `[ssh]` / `[sftp]` 日志。
+
 ## 4. 主要功能清单
 
 
@@ -298,7 +312,7 @@ Vessel/
 | 哈希计算 | 计算 **MD5 / SHA1 / SHA256**；支持输入字符串或**选择本地文件**（流式计算，适合大文件）；两段式切换控件保持内容宽度（不占满整行），字符串输入框与文件选择区共用 `--hash-source-height`（76px），切换时下方结果区不跳动；文件选择区为整块虚线框（图标 + 提示 / 文件名同一行居中，选中后行内追加「重新选择」）；切换类型时清空结果 | 字符串输入防抖 200ms；文件经系统对话框选择 |
 | 2FA 验证码 | 顶部单行输入框（右对齐「添加」按钮）：接受 **`otpauth://totp/…` 链接**或**裸 Base32 密钥**（忽略空格 / 连字符 / 小写）；点「添加」由主进程校验非法 / 重复后解析并添加 —— 链接自动解析出**标题（issuer）**与**副标题（账号 label）**（UTF-8 解码，支持中文；无 issuer 时用 label 作标题），裸密钥标题为「未命名」。下方以**卡片**实时展示：**绿色盾牌图标** + 标题 + 副标题（同一行、超出省略）、**逐位验证码数字块**（6 或 8 位、按 3/3 或 4/4 分组）、**倒计时秒数**与**进度条**（≤5 秒变红，按各自 `period`）。卡片右侧依次为**复制**按钮（`copy`，一键复制当前验证码并就地显示 ✓ 反馈）与**删除**按钮（`trash`）→ 就地二次确认（`确认删除？` + ✓ / ✕）后删除。验证码由主进程按账号的 `period` / `digits` / `algorithm`（SHA1 / SHA256 / SHA512）计算、渲染层每 250ms 刷新倒计时、时间片切换时拉取新验证码 | 输入非法 / 重复时就地红字提示并闪烁输入框；列表持久保存（密钥加密，见 §5.1）、重启保留；输入不做历史记录 |
 | 营养成分 | 输入商品名（无独立标题标签）与每 100g 的能量(kJ)/蛋白质/脂肪/碳水/钠及商品总重，实时换算盐、千卡、千焦（含每日推荐对比）与慢跑 / 步行消耗；名称输入框右侧为**保存按钮 + 记录下拉**：按商品名保存输入，**忽略大小写去重 / 同名覆盖**；切换记录回填输入时按钮变为「删除」，删除需二次确认（4 秒未确认自动复位，再次编辑输入则回到「保存」）；下方 **TDEE 计算器**（性别 / 年龄 / 身高 / 体重 / 活动水平，**无默认值、需手动填写**；Mifflin-St Jeor 计算 BMR 与 TDEE，**结果同时显示 kcal / kJ**）自动记录输入与计算结果；营养成分的**每日推荐优先使用当前 TDEE**（kcal 与 kJ），未填写 TDEE 时回退 2250kcal / 9410kJ，并新增「**TDEE ÷ 每 100g**」商（约等于多少份 100g）；底部保留**复制**按钮，已移除清空按钮 | 商品记录与 TDEE 最后状态持久化到 `nutrient-records.json`；TDEE 输入变化防抖自动保存；商品需点「保存」才写入 |
-| 设置 · 应用 | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、**悬浮模式（开关，默认关 = 窗口模式；开 = 托盘弹出面板）**、固定悬浮（置顶常驻、失焦不隐藏，仅悬浮模式）、**Liquid Glass**（主界面启用系统玻璃背景：macOS 26+ 用原生 Liquid Glass，旧系统回退 hud 毛玻璃，见 §8.1）、**Liquid Glass 透明度**（滑块 0–100，越大越透明，**实时生效**；默认 80；仅开启 Liquid Glass 时显示）、剪贴板条数、剪贴板轮询间隔、打开数据文件夹、**清理数据**（二次确认后删除窗口位置 / 大小、列宽 / 面板高度、cd 历史等**非业务数据**）、**导入 / 导出**（保存对话框导出**全部配置**为 JSON：应用设置 + SSH 主机；**SSH 密码为明文**，界面提示妥善保管；导入时选择 JSON 后二次确认，**设置覆盖当前值**、**SSH 主机只新增不覆盖已有别名**，结果就地提示新增 / 跳过 / 密码数量）。**日志**（保留天数下拉 1 / 3 / 7 / 14 / 30 / 90，默认 7；日志文件夹按钮；仅 macOS 的「打开控制台 App」按钮）。关于（版本号 + **检查更新**按钮（`app:check-updates`，见 §7）+ **开发者模式开关** `settings.developerMode`，默认关，值持久化）、开发者（**仅开发者模式开启时显示**；打开悬浮界面 / 设置界面 / **终端界面** / 文件界面 DevTools，`devtools:open` 的 `main` / `settings` / `terminal` / `file`） | 见 §5.1 |
+| 设置 · 应用 | 语言（自绘下拉）、外观（跟随系统/浅色/深色）、主题色、开机自启、**悬浮模式（开关，默认关 = 窗口模式；开 = 托盘弹出面板）**、固定悬浮（置顶常驻、失焦不隐藏，仅悬浮模式）、**Liquid Glass**（主界面启用系统玻璃背景：macOS 26+ 用原生 Liquid Glass，旧系统回退 hud 毛玻璃，见 §8.1）、**Liquid Glass 透明度**（滑块 0–100，越大越透明，**实时生效**；默认 80；仅开启 Liquid Glass 时显示）、剪贴板条数、剪贴板轮询间隔、**遵循系统代理**（开关，默认关；开启后终端命令 / SSH / SFTP / 更新按 macOS 系统代理 / PAC，SSH / SFTP 仅 SOCKS5，见 §3.10）、打开数据文件夹、**清理数据**（二次确认后删除窗口位置 / 大小、列宽 / 面板高度、cd 历史等**非业务数据**）、**导入 / 导出**（保存对话框导出**全部配置**为 JSON：应用设置 + SSH 主机；**SSH 密码为明文**，界面提示妥善保管；导入时选择 JSON 后二次确认，**设置覆盖当前值**、**SSH 主机只新增不覆盖已有别名**，结果就地提示新增 / 跳过 / 密码数量）。**日志**（保留天数下拉 1 / 3 / 7 / 14 / 30 / 90，默认 7；日志文件夹按钮；仅 macOS 的「打开控制台 App」按钮）。关于（版本号 + **检查更新**按钮（`app:check-updates`，见 §7）+ **开发者模式开关** `settings.developerMode`，默认关，值持久化）、开发者（**仅开发者模式开启时显示**；打开悬浮界面 / 设置界面 / **终端界面** / 文件界面 DevTools，`devtools:open` 的 `main` / `settings` / `terminal` / `file`） | 见 §5.1 |
 | 设置 · SSH | `~/.ssh/config` 主机的增删改（别名/HostName/User/Port/IdentityFile/ProxyJump/**分组**）；列表左侧显示系统图标；**按分组显示为手风琴**（分组来自 config 的 `# group:` 注释，**默认全部展开**，命名分组在前、未分组在后，无命名分组时保持扁平列表）；**每个命名分组的手风琴标题带一个重命名图标**：点击后就地编辑分组名（`Enter` 确认 / `Esc` 取消，重名提示「同名分组已存在」且不保存；未分组不可重命名）——改名会更新 config 里对应的 `# group:` 注释（新增 / 编辑 / 删除 / 改名后都会广播 `ssh-config:changed`，终端与文件窗口的 SSH 下拉实时刷新）；新增时自动预填 **用户 root / 端口 22 / 私钥 `~/.ssh/id_ed25519`**，**私钥支持手动选择文件**（对话框默认 `~/.ssh`，选后转为 `~` 路径），保存时别名默认取主机地址；**新增 / 编辑表单含「分组」控件：TAB 式 Switch 列出已有分组（默认选中「未分组」，可横向滚动），最右侧「新增分组」按钮点击后就地输入新分组名（`Enter` 确认 / `Esc` 取消，重名提示「同名分组已存在」），新分组自动加入并选中**（写入 config 注释 `# group: <名>`）；**表单含「密码」字段（可选）：密码经 AES-256-GCM 加密存入应用数据目录（不落明文），连接时在内置终端自动输入；密码框右侧有「查看 / 隐藏密码」眼睛按钮（在明文 / 密文间切换）；已存密码时占位提示「已保存（留空则不修改）」并可点「清除密码」**；表单内含「探测系统」，**探测也使用密码**（表单填的密码优先，留空回退已存密码），**探测成功后才允许保存**，**探测失败保留表单内容（含密码草稿）以便修改后重新探测**；支持**导出 config** | 别名与主机地址至少填一项；删除二次确认 |
 | 设置 · 终端 | 配置置顶终端窗口（打开后自动聚焦终端输入）：**默认 shell**（留空 = 系统默认 `$SHELL`，可手填或用「选择文件」挑，写入前校验文件存在）、**字体大小**（8–24px，默认 12）、**窗口大小**（宽 × 高，最小 350 × 200，默认 1024 × 768；改完立即作用到已打开的终端窗口，手动拖动窗口也会写回；这是「换屏 / 无记忆」时的默认尺寸，同屏则优先沿用终端窗口自己的位置与尺寸）、**缓冲区大小**（默认 10000 行）、**SSH 使用内置终端连接**（开关：开 = 点「连接」在置顶终端执行 `ssh`，关 = 改用 iTerm）、**关闭按钮行为**（分段控件：隐藏窗口 / 销毁窗口，默认销毁）、**自动缩成悬浮球**（开关，默认开）、**缩成悬浮球延迟**（下拉：立即 / 50ms / 100ms / 200ms / 500ms / 1s / 5s / 10s / 15s / 30s / 60s，默认 **50ms**；「立即」= 0ms）、**悬浮球大小**（数字，40–200px、1:1，默认 75，见 §3.9-12）、**悬浮球图标**（带预览的下拉，选项为 `assets/icons/ball/` 下所有 SVG，默认 `ball.svg`，**实时生效**）、**终端暗色模式**（开关，默认开：开 = 终端窗口（xterm 终端 + 悬浮球）始终暗色 / 关 = 跟随全局主题；悬浮球图标始终保留原色）、**SFTP 下载目录**（文本 + 「选择目录」，默认 `~/Downloads`，见 §3.9-10）、**重置**（二次确认后把以上终端设置恢复默认值，并清掉 `terminal-window.json` 里记住的屏幕 / 位置 / 大小） | 对应 `settings.json` 的 `terminalShell`/`terminalFontSize`/`terminalWindowWidth`/`terminalWindowHeight`/`terminalScrollback`/`terminalCloseAction`/`sshBuiltinTerminal`/`terminalBallEnabled`/`terminalBallDelayMs`/`terminalBallSize`/`terminalBallIcon`/`terminalBallDark`/`sftpDownloadDir`；默认值来自 `package.json` 的 `vessel.terminalWindow`/`vessel.sshBuiltinTerminal`/`vessel.sftpDownloadDir`；窗口位置 / 屏幕在 `terminal-window.json`（见 §5.1、§3.9） |
 | 设置 · 快捷键 | **主窗口**与**终端**各绑定一个全局组合键（默认都是 `⌘⇧Z`）：终端按一下、主窗口快速连按两下（显示 / 带到前台）；两者同键时单击稍等 260ms 区分双击。点按钮后按新组合键改绑（`Backspace` 清除、`Esc` 取消，至少含 Command / Control / Alt 之一），被占用 / 非法时红字提示且不落盘 | `settings.mainWindowHotkey` / `settings.terminalHotkey` |
@@ -314,7 +328,7 @@ Vessel/
 
 | 文件 | 位置 | 结构 | 生命周期 |
 | --- | --- | --- | --- |
-| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/vessel/settings.json`） | `{ locale, theme, accent, launchAtLogin, floatMode, pinWindow, vibrancy, glassOpacity, developerMode, clipboardLimit, clipboardPollMs, terminalShell, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, mainWindowHotkey, terminalHotkey, terminalCloseAction, sshBuiltinTerminal, sftpDownloadDir, terminalBallEnabled, terminalBallDelayMs, terminalBallSize, terminalBallIcon, terminalBallDark, fileWindowAlwaysOnTop, logRetentionDays }` | 持久；重启保留 |
+| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/vessel/settings.json`） | `{ locale, theme, accent, launchAtLogin, floatMode, pinWindow, vibrancy, glassOpacity, developerMode, clipboardLimit, clipboardPollMs, terminalShell, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, mainWindowHotkey, terminalHotkey, terminalCloseAction, sshBuiltinTerminal, followSystemProxy, sftpDownloadDir, terminalBallEnabled, terminalBallDelayMs, terminalBallSize, terminalBallIcon, terminalBallDark, fileWindowAlwaysOnTop, logRetentionDays }` | 持久；重启保留 |
 | `vessel-YYYY-MM-DD.log` | **macOS：`~/Library/Logs/Vessel/`**（Console.app 的「日志报告」会收录该目录，与 JetBrains/CLion 一致，与用户数据目录分离）；其它平台：`app.getPath('userData')` 的 `logs/` 子目录（`src/main/utils/paths.js` 的 `LOG_DIR`，按 `process.platform` 选择） | 按天追加的文本日志（启动信息、SSH 探测 / SFTP / 终端 / 文件管理等）；启动时把数据文件清单也写进去 | 持久；**惰性清理**：每天首次写日志时删除保留期之前的日志文件（保留天数取设置 `logRetentionDays`，默认 **7 天**，来自 `package.json` 的 `vessel.logRetentionDays`） |
 | `ssh-detected.json` | 同上目录 | `{ [alias]: { os, family, label, at } }` | 持久；缓存探测结果 |
 | `ssh-credentials.json` | 同上目录 | `{ entries: { [别名]: { iv, tag, data } } }`（**AES-256-GCM 密文**，全 base64） | 持久；在设置里保存 / 清除 SSH 密码时更新。密钥随机生成、存 `ssh-credentials.key`（0600）；密码明文不落盘，连接时主进程解密后交给内置终端自动输入（见 §3.4） |
@@ -630,7 +644,7 @@ flowchart TD
   - **版本检测**：macOS 调用 GitHub Releases API（`releases/latest`，仓库来自 `vessel.updateRepo`），Windows 仍用 `electron-updater`。**仅打包后**的 macOS / Windows 生效（`app.isPackaged`）；开发模式不检查。启动后**静默检查一次**（延迟 5s，不打扰）。
   - **提示后下载**：`update-available` → 弹窗「发现新版本 vX（当前 vY），现在下载吗？」→ 确认才下载。
   - **下载方式按平台分两种模式**（`dl.mode`）：
-    - **macOS（`mode=pkg`）**：GitHub Releases API 返回的最新版本里选出与当前架构匹配的 `.pkg`；用 **Node 原生 `http(s)`** 流式下载到 `app.getPath('downloads')`（手动跟随重定向），可取消（`destroy` + 删除半成品）。**不用 Electron `net`**：`net` 走 Chromium 网络栈会触及加密 Cookie 存储（打包时翻转了 `EnableCookieEncryption` fuse），从而弹出 macOS「钥匙串」授权框；Node 原生请求不碰 Chromium 会话 / Cookie，因此更新检查与下载都不会再触发该弹框。**`owner` / `repo` 取自 `package.json` 的 `vessel.updateRepo`**；产物前缀固定取应用名 `Vessel`（`APP_NAME`）。**不依赖 Squirrel / 签名**，因此 ad-hoc 构建也能更新。
+    - **macOS（`mode=pkg`）**：GitHub Releases API 返回的最新版本里选出与当前架构匹配的 `.pkg`；用 **Node 原生 `http(s)`** 流式下载到 `app.getPath('downloads')`（手动跟随重定向），可取消（`destroy` + 删除半成品）。**不用 Electron `net`**：`net` 走 Chromium 网络栈会触及加密 Cookie 存储（打包时翻转了 `EnableCookieEncryption` fuse），从而弹出 macOS「钥匙串」授权框；Node 原生请求不碰 Chromium 会话 / Cookie，因此更新检查与下载都不会再触发该弹框。**`owner` / `repo` 取自 `package.json` 的 `vessel.updateRepo`**；产物前缀固定取应用名 `Vessel`（`APP_NAME`）。**不依赖 Squirrel / 签名**，因此 ad-hoc 构建也能更新。开启「遵循系统代理」（§3.10）时，这些 Node `http(s)` 请求会按系统代理 / PAC 走 SOCKS5 或 HTTP CONNECT；代理失败时回退直连。
     - **Windows（`mode=auto`）**：仍用 `electron-updater` 的 `downloadUpdate()` 自动下载并 `quitAndInstall()`（`autoInstallOnAppQuit=true`；6 秒未退出则 `app.relaunch()` + `app.quit()` 兜底）。
   - **下载窗口**：确认下载后弹出一个**小型、不可关闭（`closable: false` + 系统关闭按钮禁用，仅退出应用时放行）、可最小化、置顶居中的前台窗口** `update.html`（尺寸 `vessel.updateWindow` = 380 × 150，见 §8.7）。窗口采用 **`titleBarStyle: 'hiddenInset'`**：**真正的系统红绿灯**与标题同一行，**只有「最小化」可用**（关闭 / 缩放禁用）。窗口还有：**实时进度条**（`update:progress`）、**取消**、**安装按钮**（下载期间禁用）。下载完成后按钮可用并显示 **60 秒倒计时**（常量 `UPDATE_COUNTDOWN_SECONDS`）；**macOS 按钮为「退出并安装」**（`open` 打开 PKG 系统安装器，随后退出本程序；安装完成后 PKG 的 postinstall 会重新启动 Vessel；倒计时文案「N 秒后自动退出并打开安装器」），**Windows 按钮为「重启更新」**（`quitAndInstall()`）。**取消 = 退出本次更新**（下载阶段中止下载并删除半成品；点击安装 / 倒计时到 0 后取消按钮禁用）。**注意**：macOS 上 `closable: false` 的窗口会让 `app.quit()` 卡住（窗口永不被关闭），因此退出时（`before-quit`）会对更新窗口 `setClosable(true)` 放行，保证能真正退出。
   - **下载失败**：仅在日志记录详细错误，并关闭下载窗口、给一句友好提示。

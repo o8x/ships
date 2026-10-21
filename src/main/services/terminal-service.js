@@ -11,6 +11,7 @@ const os = require('os');
 const path = require('path');
 const sshService = require('./ssh-service');
 const sshConfig = require('./ssh-config-service');
+const proxyService = require('./proxy-service');
 const processTree = require('../utils/process-tree');
 const logger = require('../utils/logger');
 
@@ -137,6 +138,8 @@ function childEnv() {
   const env = Object.assign({}, process.env, { TERM: 'xterm-256color' });
   const socket = sshService.getAgentSocket();
   if (socket) env.SSH_AUTH_SOCK = socket;
+  // 开启「遵循系统代理」后，让 curl / git 等命令行工具使用系统代理。
+  Object.assign(env, proxyService.terminalEnv());
   return env;
 }
 

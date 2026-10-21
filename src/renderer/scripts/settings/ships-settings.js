@@ -35,6 +35,8 @@
         clipboardLimitHint: '最多保留最近几条记录',
         clipboardPoll: '剪贴板轮询间隔',
         clipboardPollHint: '检测系统剪贴板变化的频率',
+        followSystemProxy: '遵循系统代理',
+        followSystemProxyHint: '开启后终端命令、SSH / SFTP 与更新请求按 macOS 系统代理 / PAC 转发（SSH / SFTP 仅支持 SOCKS5）',
         dataFolder: '数据文件夹',
         clearData: '清理数据',
         clearDataHint: '清除窗口位置 / 大小、列宽与 cd 历史等非业务数据',
@@ -84,6 +86,9 @@
         clipboardLimitHint: 'How many recent items to keep',
         clipboardPoll: 'Clipboard poll interval',
         clipboardPollHint: 'How often to check the system clipboard',
+        followSystemProxy: 'Follow system proxy',
+        followSystemProxyHint:
+          'Route terminal commands, SSH / SFTP and update requests through the macOS system proxy / PAC (SSH / SFTP: SOCKS5 only)',
         dataFolder: 'Data folder',
         clearData: 'Clear data',
         clearDataHint: 'Remove window position / size, column widths and cd history (non-business data)',
@@ -264,6 +269,14 @@
     });
     generalSection.appendChild(
       row(i18n.t('settingsPage.clipboardPoll'), i18n.t('settingsPage.clipboardPollHint'), pollSelect.el)
+    );
+
+    // 遵循系统代理：默认关闭；开启后由主进程按 macOS 系统代理 / PAC 转发连接。
+    const proxySwitch = switchControl(settings.followSystemProxy === true, (value) =>
+      patch({ followSystemProxy: value })
+    );
+    generalSection.appendChild(
+      row(i18n.t('settingsPage.followSystemProxy'), i18n.t('settingsPage.followSystemProxyHint'), proxySwitch.root)
     );
 
     const folderBtn = el('button', { class: 'btn shrink-0', type: 'button' });

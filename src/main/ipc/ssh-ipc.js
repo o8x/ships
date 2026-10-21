@@ -9,6 +9,7 @@ const credentials = require('../services/ssh-credentials-service');
 const { broadcast, getMainWindow } = require('../window-manager');
 const { runInTerminal } = require('./terminal-ipc');
 const { requestLocalNetworkAccess } = require('../services/local-network-service');
+const proxyService = require('../services/proxy-service');
 const logger = require('../utils/logger');
 
 function findHost(alias) {
@@ -31,17 +32,18 @@ function registerSshIpc(ipcMain) {
   // apps, unlike iTerm which switches desktops).
   // `inTerminal: true`（终端窗口头部的 SSH 下拉）明确要求在「当前终端」里执行，
   // 不受「SSH 使用内置终端连接」开关影响。
-  ipcMain.handle(IPC.SSH_CONNECT, (_event, payload) => {
+  ipcMain.handle(IPC.SSH_CONNECT, async (_event, payload) => {
     requestLocalNetworkAccess();
     const host = findHost(payload && payload.alias);
     if (!host) return { ok: false, error: 'host not found' };
-    const command = sshService.buildCommand(host);
+    const socksProxy = await proxyService.resolveSocks(host.hostName, Number(host.port) || 22);
+    const command = sshService.buildCommand(host, { socksProxy });
     const settingsService = require('../services/settings-service');
     const inTerminal = Boolean(payload && payload.inTerminal);
     if (!inTerminal && settingsService.get('sshBuiltinTerminal') === false) {
       // iTerm：不自动输入密码（在 iTerm 里手动输入）。
       logger.file(`[ssh] connect(alias=${host.alias}) -> iTerm: ${command}`);
-      return sshService.connect(host);
+      return sshService.connect(host, { socksProxy });
     }
     // 内置终端：若有存储密码，ssh 提示输入密码时由终端自动注入（见 terminal-service）。
     const secret = credentials.has(host.alias) ? credentials.get(host.alias) : '';

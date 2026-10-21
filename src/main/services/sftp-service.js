@@ -14,6 +14,7 @@ const path = require('path');
 const { Client } = require('ssh2');
 const sshConfig = require('./ssh-config-service');
 const sshService = require('./ssh-service');
+const proxyService = require('./proxy-service');
 const settings = require('./settings-service');
 const logger = require('../utils/logger');
 
@@ -127,6 +128,11 @@ function connect(target, ownerId) {
       } catch (err) {
         /* ignore */
       }
+      try {
+        if (options.sock) options.sock.destroy();
+      } catch (err) {
+        /* ignore */
+      }
     };
 
     logger.file(
@@ -165,12 +171,19 @@ function connect(target, ownerId) {
       finish({ ok: false, error: message, code });
     });
 
-    try {
-      client.connect(options);
-    } catch (err) {
-      cleanup();
-      finish({ ok: false, error: err.message, code: 'connect' });
-    }
+    (async () => {
+      try {
+        const socks = await proxyService.resolveSocks(resolved.host, resolved.port);
+        if (socks) {
+          options.sock = await proxyService.createSocksSocket(socks, resolved.host, resolved.port);
+          logger.file(`[sftp] using SOCKS5 ${socks.host}:${socks.port} for ${resolved.host}:${resolved.port}`);
+        }
+        client.connect(options);
+      } catch (err) {
+        cleanup();
+        finish({ ok: false, error: err.message, code: 'connect' });
+      }
+    })();
   });
 }
 

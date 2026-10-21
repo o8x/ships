@@ -8,6 +8,7 @@ const { Client } = require('ssh2');
 const { SSH_DETECTED_FILE } = require('../utils/paths');
 const { readJson, writeJson } = require('../utils/json-store');
 const iterm = require('./iterm-service');
+const proxyService = require('./proxy-service');
 const logger = require('../utils/logger');
 
 function shellQuote(value) {
@@ -19,6 +20,12 @@ function shellQuote(value) {
 function expandHome(filePath) {
   if (!filePath) return filePath;
   return filePath.startsWith('~') ? filePath.replace(/^~/, os.homedir()) : filePath;
+}
+
+function proxyHostPort(proxy) {
+  const host = String(proxy.host || '');
+  const formatted = host.includes(':') && !host.startsWith('[') ? `[${host}]` : host;
+  return `${formatted}:${proxy.port}`;
 }
 
 // A GUI app launched from Finder does not inherit the shell's SSH_AUTH_SOCK;
@@ -171,14 +178,20 @@ class SshService extends EventEmitter {
       parts.push('-i', shellQuote(host.identityFile));
     }
     if (host.proxyJump) parts.push('-J', host.proxyJump);
+    // 开启「遵循系统代理」且系统代理是 SOCKS5 时，让 CLI ssh 走 SOCKS5。
+    // ProxyJump 优先，避免与 -J 叠加造成双重跳转。
+    if (opts.socksProxy && !host.proxyJump) {
+      const proxyCommand = `/usr/bin/nc -X 5 -x ${proxyHostPort(opts.socksProxy)} %h %p`;
+      parts.push('-o', shellQuote(`ProxyCommand=${proxyCommand}`));
+    }
     if (opts.forceTty) parts.push('-t');
     parts.push(host.user ? `${host.user}@${host.hostName}` : host.hostName);
     if (opts.command) parts.push(opts.command);
     return parts.join(' ');
   }
 
-  connect(host) {
-    const command = this.buildCommand(host);
+  connect(host, options) {
+    const command = this.buildCommand(host, options);
     logger.file(`[ssh] connect(alias=${host.alias}) command: ${command}`);
     return iterm.openCommand(command, `ssh connect(alias=${host.alias})`);
   }
@@ -199,14 +212,28 @@ class SshService extends EventEmitter {
       });
   }
 
-  runDetect(host, auth) {
+  async runDetect(host, auth) {
+    // 可选密码认证：设置里填了密码（或该主机已存密码）时，用它探测；
+    // 同时开 tryKeyboard 以兼容用 keyboard-interactive 提交密码的服务器。
+    const password = auth && auth.password ? String(auth.password) : '';
+    const overrides = password ? { password, tryKeyboard: true } : {};
+    if (!host.proxyJump) {
+      const port = Number(host.port) || 22;
+      try {
+        const socks = await proxyService.resolveSocks(host.hostName, port);
+        if (socks) {
+          overrides.sock = await proxyService.createSocksSocket(socks, host.hostName, port);
+          logger.file(`[ssh] using SOCKS5 ${proxyHostPort(socks)} for ${host.hostName}:${port}`);
+        }
+      } catch (err) {
+        logger.error(`[ssh] proxy connect failed (${host.alias}): ${err.message}`);
+        return UNKNOWN_OS;
+      }
+    }
+    const options = connectionOptions(host, overrides);
+
     return new Promise((resolve) => {
       const client = new Client();
-      // 可选密码认证：设置里填了密码（或该主机已存密码）时，用它探测；
-      // 同时开 tryKeyboard 以兼容用 keyboard-interactive 提交密码的服务器。
-      const password = auth && auth.password ? String(auth.password) : '';
-      const overrides = password ? { password, tryKeyboard: true } : null;
-      const options = connectionOptions(host, overrides);
 
       logger.file(
         `[ssh] connecting ${host.alias} -> ${options.host}:${options.port} ` +
@@ -220,6 +247,11 @@ class SshService extends EventEmitter {
         settled = true;
         try {
           client.end();
+        } catch (err) {
+          /* ignore */
+        }
+        try {
+          if (overrides.sock) overrides.sock.destroy();
         } catch (err) {
           /* ignore */
         }

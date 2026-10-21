@@ -45,7 +45,7 @@ macOS 15（Sequoia）起引入 **Local Network 隐私**：应用访问「本地�
 5. **弹窗被忽略后不再出现**
    - 系统展示过一次后，即使没有记录决定，同一 bundle id 也可能不再弹出；此时只能重置系统授权状态或更换身份。
 
-> 结论：**Proxy 不是原因**。`ping` 不使用代理；`ssh` / `ssh2` 不走系统 PAC / HTTP 代理；PTY 桥（`python3`）只负责起 shell，不做网络代理。系统设置里的 Clash PAC 只会影响 CFNetwork / 浏览器类请求。
+> 结论：**Proxy 不是本问题的原因**。`ping` 不使用代理；`ssh` / `ssh2` 默认也不走系统 PAC / HTTP 代理；PTY 桥（`python3`）只负责起 shell，不做网络代理。系统设置里的 Clash PAC 只会影响 CFNetwork / 浏览器类请求。Vessel 另有一个**默认关闭**的「遵循系统代理」开关（§3.10）；只有手动开启时，终端 / SSH / SFTP / 更新才会使用系统代理。
 
 ### 1.4 解决方案
 
