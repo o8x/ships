@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const path = require('path');
 const { app, shell, BrowserWindow, dialog, clipboard, ClipboardItem } = require('electron');
 const os = require('os');
 const { IPC, VERSION, TERMINAL_WINDOW } = require('../../shared/constants');
@@ -92,6 +93,23 @@ function registerAppIpc(ipcMain) {
       return { ok: false, error: 'invalid url' };
     }
     await shell.openExternal(url);
+    return { ok: true };
+  });
+
+  // 终端里的文件路径：在 Finder 中定位（目录 / 文件都只“显示在文件夹中”，不执行任何文件）。
+  ipcMain.handle(IPC.OPEN_PATH, async (_event, target) => {
+    const raw = String(target || '').trim();
+    if (!raw || raw.includes('\0')) return { ok: false, error: 'invalid path' };
+    let filePath = raw;
+    if (filePath === '~') filePath = os.homedir();
+    else if (filePath.startsWith('~/')) filePath = path.join(os.homedir(), filePath.slice(2));
+    if (!path.isAbsolute(filePath)) return { ok: false, error: 'not absolute' };
+    try {
+      await fs.promises.access(filePath);
+    } catch (err) {
+      return { ok: false, error: 'not found' };
+    }
+    shell.showItemInFolder(filePath);
     return { ok: true };
   });
 

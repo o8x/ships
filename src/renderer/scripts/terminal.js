@@ -111,7 +111,7 @@
     const css = getComputedStyle(document.documentElement);
     const read = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
     return {
-      background: read('--color-bg', '#ffffff'),
+      background: read('--term-bg', dark ? '#0e1116' : '#ffffff'),
       foreground: read('--color-fg', '#1d1d1f'),
       cursor: read('--color-accent', '#2e6bfc'),
       selectionBackground: read('--color-fg-muted', '#8a8a8f'),
@@ -119,6 +119,113 @@
       scrollbarSliderHoverBackground: dark ? 'rgba(255,255,255,0.34)' : 'rgba(0,0,0,0.32)',
       scrollbarSliderActiveBackground: dark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.42)',
     };
+  }
+
+  /* 按住 Command 时才识别终端里的 http(s) URL 与文件路径：显示下划线 / 手形；
+     Cmd + 点击（非 macOS 为 Ctrl）URL 用默认浏览器打开，路径在 Finder 中定位。
+     松开 Command 后不再提供链接（不显示下划线、不显示手形）。 */
+  let metaHeld = false;
+  let linkProvider = null;
+  let linkProviderDisposable = null;
+  let linkKeysBound = false;
+
+  function refreshLinkProvider() {
+    if (!term || typeof term.registerLinkProvider !== 'function' || !linkProvider) return;
+    try {
+      if (linkProviderDisposable) linkProviderDisposable.dispose();
+    } catch (err) {
+      /* ignore */
+    }
+    linkProviderDisposable = term.registerLinkProvider(linkProvider);
+    try {
+      term.refresh(0, term.rows - 1);
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
+  function bindLinkModifierKeys() {
+    if (linkKeysBound) return;
+    linkKeysBound = true;
+    window.addEventListener('keydown', (event) => {
+      if (event.key !== 'Meta' || metaHeld) return;
+      metaHeld = true;
+      refreshLinkProvider();
+    });
+    window.addEventListener('keyup', (event) => {
+      if (event.key !== 'Meta' || !metaHeld) return;
+      metaHeld = false;
+      refreshLinkProvider();
+    });
+    window.addEventListener('blur', () => {
+      if (!metaHeld) return;
+      metaHeld = false;
+      refreshLinkProvider();
+    });
+  }
+
+  function registerUrlLinks() {
+    if (!term || typeof term.registerLinkProvider !== 'function' || linkProvider) return;
+    linkProvider = {
+      provideLinks(bufferLineNumber, callback) {
+        if (!metaHeld) {
+          callback(undefined);
+          return;
+        }
+        const line = term.buffer.active.getLine(bufferLineNumber - 1);
+        if (!line) {
+          callback(undefined);
+          return;
+        }
+        const text = line.translateToString(true);
+        const links = [];
+        const urlRanges = [];
+
+        const addLink = (startIndex, raw, kind) => {
+          const value = raw.replace(/[.,;:!?)\]}'"]+$/, '');
+          if (!value) return;
+          const start = startIndex + 1;
+          links.push({
+            range: {
+              start: { x: start, y: bufferLineNumber },
+              end: { x: start + value.length - 1, y: bufferLineNumber },
+            },
+            text: value,
+            decorations: { pointerCursor: true, underline: true },
+            activate(event) {
+              if (!(event.metaKey || event.ctrlKey)) return;
+              if (kind === 'url') window.ships.openExternal(value);
+              else window.ships.openPath(value);
+            },
+          });
+        };
+
+        const urlRe = /https?:\/\/[^\s"'<>]+/gi;
+        let match;
+        while ((match = urlRe.exec(text))) {
+          const raw = match[0].replace(/[.,;:!?)\]}'"]+$/, '');
+          if (!raw) continue;
+          urlRanges.push([match.index, match.index + raw.length - 1]);
+          addLink(match.index, raw, 'url');
+        }
+
+        // 绝对路径 / ~ 路径；排除 URL 内部、以及 "and/or" 这类非路径片段。
+        const pathRe = /(?:~\/|\/(?!\/))[^\s"'<>|:]+/g;
+        while ((match = pathRe.exec(text))) {
+          const startIndex = match.index;
+          if (urlRanges.some(([s, e]) => startIndex >= s && startIndex <= e)) continue;
+          const prev = startIndex > 0 ? text[startIndex - 1] : '';
+          if (prev && !/[\s("'`\[{:=<]/.test(prev)) continue;
+          const raw = match[0].replace(/[.,;:!?)\]}'"]+$/, '');
+          if (!raw || raw === '/' || raw === '~/') continue;
+          addLink(startIndex, raw, 'path');
+        }
+
+        callback(links.length ? links : undefined);
+      },
+    };
+    bindLinkModifierKeys();
+    refreshLinkProvider();
   }
 
   function write(text) {
@@ -566,6 +673,7 @@
       theme: themeColors(),
     });
     term.open(host);
+    registerUrlLinks();
     requestAnimationFrame(() => {
       if (term) term.focus();
     });

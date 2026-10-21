@@ -22,6 +22,7 @@ const api = {
   openSettings: (section) => ipcRenderer.send(IPC.WINDOW_OPEN_SETTINGS, section),
   openDataFolder: () => ipcRenderer.invoke(IPC.OPEN_DATA_FOLDER),
   openExternal: (url) => ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url),
+  openPath: (target) => ipcRenderer.invoke(IPC.OPEN_PATH, target),
   log: (text) => ipcRenderer.send(IPC.LOG_WRITE, text),
   copyImage: (dataUrl) => ipcRenderer.invoke(IPC.COPY_IMAGE, dataUrl),
   saveImage: (payload) => ipcRenderer.invoke(IPC.SAVE_IMAGE, payload),

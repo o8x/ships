@@ -69,6 +69,8 @@
 [data-theme='light'] {
   color-scheme: light;
   --color-bg: #f4f5f8;
+  /* 终端窗口专用底色：白天纯白，避免跟随应用窗口的蓝灰色。 */
+  --term-bg: #ffffff;
   --color-surface: #ffffff;
   --color-surface-2: #eef0f4;
   --color-surface-3: #e3e6ec;
@@ -99,6 +101,7 @@
 [data-terminal-dark='on'] {
   color-scheme: dark;
   --color-bg: #0e1116;
+  --term-bg: #0e1116;
   --color-surface: #161a21;
   --color-surface-2: #1d222b;
   --color-surface-3: #262c37;

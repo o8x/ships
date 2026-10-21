@@ -19,6 +19,7 @@ const IPC = {
   OPEN_CONSOLE: 'app:open-console',
   CLEAR_DATA: 'app:clear-data',
   OPEN_EXTERNAL: 'app:open-external',
+  OPEN_PATH: 'app:open-path',
   UPDATER_CHECK: 'app:check-updates',
 
   // 更新下载窗口：状态查询 / 取消 / 立即重启安装（invoke）与进度 / 下载完成 / 倒计时（主→渲染）。
