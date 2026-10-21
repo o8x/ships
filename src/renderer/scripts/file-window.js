@@ -31,7 +31,7 @@
   const FONT_MAX = C.TERMINAL_FONT_MAX || 64;
   const HEADER_FONT_MIN = C.TERMINAL_HEADER_FONT_MIN || 10;
   const HEADER_FONT_MAX = C.TERMINAL_HEADER_FONT_MAX || 20;
-  const HEADER_HEIGHT_MIN = C.TERMINAL_HEADER_HEIGHT_MIN || 20;
+  const HEADER_HEIGHT_MIN = C.TERMINAL_HEADER_HEIGHT_MIN || 16;
   const HEADER_HEIGHT_MAX = C.TERMINAL_HEADER_HEIGHT_MAX || 32;
 
   const lightClose = document.getElementById('light-close');
@@ -51,7 +51,7 @@
     const headerFont = Math.max(HEADER_FONT_MIN, Math.min(HEADER_FONT_MAX, fontSize));
     const headerHeight = Math.max(
       HEADER_HEIGHT_MIN,
-      Math.min(HEADER_HEIGHT_MAX, Math.round(headerFont * 1.2 + 8))
+      Math.min(HEADER_HEIGHT_MAX, Math.round(headerFont * 1.6))
     );
     document.documentElement.style.setProperty('--term-header-font-size', `${headerFont}px`);
     document.documentElement.style.setProperty('--term-header-height', `${headerHeight}px`);

@@ -11,7 +11,7 @@ window.ShipsConstants = {
   // 高度按字号线性映射并夹在 20–32px（10px 字号 → 20px，20px 字号 → 32px）。
   TERMINAL_HEADER_FONT_MIN: 10,
   TERMINAL_HEADER_FONT_MAX: 20,
-  TERMINAL_HEADER_HEIGHT_MIN: 20,
+  TERMINAL_HEADER_HEIGHT_MIN: 16,
   TERMINAL_HEADER_HEIGHT_MAX: 32,
   // 工具标题收起动画期间先锁住内容滚动，动画完成后再滚动内容。
   HEADER_COLLAPSE_LOCK_MS: 190,

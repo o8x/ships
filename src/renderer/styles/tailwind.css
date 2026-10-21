@@ -907,11 +907,8 @@ body.show-lines #term-host {
   padding-left: calc(var(--file-font-size, 12px) * 2.6);
 }
 /* 拖动 / 缩放期间的头栏尺寸提示（居中、不吃鼠标事件，停手后由 JS 隐藏） */
+/* 头栏尺寸 / 字号提示：显示在「固定」图标右侧（不再绝对居中）。 */
 #term-size {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
   pointer-events: none;
   font-family: var(--font-mono);
   font-size: var(--term-header-font-size);
