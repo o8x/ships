@@ -19,6 +19,7 @@
 - **改代码必须同步改文档**，不得只改其一；文档与实现不一致时**以代码为准**（先核对主进程 / 预加载 / 渲染层入口，再修文档）。
 - 对外接口必须写清：**签名、可用范围、是否持久（刷新 / 重启是否丢失）、副作用条件与示例**。
 - 版本号变更时，同步更新本文件内所有版本引用（含示例）。
+- 遇到**本地网络不可达 / 授权弹窗 / 安装后 app id 与运行实例不一致**等问题，先看 `docs/FAQ.md` §1；FAQ 记录的是已验证的现象、原理、恢复步骤与测试流程。
 
 ### 变更类型 → 需同步章节
 
@@ -34,6 +35,7 @@
 | 新增 / 修改图标 | §8.3 图标与资源、`assets/icons/`（SVG）与 `assets/imgs/`（位图） |
 | 修改 GeoIP / 国旗 | §2.1 项目结构、§5.2 `geo:lookup`、§8.3、`assets/geoip.json` / `assets/flags/` |
 | 修改构建 / 脚本 / 依赖 / CI | §7 构建与发布、`package.json`、`pnpm-lock.yaml`、`.github/workflows/*.yml` |
+| 修改 appId / 本地网络权限 / 安装位置 | §3.1、§3.5、§7 构建与发布、`docs/FAQ.md` §1 |
 
 ---
 
@@ -129,7 +131,7 @@ Vessel/
 2. `app.whenReady()` 后：按需隐藏 Dock → 注册全部 IPC → 创建主面板（`show:false`）→ 创建托盘。
 3. 打印版本、平台与数据文件清单。
 4. 不显示任何窗口，仅托盘图标可见。
-5. **提前请求本地网络权限**：主进程向本机各网卡广播地址与 mDNS 组播（`224.0.0.251:5353`）发送空 UDP 包，触发 macOS 15+ 的「本地网络」授权弹窗。每次请求会先 `app.focus({ steal: true })` 让菜单栏应用成为前台（否则系统可能不展示授权框），创建保持 `30000ms` 的 socket，并在 `0 / 2500 / 5000ms` 重试 3 次；`2000ms` 内的重复调用会合并。除启动外，**窗口获得焦点（`browser-window-focus` / `activate`）、发起 SSH 连接 / 系统探测 / 网络测试时都会再次请求**，因此弹窗被忽略或自动消失后，下次操作可重新弹出；失败静默忽略。
+5. **提前请求本地网络权限**：主进程向本机各网卡广播地址与 mDNS 组播（`224.0.0.251:5353`）发送空 UDP 包，触发 macOS 15+ 的「本地网络」授权弹窗。每次请求会先 `app.focus({ steal: true })` 让菜单栏应用成为前台（否则系统可能不展示授权框），创建保持 `30000ms` 的 socket，并在 `0 / 2500 / 5000ms` 重试 3 次；`2000ms` 内的重复调用会合并。除启动外，**窗口获得焦点（`browser-window-focus` / `activate`）、发起 SSH 连接 / 系统探测 / 网络测试时都会再次请求**，因此弹窗被忽略或自动消失后，下次操作可重新弹出；失败静默忽略。原理、恢复方式与排查流程见 `docs/FAQ.md` §1。
 
 ### 3.2 主界面显示 / 隐藏（点击托盘）
 
@@ -176,7 +178,7 @@ Vessel/
 4. 结果（`{ os, family, label, at }`）写入 `ssh-detected.json` 并广播 `ssh:detected` 事件；渲染层据此更新左侧彩色系统图标与提示。
 5. 表单内探测期间按钮显示「探测中…」且禁用；**探测成功后**才启用「保存」。**探测失败不清空表单**：已填写的别名 / 地址 / 用户 / 端口 / 私钥 / 跳板机 / 分组 / 密码都会保留，便于原地修改后直接重新探测（密码为内存草稿，不落盘）。
 6. **日志**：探测的每一步（开始、目标、认证方式、执行命令、stdout/stderr、解析结果、连接报错）都会追加写入**当天的日志文件** `~/Library/Logs/Vessel/vessel-YYYY-MM-DD.log`（设置 → 日志 → 日志文件夹可打开所在目录）；便于排查本地网络 / 权限问题。
-7. **macOS 本地网络权限**：主 `Info.plist` 与 **4 个 Electron Helper 的 `Info.plist`** 都含 `NSLocalNetworkUsageDescription`（打包时由 `afterPack` 统一写入，见 §7）。应用在启动、窗口聚焦、发起 SSH / 探测 / 网络测试时会主动请求（广播 + mDNS，长持有 + 重试）；macOS 15+ 首次访问局域网（如 192.168.x / 10.x / 172.16.x）时会弹「本地网络」授权，需允许 Vessel，否则连接会被系统拦截（表现即 `No route to host` / `EHOSTUNREACH`）。可在「系统设置 → 隐私与安全性 → 本地网络」中开启。注意：该授权按 bundle id 记录，**更换 appId 会得到一条全新的、未授权的记录**；`tccutil` 无法重置本地网络授权。
+7. **macOS 本地网络权限**：主 `Info.plist` 与 **4 个 Electron Helper 的 `Info.plist`** 都含 `NSLocalNetworkUsageDescription`（打包时由 `afterPack` 统一写入，见 §7）。应用在启动、窗口聚焦、发起 SSH / 探测 / 网络测试时会主动请求（广播 + mDNS，长持有 + 重试）；macOS 15+ 首次访问局域网（如 192.168.x / 10.x / 172.16.x）时会弹「本地网络」授权，需允许 Vessel，否则连接会被系统拦截（表现即 `No route to host` / `EHOSTUNREACH`）。可在「系统设置 → 隐私与安全性 → 本地网络」中开启。注意：该授权按 bundle id 记录，**更换 appId 会得到一条全新的、未授权的记录**；`tccutil` 无法重置本地网络授权。**出现本地网络不可达 / 弹窗不出现 / 授权条目与运行实例不一致时，按 `docs/FAQ.md` §1 的测试流程排查。**
 
 ### 3.6 修改设置
 
@@ -607,7 +609,7 @@ flowchart TD
   - `dist:mac`：执行 `scripts/dist-mac.sh` —— 先清理旧 `release/` 再 `build:css`，自动选择签名身份并 `electron-builder --mac --arm64 --publish never`（实际调用 `npx electron-builder`），产出 **PKG**；`--publish never` 时发布由 CI 完成（见下）。
   - `pack:mac`：同上但加 `--dir`，仅产出 `.app`（调试用）。
 - **打包配置**（`package.json` 的 `build` 段，electron-builder）：
-  - `appId = cn.com.stdout.vessel`，`productName = Vessel`；产物目录 `release/`。**appId 是本地网络授权的键**：更换 appId 会得到一条全新的未授权记录；当前正式 appId 保持为 `cn.com.stdout.vessel`，不要随意改（旧 `com.ships.app` 的授权记录仍在系统里，但不影响新 id）。
+  - `appId = cn.com.stdout.vessel`，`productName = Vessel`；产物目录 `release/`。**appId 是本地网络授权的键**：更换 appId 会得到一条全新的未授权记录；当前正式 appId 保持为 `cn.com.stdout.vessel`，不要随意改（旧 `com.ships.app` 的授权记录仍在系统里，但不影响新 id）。改名 / 改 id 还会触发 Installer 的重定位行为与「运行实例 id 不一致」，处理步骤见 `docs/FAQ.md` §1。
   - `publish`：`[{ provider: 'github', owner: 'o8x', repo: 'vessel' }]`；macOS 检测更新不依赖 `latest-mac.yml`，使用 `package.json` 的 `vessel.updateRepo`（不会被 electron-builder 裁剪）调用 GitHub Releases API。
   - `files`：`src/**/*`、`assets/**/*`、`package.json`；依赖由 electron-builder 自动收集（`asar: true`）—— 渲染层直接从 `node_modules/@xterm/…` 加载终端资源，因此 `@xterm/xterm` 与 `@xterm/addon-fit` 放在 `dependencies`（不是 devDependencies）；`electron-updater` 同样放在 `dependencies`。
   - **原生依赖 `electron-liquid-glass`**：N-API 预编译（含 `darwin-arm64` / `darwin-x64`），故 `npmRebuild: false` 无需重编；`build.asarUnpack` 把 `**/*.node` 与 `node_modules/electron-liquid-glass/**` 解包到 `app.asar.unpacked` 供加载（Liquid Glass 仅运行时 macOS 26+ 生效，旧系统由主进程回退）。
