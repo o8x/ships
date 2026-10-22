@@ -971,11 +971,16 @@
   function syncBallClock() {
     if (ballClockRaf == null) tickBallClock();
   }
+  // 计时器状态：运行中（绿色呼吸点）/ 已停止（灰色空心点 + 整体变淡）。
+  function syncBallTimerState() {
+    document.documentElement.dataset.ballTimerState = ballBounceOn ? 'running' : 'paused';
+  }
   function startBallBounce() {
     if (ballBounceOn || !ballEl) return;
     ballBounceOn = true;
     ballBounceStartedAt = performance.now();
     ballEl.classList.add('term-ball-bounce');
+    syncBallTimerState();
     syncBallClock();
   }
   function pauseBallBounce() {
@@ -984,6 +989,7 @@
     }
     if (ballEl) ballEl.classList.remove('term-ball-bounce');
     ballBounceOn = false;
+    syncBallTimerState();
     if (ballClockRaf != null) {
       cancelAnimationFrame(ballClockRaf);
       ballClockRaf = null;
@@ -1157,6 +1163,7 @@
     const [settings, info] = await Promise.all([window.ships.getSettings(), window.ships.getInfo()]);
     i18n.setLocale((settings && settings.locale) || 'zh');
     window.ShipsTheme.set(settings || {});
+    syncBallTimerState();
     applyBallIcon(settings && settings.terminalBallIcon);
     applyTerminalDark((settings && settings.terminalBallDark) !== false);
     applyBallTransparent((settings && settings.terminalBallTransparent) !== false);

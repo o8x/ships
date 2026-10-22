@@ -742,9 +742,11 @@ input[type='color'].swatch::-webkit-color-swatch {
   width: 100%;
   height: 100%;
 }
-/* 悬浮球：跳动的状态 + 悬停时，球内显示本轮累计跳动时长；停止跳动即隐藏并清空。
+/* 悬浮球：悬停时显示本轮累计活动时长。运行中 / 已停止有明确区别：
+   运行中 = 右上角绿色呼吸圆点 + 正常不透明度；已停止 = 空心灰点 + 整体变淡。
    两行：上行 h/m（仅非 0 才显示，字号为 S 的一半），下行 S（更大）。 */
 .term-ball-timer {
+  position: relative;
   display: none;
   flex-direction: column;
   align-items: center;
@@ -780,6 +782,40 @@ input[type='color'].swatch::-webkit-color-swatch {
 .term-ball-timer-s {
   font-size: calc(var(--term-ball-size, 90px) * 0.3);
   font-weight: 600;
+}
+/* 状态指示点（右上角）：运行中实心绿色并呼吸；停止时空心灰色。 */
+.term-ball-timer::after {
+  content: '';
+  position: absolute;
+  top: calc(var(--term-ball-size, 90px) * 0.09);
+  right: calc(var(--term-ball-size, 90px) * 0.1);
+  width: calc(var(--term-ball-size, 90px) * 0.09);
+  height: calc(var(--term-ball-size, 90px) * 0.09);
+  border-radius: 50%;
+  border: 1.5px solid var(--color-fg-muted);
+  background: transparent;
+}
+[data-ball-timer-state='running'] .term-ball-timer {
+  border-color: var(--color-accent-line);
+}
+[data-ball-timer-state='running'] .term-ball-timer::after {
+  border-color: var(--color-success);
+  background: var(--color-success);
+  animation: ships-ball-timer-pulse 1.1s ease-in-out infinite;
+}
+[data-ball-timer-state='paused'] .term-ball-timer {
+  opacity: 0.72;
+}
+@keyframes ships-ball-timer-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.78);
+  }
 }
 /* 悬浮球底色：终端暗色模式开 = 始终暗色；关 = 跟随全局主题（依 data-theme）。
    均为不透明纯色；图标始终保留原色。（同一开关也把整个终端窗口强制暗色，见 constants.css） */
