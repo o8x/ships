@@ -1,6 +1,10 @@
 'use strict';
 
 window.ShipsConstants = {
+  // ssh 退出标记（需与 src/shared/constants.js 的 SSH_EXIT_MARKER 保持一致）。
+  SSH_EXIT_MARKER: '\u001b]777;VesselSshExit\u0007',
+  // ssh 退出标记的 shell 片段；从 shell 回显中删除，避免在前台显示。
+  SSH_EXIT_MARKER_COMMAND: "; printf '\\033]777;VesselSshExit\\007'",
   FALLBACK_VERSION: '0.0.0',
   COPY_FEEDBACK_MS: 1200,
   // 终端字号范围（Cmd +/- 与 设置 → 终端 共用）。

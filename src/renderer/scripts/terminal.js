@@ -101,7 +101,6 @@
   let filesApi = null;
   // 悬浮球模式（失去焦点缩成圆形小窗；期间不 fit、不把尺寸同步给 PTY）
   let ballMode = false;
-  let commandBusy = false;
   // 「固定」：开启后本窗口失焦不缩成悬浮球（仅当前窗口，默认关，不持久）
   let ballPinned = false;
 
@@ -549,6 +548,7 @@
     }
     sessionId = result.id;
     ballElapsedAccum = 0;
+    ballTaskEnded = false;
     syncBallClock();
     sshTarget = '';
     if (filesApi) filesApi.setSshTarget('');
@@ -741,20 +741,34 @@
 
   const offData = window.ships.terminal.onData((message) => {
     if (!message || message.id !== sessionId || message.type !== 'data') return;
-    write(message.data);
+    let data = message.data;
+    // 追加在 ssh 命令后的 printf 片段会被 shell 回显；从显示内容里删掉，只保留 ssh 命令。
+    const sshExitCommand = C.SSH_EXIT_MARKER_COMMAND;
+    if (sshExitCommand && data.includes(sshExitCommand)) {
+      data = data.split(sshExitCommand).join('');
+    }
+    // ssh 进程退出：本地 shell 会输出一个不可见的 OSC 标记 → 清空目标并断开内嵌文件面板。
+    const sshExitMarker = C.SSH_EXIT_MARKER;
+    if (sshExitMarker && data.includes(sshExitMarker)) {
+      data = data.split(sshExitMarker).join('');
+      sshTarget = '';
+      if (filesApi) filesApi.setSshTarget('');
+    }
+    if (!data) return;
+    write(data);
     pulseBall();
   });
   const offSession = window.ships.terminal.onSession((message) => {
     if (!message || message.id !== sessionId) return;
     sshTarget = message.target || '';
     if (filesApi) filesApi.setSshTarget(sshTarget);
-    applyCommandBusy(message.busy);
   });
   const offExit = window.ships.terminal.onExit((message) => {
     if (!message || message.id !== sessionId) return;
     sessionId = '';
     sshTarget = '';
     ballElapsedAccum = 0;
+    ballTaskEnded = false;
     syncBallClock();
     if (filesApi) filesApi.setSshTarget('');
     if (message.type === 'error') {
@@ -908,8 +922,8 @@
   function applyBallTransparent(enabled) {
     document.documentElement.dataset.ballTransparent = enabled ? 'on' : 'off';
   }
-  // 终端持续有输出时，悬浮球图标做流畅的上下弹跳；2s 内无输出则停止。
-  const BALL_IDLE_STOP_MS = 2000;
+  // 以「持续输出」判断程序是否仍在运行：连续 5s 没有输出即视为已停止。
+  const BALL_IDLE_STOP_MS = 5000;
   // 弹跳一个完整循环的时长（读 styles/ball-animations.css 的 --ball-bounce-duration，带兜底）。
   function ballBounceDurationMs() {
     const raw = getComputedStyle(document.documentElement)
@@ -921,8 +935,9 @@
   }
   let ballBounceOn = false; // 是否正在播放弹跳
   let ballBounceStartedAt = 0; // 本轮播放起始时间（算相位与当前段时长）
-  let ballElapsedAccum = 0; // 之前各段弹跳累计的毫秒数（跨球/窗口切换保留，会话重启清零）
-  let ballIdleTimer = null; // 无输出满 2s 的计时
+  let ballElapsedAccum = 0; // 本轮任务累计的活动时长（暂停后保留，出现新任务时清零）
+  let ballTaskEnded = false; // 本轮任务是否已因 5s 无输出而结束
+  let ballIdleTimer = null; // 无输出满 5s 的计时
   let ballSettleTimer = null; // 「走到循环边界再停」的计时
   let ballHovered = false; // 鼠标是否悬停在球上（由 pointerenter/leave 维护，不依赖 :hover 轮询）
   let ballClockRaf = null; // 悬停显示时的刷新帧（只在可见时运行）
@@ -982,8 +997,14 @@
   }
   function pulseBall() {
     if (!ballMode || !ballEl) return;
+    // 上一轮活动已经停止（计时冻结）后又出现输出 = 新的任务：重新从 0 开始计时。
+    if (ballTaskEnded || !ballBounceOn) {
+      ballElapsedAccum = 0;
+      if (ballBounceOn) ballBounceStartedAt = performance.now();
+    }
+    ballTaskEnded = false;
     startBallBounce();
-    // 有输出：取消「准备停止」，并重开 1s 空闲计时。
+    // 有输出：取消「准备停止」，并重开 5s 空闲计时。
     if (ballSettleTimer) {
       clearTimeout(ballSettleTimer);
       ballSettleTimer = null;
@@ -994,9 +1015,9 @@
   function onBallIdle() {
     ballIdleTimer = null;
     if (!ballBounceOn) return;
-    // 前台命令仍在运行（即使没有输出）→ 继续跳动。
-    if (commandBusy) return;
-    // 等当前循环走完（回到 translateY(0)）再停，避免停在半空 / 顶部 / 底部显得「卡」。
+    // 连续 5s 没有输出 = 程序已结束：计时冻结、保留累计时长；等当前循环走完再停
+    // （回到 translateY(0)），避免停在半空 / 顶部 / 底部显得「卡」。
+    ballTaskEnded = true;
     const duration = ballBounceDurationMs();
     const phase = (performance.now() - ballBounceStartedAt) % duration;
     const wait = phase === 0 ? 0 : duration - phase;
@@ -1006,27 +1027,6 @@
       pauseBallBounce();
     }, wait);
   }
-  function applyCommandBusy(busy) {
-    const next = Boolean(busy);
-    if (next === commandBusy) return;
-    commandBusy = next;
-    if (commandBusy) {
-      if (ballSettleTimer) {
-        clearTimeout(ballSettleTimer);
-        ballSettleTimer = null;
-      }
-      clearTimeout(ballIdleTimer);
-      ballIdleTimer = null;
-      if (ballMode) startBallBounce();
-      return;
-    }
-    // 命令结束：等 2s 无输出再停（若还有输出，pulseBall 会重置计时）。
-    if (ballMode && ballBounceOn) {
-      clearTimeout(ballIdleTimer);
-      ballIdleTimer = setTimeout(onBallIdle, BALL_IDLE_STOP_MS);
-    }
-  }
-
   function stopBallPulse() {
     if (ballIdleTimer) {
       clearTimeout(ballIdleTimer);
@@ -1112,7 +1112,6 @@
     const active = Boolean(payload && payload.active);
     const phase = (payload && payload.phase) || 'settle';
     // 仅球真正显示时启用主进程的前台命令检测。
-    window.ships.terminal.setBallActive(active && phase !== 'enter');
     const size = payload && payload.size;
     const duration = (payload && payload.duration) || 0;
     const scaleX = (payload && payload.scaleX) || 1;
@@ -1128,7 +1127,6 @@
       ballMode = true;
       resetBallShellScale();
       document.documentElement.dataset.ball = 'on';
-      if (commandBusy) startBallBounce();
     } else if (phase === 'grow') {
       // 放大：窗口已还原，终端先按球大小显示，再 CSS 放大到 1。
       ballMode = true;

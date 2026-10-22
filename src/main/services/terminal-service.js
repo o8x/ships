@@ -6,13 +6,11 @@
 // window; every session has an id so several can live at once.
 
 const fs = require('fs');
-const { spawn, execFile } = require('child_process');
+const { spawn } = require('child_process');
 const os = require('os');
 const path = require('path');
 const sshService = require('./ssh-service');
-const sshConfig = require('./ssh-config-service');
 const proxyService = require('./proxy-service');
-const processTree = require('../utils/process-tree');
 const logger = require('../utils/logger');
 
 /* Packaged builds keep the app source inside app.asar, which is an archive — a
@@ -27,10 +25,6 @@ const BRIDGE = unpackedPath(path.join(__dirname, '..', 'scripts', 'pty-bridge.py
 const PYTHON_CANDIDATES = ['/usr/bin/python3', '/opt/homebrew/bin/python3', '/usr/local/bin/python3'];
 const DEFAULT_COLS = 80;
 const DEFAULT_ROWS = 24;
-// How often each session's process subtree is scanned for an open `ssh` connection.
-// The foreground-command check only runs while the session window is in ball mode.
-const SESSION_POLL_MS = 2000;
-const PS_MAX_BUFFER = 8 * 1024 * 1024;
 // 注入 ssh 命令后，若带密码，则在一段时间内监听输出、出现「password:」提示就自动输入。
 const SECRET_TTL_MS = 60000;
 const SECRET_PROMPT_RE = /password[^\n\r]*:\s*$/i;
@@ -52,70 +46,6 @@ function pythonBinary() {
 
 const sessions = new Map();
 let counter = 0;
-let pollTimer = null;
-let pollBusy = false;
-
-/* Turn the ssh destination token into something readable for the window title:
-   resolve a ~/.ssh/config alias to user@hostname, otherwise show the token as typed. */
-function resolveSshLabel(destination) {
-  const token = String(destination || '');
-  if (!token) return '';
-  const at = token.lastIndexOf('@');
-  const typedUser = at >= 0 ? token.slice(0, at) : '';
-  const hostPart = at >= 0 ? token.slice(at + 1) : token;
-  let host = null;
-  try {
-    host = sshConfig.list().find((entry) => entry.alias === hostPart) || null;
-  } catch (err) {
-    host = null;
-  }
-  if (!host) return token;
-  const user = typedUser || host.user || '';
-  return user ? `${user}@${host.hostName}` : host.hostName;
-}
-
-/* Once per second: snapshot the process table and report the ssh target per session.
-   Only emits when the value changes so the renderer is not spammed. */
-function pollSessions() {
-  if (!sessions.size) {
-    stopSessionPoll();
-    return;
-  }
-  if (pollBusy) return;
-  pollBusy = true;
-  execFile('/bin/ps', ['-A', '-o', 'pid=,ppid=,pgid=,tpgid=,command='], { maxBuffer: PS_MAX_BUFFER }, (err, stdout) => {
-    pollBusy = false;
-    if (err || !stdout) return;
-    const tree = processTree.buildTree(stdout);
-    for (const entry of sessions.values()) {
-      const destination = processTree.sshTargetUnder(tree, entry.pid);
-      const label = resolveSshLabel(destination);
-      const busy = entry.ballActive ? processTree.terminalBusyUnder(tree, entry.pid) : false;
-      if (label === entry.sshLabel && destination === entry.sshTarget && busy === entry.busy) continue;
-      entry.sshLabel = label;
-      entry.sshTarget = destination;
-      entry.busy = busy;
-      try {
-        entry.emit({ id: entry.id, type: 'session', ssh: label || null, target: destination || null, busy });
-      } catch (sendErr) {
-        /* window went away: ignore */
-      }
-    }
-  });
-}
-
-function startSessionPoll() {
-  if (pollTimer) return;
-  pollTimer = setInterval(pollSessions, SESSION_POLL_MS);
-  if (pollTimer.unref) pollTimer.unref();
-  pollSessions();
-}
-
-function stopSessionPoll() {
-  if (!pollTimer) return;
-  clearInterval(pollTimer);
-  pollTimer = null;
-}
 
 function loginShell(preferred) {
   const wanted = String(preferred || '').trim();
@@ -152,7 +82,7 @@ function clamp(value, min, max, fallback) {
   return Math.max(min, Math.min(max, Math.trunc(number)));
 }
 
-function start(payload, emit, ownerId) {
+function start(payload, emit) {
   const cols = clamp(payload && payload.cols, 20, 500, DEFAULT_COLS);
   const rows = clamp(payload && payload.rows, 5, 200, DEFAULT_ROWS);
   const shell = loginShell(payload && payload.shell);
@@ -202,35 +132,11 @@ function start(payload, emit, ownerId) {
     cols,
     rows,
     pid: child.pid,
-    sshLabel: '',
-    sshTarget: '',
-    ownerId: ownerId || null,
-    ballActive: false,
-    busy: false,
     pendingSecret: '',
     secretTimer: null,
     tail: '',
   });
-  startSessionPoll();
   return { ok: true, id, cols, rows, shell };
-}
-
-/* 球模式开关：只有球模式下才计算前台命令 busy（ps 轮询仍用于 SSH 目标检测）。 */
-function setBallActive(ownerId, active) {
-  const next = Boolean(active);
-  for (const entry of sessions.values()) {
-    if (entry.ownerId !== ownerId || entry.ballActive === next) continue;
-    entry.ballActive = next;
-    if (!next && entry.busy) {
-      entry.busy = false;
-      try {
-        entry.emit({ id: entry.id, type: 'session', ssh: entry.sshLabel || null, target: entry.sshTarget || null, busy: false });
-      } catch (err) {
-        /* ignore */
-      }
-    }
-  }
-  if (next) pollSessions();
 }
 
 /* 给会话预置一个密码：接下来 ssh 出现「password:」提示时自动输入一次（TTL 后作废）。 */
@@ -327,4 +233,4 @@ function count() {
   return sessions.size;
 }
 
-module.exports = { start, get, write, resize, interrupt, inject, kill, killAll, count, loginShell, setBallActive };
+module.exports = { start, get, write, resize, interrupt, inject, kill, killAll, count, loginShell };

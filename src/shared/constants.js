@@ -89,7 +89,6 @@ const IPC = {
   TERMINAL_DATA: 'terminal:data',
   TERMINAL_EXIT: 'terminal:exit',
   TERMINAL_SESSION: 'terminal:session',
-  TERMINAL_BALL_ACTIVE: 'terminal:ball-active',
   TERMINAL_COPY_TEXT: 'terminal:copy-text',
   TERMINAL_PASTE_TEXT: 'terminal:paste-text',
   TERMINAL_BALL: 'terminal:ball',
@@ -233,6 +232,13 @@ const CENTER_SNAP = {
 // 「刚切走」误判成「没切」；多等一会儿再读一次可避免误缩球。
 const SPACE_CONFIRM_DELAY_MS = 150;
 
+// 注入 ssh 命令时追加给本地 shell 的退出标记：ssh 进程结束后由 printf 输出，
+// 渲染层收到后清空当前 SSH 目标并断开内嵌文件面板（不依赖后台 ps 轮询）。
+const SSH_EXIT_MARKER = '\u001b]777;VesselSshExit\u0007';
+// 同上标记追加到 ssh 命令后的 shell 片段（真实 ESC / BEL 由 printf 解释）。
+// 渲染层会把 shell 回显的这段文字从显示内容中移除，只保留 ssh 命令本身。
+const SSH_EXIT_MARKER_COMMAND = "; printf '\\033]777;VesselSshExit\\007'";
+
 // 日志保留天数（按天写文件，惰性删除更早的日志）。
 const LOG_RETENTION_DAYS = Number.isFinite(appConfig.logRetentionDays) ? appConfig.logRetentionDays : 7;
 
@@ -314,6 +320,8 @@ module.exports = {
   SHORTCUT_DOUBLE_TAP_MS,
   CENTER_SNAP,
   SPACE_CONFIRM_DELAY_MS,
+  SSH_EXIT_MARKER,
+  SSH_EXIT_MARKER_COMMAND,
   LOG_RETENTION_DAYS,
   CD_HISTORY_MAX,
   VIBRANCY,

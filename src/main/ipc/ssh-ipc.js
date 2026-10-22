@@ -48,7 +48,7 @@ function registerSshIpc(ipcMain) {
     // 内置终端：若有存储密码，ssh 提示输入密码时由终端自动注入（见 terminal-service）。
     const secret = credentials.has(host.alias) ? credentials.get(host.alias) : '';
     logger.file(`[ssh] connect(alias=${host.alias}) -> terminal: ${command}${secret ? ' (+password)' : ''}`);
-    if (!runInTerminal(command, secret)) return { ok: false, error: 'terminal unavailable', command };
+    if (!runInTerminal(command, secret, host.alias)) return { ok: false, error: 'terminal unavailable', command };
     return { ok: true, command };
   });
 
