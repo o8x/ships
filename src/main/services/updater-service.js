@@ -5,7 +5,7 @@ const path = require('path');
 const http = require('http');
 const https = require('https');
 const { spawn } = require('child_process');
-const { app, dialog } = require('electron');
+const { app } = require('electron');
 const settings = require('./settings-service');
 const proxyService = require('./proxy-service');
 const logger = require('../utils/logger');
@@ -51,7 +51,6 @@ function copy() {
 
 let updaterModule = null;
 let autoUpdater = null;
-let promptWindow = null; // 手动检查时设置窗口，用作弹窗父级
 let interactiveChecking = false;
 let manualCheck = false;
 let promptedVersion = '';
@@ -105,9 +104,63 @@ function loadUpdater() {
   return autoUpdater;
 }
 
-function showBox(options) {
-  const win = promptWindow && !promptWindow.isDestroyed() ? promptWindow : null;
-  return win ? dialog.showMessageBox(win, options) : dialog.showMessageBox(options);
+/* ----------------------------- 应用内提示框 -----------------------------
+   复用更新窗口（update.html）显示提示，替代系统 dialog.showMessageBox。
+   options: { title, message, buttons: string[], defaultId?, cancelId? }；返回 { response }。 */
+let pendingPrompt = null;
+let promptSeq = 0;
+
+function getPromptState() {
+  if (!pendingPrompt) return null;
+  const { id, title, message, buttons, defaultId, cancelId } = pendingPrompt;
+  return { id, title, message, buttons, defaultId, cancelId };
+}
+
+function showPrompt(options) {
+  const opt = options || {};
+  const buttons = Array.isArray(opt.buttons) && opt.buttons.length ? opt.buttons.map(String) : ['OK'];
+  const defaultId = Number.isInteger(opt.defaultId) ? opt.defaultId : 0;
+  const cancelId = Number.isInteger(opt.cancelId) ? opt.cancelId : defaultId;
+
+  // 同一时间只显示一个提示：旧的按取消处理，避免等待方一直挂着。
+  if (pendingPrompt) {
+    const previous = pendingPrompt;
+    pendingPrompt = null;
+    previous.resolve(previous.cancelId);
+  }
+
+  return new Promise((resolve) => {
+    const id = (promptSeq += 1);
+    pendingPrompt = {
+      id,
+      title: String(opt.title || ''),
+      message: String(opt.message || ''),
+      buttons,
+      defaultId,
+      cancelId,
+      resolve,
+    };
+    wm.openUpdateWindow();
+    wm.sendToUpdateWindow(IPC.UPDATE_PROMPT, getPromptState());
+  }).then((response) => {
+    // 提示结束且当前没有下载任务：关掉这个只用于提示的窗口。
+    setTimeout(() => {
+      if (dl.phase === 'idle' && !pendingPrompt) wm.closeUpdateWindow();
+    }, 0);
+    return { response };
+  });
+}
+
+/* 渲染层回传提示框选择；id 不匹配（已过期）时忽略。 */
+function answerPrompt(id, index) {
+  if (!pendingPrompt || pendingPrompt.id !== Number(id)) return { ok: false };
+  const prompt = pendingPrompt;
+  pendingPrompt = null;
+  const raw = Number.isInteger(index) ? index : prompt.cancelId;
+  const response = raw >= 0 && raw < prompt.buttons.length ? raw : prompt.cancelId;
+  prompt.resolve(response);
+  wm.sendToUpdateWindow(IPC.UPDATE_PROMPT, null);
+  return { ok: true };
 }
 
 /* ----------------------------- 下载窗口 ----------------------------- */
@@ -129,8 +182,7 @@ async function promptDownload(info) {
     return;
   }
   const c = copy();
-  const { response } = await showBox({
-    type: 'info',
+  const { response } = await showPrompt({
     buttons: [c.download, c.later],
     defaultId: 0,
     cancelId: 1,
@@ -539,9 +591,9 @@ function cancelUpdate() {
 
 function failDownload() {
   resetDownloadState();
-  wm.closeUpdateWindow();
   const c = copy();
-  showBox({ type: 'info', buttons: ['OK'], defaultId: 0, title: c.checkTitle, message: c.notCheckable }).catch(() => {});
+  // 不关窗再重开：直接复用当前更新窗口显示失败提示。
+  showPrompt({ buttons: ['OK'], defaultId: 0, title: c.checkTitle, message: c.notCheckable }).catch(() => {});
 }
 
 function onDownloaded(info) {
@@ -604,7 +656,7 @@ async function checkForUpdatesMac(manual) {
     const release = await fetchLatestMacRelease();
     if (!isNewerVersion(release.version, app.getVersion())) {
       if (manual) {
-        showBox({ type: 'info', buttons: ['OK'], defaultId: 0, title: c.checkTitle, message: c.notAvailable }).catch(
+        showPrompt({ buttons: ['OK'], defaultId: 0, title: c.checkTitle, message: c.notAvailable }).catch(
           () => {}
         );
       }
@@ -618,7 +670,7 @@ async function checkForUpdatesMac(manual) {
   } catch (err) {
     logger.warn('[updater] mac check failed:', (err && err.message) || err);
     if (manual) {
-      showBox({ type: 'info', buttons: ['OK'], defaultId: 0, title: c.checkTitle, message: c.notCheckable }).catch(
+      showPrompt({ buttons: ['OK'], defaultId: 0, title: c.checkTitle, message: c.notCheckable }).catch(
         () => {}
       );
       return { ok: false, error: 'check-failed', message: c.notCheckable };
@@ -662,7 +714,7 @@ function initUpdater() {
     if (!manualCheck) return;
     manualCheck = false;
     const c = copy();
-    showBox({ type: 'info', buttons: ['OK'], defaultId: 0, title: c.checkTitle, message: c.notAvailable }).catch(
+    showPrompt({ buttons: ['OK'], defaultId: 0, title: c.checkTitle, message: c.notAvailable }).catch(
       () => {}
     );
   });
@@ -689,8 +741,7 @@ function initUpdater() {
     if (manualCheck) {
       manualCheck = false;
       const c = copy();
-      showBox({
-        type: 'info',
+      showPrompt({
         buttons: ['OK'],
         defaultId: 0,
         title: c.checkTitle,
@@ -708,8 +759,9 @@ function initUpdater() {
 }
 
 /* 设置界面「检查更新」（手动）：会提示已最新 / 暂时无法检查（不报技术错误）。 */
-async function checkForUpdatesInteractive(win) {
+async function checkForUpdatesInteractive(_win) {
   if (!supported()) {
+    showPrompt({ buttons: ['OK'], defaultId: 0, title: copy().checkTitle, message: copy().devMessage }).catch(() => {});
     return { ok: false, error: 'unsupported', message: copy().devMessage };
   }
   // 正在下载 / 已完成：不重复检查，直接把下载窗口拉到前台。
@@ -718,14 +770,15 @@ async function checkForUpdatesInteractive(win) {
     return { ok: true };
   }
   if (process.platform === 'darwin') {
-    promptWindow = win || promptWindow;
     return checkForUpdatesMac(true);
   }
   const updater = loadUpdater();
-  if (!updater) return { ok: false, error: 'unavailable', message: copy().notCheckable };
+  if (!updater) {
+    showPrompt({ buttons: ['OK'], defaultId: 0, title: copy().checkTitle, message: copy().notCheckable }).catch(() => {});
+    return { ok: false, error: 'unavailable', message: copy().notCheckable };
+  }
   if (interactiveChecking) return { ok: true, checking: true };
   interactiveChecking = true;
-  promptWindow = win || promptWindow;
   manualCheck = true;
   try {
     await updater.checkForUpdates();
@@ -740,6 +793,7 @@ async function checkForUpdatesInteractive(win) {
   // 兜底：整次检查没有触发任何事件（理论上仅当更新被停用），也要给用户一个反馈。
   if (manualCheck) {
     manualCheck = false;
+    showPrompt({ buttons: ['OK'], defaultId: 0, title: copy().checkTitle, message: copy().notCheckable }).catch(() => {});
     return { ok: false, error: 'no-result', message: copy().notCheckable };
   }
   return { ok: true };
@@ -747,13 +801,14 @@ async function checkForUpdatesInteractive(win) {
 
 /* 下载窗口渲染层查询当前状态（打开窗口 / 刷新时调用）。 */
 function getUpdateState() {
-  return snapshot();
+  return Object.assign({}, snapshot(), { prompt: getPromptState() });
 }
 
 module.exports = {
   initUpdater,
   checkForUpdatesInteractive,
   getUpdateState,
+  answerPrompt,
   cancelUpdate,
   installNow,
   supported,

@@ -16,9 +16,11 @@ const api = {
     state: () => ipcRenderer.invoke(IPC.UPDATE_STATE),
     cancel: () => ipcRenderer.invoke(IPC.UPDATE_CANCEL),
     install: () => ipcRenderer.invoke(IPC.UPDATE_INSTALL),
+    choose: (payload) => ipcRenderer.invoke(IPC.UPDATE_CHOICE, payload),
     onProgress: (cb) => on(IPC.UPDATE_PROGRESS, cb),
     onDownloaded: (cb) => on(IPC.UPDATE_DOWNLOADED, cb),
     onCountdown: (cb) => on(IPC.UPDATE_COUNTDOWN, cb),
+    onPrompt: (cb) => on(IPC.UPDATE_PROMPT, cb),
   },
 };
 

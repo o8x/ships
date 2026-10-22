@@ -1931,6 +1931,14 @@ body.file-window .fm-tree-row {
   font-weight: 600;
   color: var(--color-fg);
 }
+.update-message {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 .update-progress {
   height: 8px;
   border-radius: 999px;

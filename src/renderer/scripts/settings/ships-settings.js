@@ -333,7 +333,7 @@
       row(i18n.t('settingsPage.version'), '', el('span', { class: 'font-mono text-[12px] text-fg-muted' }, `v${(info && info.version) || ''}`))
     );
 
-    /* 检查更新：手动触发自动更新检查（服务端弹窗提示结果）。 */
+    /* 检查更新：手动触发自动更新检查（结果由应用内更新窗口提示）。 */
     const updateRow = el('div', {
       class: 'flex items-center justify-between gap-4 rounded-card border border-border bg-surface px-4 py-3',
     });
@@ -347,8 +347,8 @@
       checkBtn.disabled = true;
       try {
         const res = await window.ships.checkUpdates();
+        // 结果（已最新 / 无法检查等）由更新窗口（应用内提示框）展示，这里不再重复。
         if (res && res.checking) updateNote.textContent = i18n.t('settingsPage.checking');
-        else if (res && res.ok === false) updateNote.textContent = res.message || res.error || '';
       } catch (err) {
         updateNote.textContent = String((err && err.message) || err);
       } finally {

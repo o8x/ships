@@ -22,13 +22,15 @@ const IPC = {
   OPEN_PATH: 'app:open-path',
   UPDATER_CHECK: 'app:check-updates',
 
-  // 更新下载窗口：状态查询 / 取消 / 立即重启安装（invoke）与进度 / 下载完成 / 倒计时（主→渲染）。
+  // 更新窗口：状态查询 / 取消 / 立即重启安装 / 提示框选择（invoke）与进度 / 下载完成 / 倒计时 / 提示（主→渲染）。
   UPDATE_STATE: 'update:state',
   UPDATE_CANCEL: 'update:cancel',
   UPDATE_INSTALL: 'update:install',
+  UPDATE_CHOICE: 'update:choice',
   UPDATE_PROGRESS: 'update:progress',
   UPDATE_DOWNLOADED: 'update:downloaded',
   UPDATE_COUNTDOWN: 'update:countdown',
+  UPDATE_PROMPT: 'update:prompt',
 
   WINDOW_HIDE: 'window:hide',
   WINDOW_OPEN_SETTINGS: 'window:open-settings',

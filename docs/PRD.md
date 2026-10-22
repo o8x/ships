@@ -54,7 +54,7 @@
 
 - **主进程**（`src/main/`）：创建托盘与窗口、读写本地数据、解析 `~/.ssh/config`、执行 iTerm 连接与 SSH 探测、注册 IPC。
 - **预加载脚本**（`src/preload/`）：在 `contextIsolation: true`、`nodeIntegration: false`、`sandbox: false` 下运行，用 `contextBridge` 暴露白名单 API（主面板用 `main-preload.js`，设置窗口用 `settings-preload.js`）。
-- **渲染进程**（`src/renderer/`）：多个页面 —— 托盘主面板 `index.html`、设置窗口 `settings.html`、置顶终端窗口 `terminal.html`、独立文件窗口 `file-window.html`、更新下载窗口 `update.html`；不含 Node 能力，仅通过 `window.ships`（能力）、`window.shipsIcons`（内部 SVG 图标）与 `window.shipsFlags`（国旗 SVG）与主进程 / 预加载通信（更新下载窗口用独立预加载脚本，只暴露更新相关能力）。
+- **渲染进程**（`src/renderer/`）：多个页面 —— 托盘主面板 `index.html`、设置窗口 `settings.html`、置顶终端窗口 `terminal.html`、独立文件窗口 `file-window.html`、更新窗口 `update.html`（下载进度 + 应用内提示框）；不含 Node 能力，仅通过 `window.ships`（能力）、`window.shipsIcons`（内部 SVG 图标）与 `window.shipsFlags`（国旗 SVG）与主进程 / 预加载通信（更新窗口用独立预加载脚本，只暴露更新相关能力）。
 - **无 Webview**：不内嵌远程 Web，无 guest 进程。
 
 **项目结构**
@@ -94,15 +94,15 @@ Vessel/
     │   ├── scripts/             # pty-bridge.py（PTY 桥接，交互终端用；打包时经 build.asarUnpack 解包到 app.asar.unpacked）
     │   ├── services/            # settings / ssh-config / ssh / iterm / terminal / sftp（文件管理 SFTP 会话）/ layout（文件管理布局）/ cd-history（cd 历史）/ vscode（用 VS Code 打开本地文件）/ space（解析 com.apple.spaces 读取当前 Space）/ hotkey / geo / clipboard / hash / nutrient（营养成分 / TDEE 记录）/ local-network（启动 / 窗口聚焦 / 连接时请求本地网络权限，长持有 + 重试）/ proxy（可选的系统代理 / PAC 解析、SOCKS5 / HTTP CONNECT 隧道）/ font（系统字体列表）/ totp（2FA 动态验证码，密钥加密存储）/ updater（自动更新）服务
     │   └── utils/               # logger / json-store / paths / utf8（UTF-8 保真解码 + 非法字节转义）/ net-test（网络测试命令与校验）/ window-geometry（终端窗口几何记忆的纯计算）/ process-tree（终端会话进程树里找 ssh 目标）
-    ├── preload/                 # main-preload.js / settings-preload.js / update-preload.js（更新下载窗口，仅暴露更新能力）/ icons.js（assets/icons/*.svg）/ flags.js（assets/flags/*.svg）
+    ├── preload/                 # main-preload.js / settings-preload.js / update-preload.js（更新窗口，仅暴露更新能力）/ icons.js（assets/icons/*.svg）/ flags.js（assets/flags/*.svg）
     └── renderer/
         ├── index.html           # 托盘主面板
         ├── settings.html        # 设置窗口
         ├── terminal.html        # 置顶终端窗口（含内嵌文件面板）
         ├── file-window.html     # 独立文件窗口
-        ├── update.html          # 自动更新下载窗口（不可关闭，进度 / 取消 / 重启）
+        ├── update.html          # 自动更新窗口：应用内提示框 + 下载进度 / 取消 / 重启
         ├── font-picker.html     # 字体选择子窗口（非模态，挂在设置窗口上）
-        ├── scripts/             # theme / i18n / ui / registry / tool-order / app / settings / terminal（置顶终端）/ terminal-files（内嵌面板宿主）/ file-manager（文件管理 UI）/ file-window（独立文件窗口）/ update（更新下载窗口）/ font-picker-window（字体选择子窗口）
+        ├── scripts/             # theme / i18n / ui / registry / tool-order / app / settings / terminal（置顶终端）/ terminal-files（内嵌面板宿主）/ file-manager（文件管理 UI）/ file-window（独立文件窗口）/ update（更新窗口：提示框 + 下载）/ font-picker-window（字体选择子窗口）
         │   ├── tools/           # 每个工具一个文件，注册进 ShipsToolRegistry
         │   └── settings/        # 设置分区，注册进 ShipsSettingsRegistry
         └── styles/              # constants.css（设计变量）+ tailwind.css（入口）
@@ -370,10 +370,11 @@ Vessel/
 | `app:open-path` | `target` | `{ ok, error? }` | 终端路径链接：展开 `~`、校验绝对路径且存在，然后 `shell.showItemInFolder` 在 Finder 中定位（不执行文件 / 不启动 .app） |
 | `app:copy-image` | PNG data URL | `{ ok, error? }` | 把 PNG 图片写入系统剪贴板（Electron 44：`new ClipboardItem({ 'image/png': Blob })` + `await clipboard.write([…])`）；仅接受 `data:image/png;base64,` 前缀；编码转换工具的二维码「复制」用 |
 | `app:save-image` | `{ dataUrl, name? }` | `{ ok, path?, canceled?, error? }` | 保存对话框把 PNG data URL 存为本地文件（默认名 `qrcode.png`）；编码转换工具的二维码「下载到本地」用 |
-| `app:check-updates` | — | `{ ok, checking?, error?, message? }` | 设置 → 应用 → 关于 的「检查更新」：触发一次自动更新检查（`updater-service`）。**每次手动检查都会给出反馈**（有新版本 / 已是最新 / 暂时无法检查，均弹窗），反复点击不会静默无响应；检查进行中再次点击返回 `{ ok: true, checking: true }`，界面就地提示「正在检查…」。打包后由主进程弹窗（**失败只给一句友好提示，不暴露技术错误**，详情写日志）；开发模式返回 `{ ok: false, error: 'unsupported', message }` 由界面就地提示 |
-| `update:state` | — | 下载状态快照 `{ phase, version, percent, transferred, total, bytesPerSecond, countdown }` 或 `null` | 更新下载窗口查询当前状态（`phase` ∈ `idle` / `downloading` / `downloaded`）；只接受来自**更新下载窗口**的请求 |
-| `update:cancel` | — | `{ ok }` | 下载窗口「取消」：下载阶段中止下载（`CancellationToken`），已完成则停止倒计时、不立即重启（退出本次更新）；只接受来自更新下载窗口的请求 |
-| `update:install` | — | `{ ok }` | 下载窗口「重启更新」：`quitAndInstall()` 立即重启并安装；只接受来自更新下载窗口的请求 |
+| `app:check-updates` | — | `{ ok, checking?, error?, message? }` | 设置 → 应用 → 关于 的「检查更新」：触发一次自动更新检查（`updater-service`）。**每次手动检查都会给出反馈**（有新版本 / 已是最新 / 暂时无法检查 / 开发模式不检查，均由**应用内提示框**即更新窗口显示），反复点击不会静默无响应；检查进行中再次点击返回 `{ ok: true, checking: true }`，设置页就地提示「正在检查…」。**失败只给一句友好提示，不暴露技术错误**，详情写日志；`message` 字段为向后兼容保留（界面不再重复显示，提示统一走更新窗口） |
+| `update:state` | — | `{ phase, mode, version, percent, transferred, total, bytesPerSecond, countdown, prompt }` 或 `null` | 更新窗口查询当前状态（`phase` ∈ `idle` / `downloading` / `downloaded`；`prompt` = 待处理的提示框 `{ id, title, message, buttons, defaultId, cancelId }` 或 `null`，窗口加载完成时据此补显示）；只接受来自**更新窗口**的请求 |
+| `update:cancel` | — | `{ ok }` | 下载窗口「取消」：下载阶段中止下载（`CancellationToken`），已完成则停止倒计时、不立即重启（退出本次更新）；只接受来自更新窗口的请求 |
+| `update:install` | — | `{ ok }` | 下载窗口「重启更新」：`quitAndInstall()` 立即重启并安装；只接受来自更新窗口的请求 |
+| `update:choice` | `{ id, index }` | `{ ok }` | 应用内提示框：渲染层回传用户点击的按钮下标（`id` 由主进程下发）；`id` 过期 / 不匹配返回 `{ ok:false }`，只接受来自更新窗口的请求 |
 | `settings:get` | — | `settings` | |
 | `settings:set` | `patch` | 合并后的 `settings` | 副作用：写盘 + 广播 + 可能修改登录项 |
 | `ssh:list` | — | `{ hosts, detected }` | 读 `~/.ssh/config`；每个 host 含 `group`（分组名，未分组为 `''`）与 `hasPassword`（是否已存密码，见 §5.1）字段 |
@@ -480,9 +481,10 @@ Vessel/
 | `file-window:target` | `{ target, path }` | 独立文件窗口已打开时，`file-window:open` 带目标再次调用 → 请它切换连接并进入 `path` |
 | `ssh-config:changed` | `{ hosts }` | SSH 主机 / 分组增删改后广播（`ssh-config:upsert` / `remove` / `rename-group` 触发），终端窗口与独立文件窗口据此**实时刷新 SSH 下拉** |
 | `settings:edit-ssh` | `{ alias }` | 设置窗口的 SSH 分区收到后打开该别名的编辑表单（由 `ssh:edit` 触发；等 hosts 加载完成再打开） |
-| `update:progress` | 状态快照 | 下载进度变化（`percent` / `transferred` / `total` / `bytesPerSecond`），只发给更新下载窗口 |
-| `update:downloaded` | 状态快照 | 下载完成（`phase: 'downloaded'`、`countdown: 60`），只发给更新下载窗口 |
-| `update:countdown` | `{ countdown }` | 下载完成后的自动重启倒计时（每秒一次），只发给更新下载窗口 |
+| `update:progress` | 状态快照 | 下载进度变化（`percent` / `transferred` / `total` / `bytesPerSecond`），只发给更新窗口 |
+| `update:downloaded` | 状态快照 | 下载完成（`phase: 'downloaded'`、`countdown: 60`），只发给更新窗口 |
+| `update:countdown` | `{ countdown }` | 下载完成后的自动重启倒计时（每秒一次），只发给更新窗口 |
+| `update:prompt` | 提示框对象或 `null` | 应用内提示框（`{ id, title, message, buttons, defaultId, cancelId }`）；`null` = 提示结束 / 切回下载进度，只发给更新窗口 |
 | `settings:open-section` | `sectionId` | 请求设置窗口切换到指定分区（由 `window:open-settings` 的 `section` 触发） |
 
 ### 5.3 菜单与权限映射
@@ -506,7 +508,7 @@ flowchart LR
   Tray[Tray 图标] -->|点击| WM[window-manager]
   WM --> Main[主面板 index.html]
   WM --> Settings[设置窗口 settings.html]
-  WM --> Update[更新下载窗口 update.html]
+  WM --> Update[更新窗口 update.html]
   Main <-->|invoke/send/event| IPC[IPC 层]
   Settings <-->|invoke/send/event| IPC
   Update <-->|invoke/event| IPC
@@ -598,10 +600,10 @@ flowchart TD
   J[设置→关于→检查更新] --> K["手动 checkForUpdates（每次点击都有反馈）"]
   B --> C{有新版本?}
   K --> C
-  C -- 是 --> D["弹窗：发现 vX，是否下载？"]
-  C -- 否（手动） --> N[弹窗：已是最新]
+  C -- 是 --> D["应用内提示框（更新窗口）：发现 vX，是否下载？"]
+  C -- 否（手动） --> N[应用内提示框：已是最新]
   C -- 否（静默） --> Z[结束]
-  C -- 出错（手动） --> E[弹窗：暂时无法检查]
+  C -- 出错（手动） --> E[应用内提示框：暂时无法检查]
   D -- 稍后 --> Z
   D -- 下载 --> W["下载窗口（不可关闭）：进度条 + 取消 + 安装按钮"]
   W --> F{平台?}
@@ -652,13 +654,13 @@ flowchart TD
   - 产物命名：`Vessel-v<version>-<arch>.pkg`；无 blockmap / latest-mac.yml。
 - **更新流程（`src/main/services/updater-service.js`）**：
   - **版本检测**：macOS 调用 GitHub Releases API（`releases/latest`，仓库来自 `vessel.updateRepo`），Windows 仍用 `electron-updater`。**仅打包后**的 macOS / Windows 生效（`app.isPackaged`）；开发模式不检查。启动后**静默检查一次**（延迟 5s，不打扰）。
-  - **提示后下载**：`update-available` → 弹窗「发现新版本 vX（当前 vY），现在下载吗？」→ 确认才下载。
+  - **提示后下载**：`update-available` → 应用内提示框（复用更新窗口）「发现新版本 vX（当前 vY），现在下载吗？」→ 确认才下载。**所有更新相关提示（发现新版本 / 已是最新 / 暂时无法检查 / 下载失败 / 开发模式不检查）都不再使用系统 `dialog.showMessageBox`**，统一由更新窗口渲染（标题 + 消息 + 按钮，`Esc` = 取消）；提示结束后若没有下载任务，窗口自动关闭。
   - **下载方式按平台分两种模式**（`dl.mode`）：
     - **macOS（`mode=pkg`）**：GitHub Releases API 返回的最新版本里选出与当前架构匹配的 `.pkg`；用 **Node 原生 `http(s)`** 流式下载到 `app.getPath('downloads')`（手动跟随重定向），可取消（`destroy` + 删除半成品）。**不用 Electron `net`**：`net` 走 Chromium 网络栈会触及加密 Cookie 存储（打包时翻转了 `EnableCookieEncryption` fuse），从而弹出 macOS「钥匙串」授权框；Node 原生请求不碰 Chromium 会话 / Cookie，因此更新检查与下载都不会再触发该弹框。**`owner` / `repo` 取自 `package.json` 的 `vessel.updateRepo`**；产物前缀固定取应用名 `Vessel`（`APP_NAME`）。**不依赖 Squirrel / 签名**，因此 ad-hoc 构建也能更新。开启「遵循系统代理」（§3.10）时，这些 Node `http(s)` 请求会按系统代理 / PAC 走 SOCKS5 或 HTTP CONNECT；代理失败时回退直连。
     - **Windows（`mode=auto`）**：仍用 `electron-updater` 的 `downloadUpdate()` 自动下载并 `quitAndInstall()`（`autoInstallOnAppQuit=true`；6 秒未退出则 `app.relaunch()` + `app.quit()` 兜底）。
   - **下载窗口**：确认下载后弹出一个**小型、不可关闭（`closable: false` + 系统关闭按钮禁用，仅退出应用时放行）、可最小化、置顶居中的前台窗口** `update.html`（尺寸 `vessel.updateWindow` = 380 × 150，见 §8.7）。窗口采用 **`titleBarStyle: 'hiddenInset'`**：**真正的系统红绿灯**与标题同一行，**只有「最小化」可用**（关闭 / 缩放禁用）。窗口还有：**实时进度条**（`update:progress`）、**取消**、**安装按钮**（下载期间禁用）。下载完成后按钮可用并显示 **60 秒倒计时**（常量 `UPDATE_COUNTDOWN_SECONDS`）；**macOS 按钮为「退出并安装」**（`open` 打开 PKG 系统安装器，随后退出本程序；安装完成后 PKG 的 postinstall 会重新启动 Vessel；倒计时文案「N 秒后自动退出并打开安装器」），**Windows 按钮为「重启更新」**（`quitAndInstall()`）。**取消 = 退出本次更新**（下载阶段中止下载并删除半成品；点击安装 / 倒计时到 0 后取消按钮禁用）。**注意**：macOS 上 `closable: false` 的窗口会让 `app.quit()` 卡住（窗口永不被关闭），因此退出时（`before-quit`）会对更新窗口 `setClosable(true)` 放行，保证能真正退出。
-  - **下载失败**：仅在日志记录详细错误，并关闭下载窗口、给一句友好提示。
-  - **手动检查**：设置 → 应用 → 关于「检查更新」（`app:check-updates`）触发，会提示「已是最新 / 暂时无法检查」；**每次点击都必须有反馈**（有新版本同样会重新弹窗，反复点击不会静默无响应）；检查进行中再次点击返回 `{ ok: true, checking: true }`，界面就地提示「正在检查…」。**出错时不报技术错误**：手动检查给一句友好提示（详情写日志），启动时的静默检查出错则完全不提示。
+  - **下载失败**：仅在日志记录详细错误，并在当前更新窗口内显示应用内提示（不再弹系统对话框）。
+  - **手动检查**：设置 → 应用 → 关于「检查更新」（`app:check-updates`）触发，会用应用内提示框提示「已是最新 / 暂时无法检查」；**每次点击都必须有反馈**（有新版本同样会重新弹窗，反复点击不会静默无响应）；检查进行中再次点击返回 `{ ok: true, checking: true }`，界面就地提示「正在检查…」。**出错时不报技术错误**：手动检查给一句友好提示（详情写日志），启动时的静默检查出错则完全不提示。
   - **说明**：macOS 的 Squirrel 自动安装需要稳定 **Developer ID 签名**，本项目默认 ad-hoc 签名，故改用 PKG + 系统安装器；发布仅含 `*.pkg`，更新检测通过 GitHub API 完成。
   - **签名要求**：正式分发建议同时配置 Developer ID Application（.app）与 Developer ID Installer（.pkg）；未签名 PKG 仍可手动安装，但会触发系统安全提示。
 - **图标生成**：`node scripts/gen-icons.mjs` 在 `assets/imgs/` 生成 `trayTemplate*.png`、`app.png`，在 macOS 上经 `iconutil` 额外生成 `icon.icns`。
@@ -741,11 +743,12 @@ flowchart TD
 - 字体与行高：`.fm-root { font-size: var(--file-font-size) }`；终端窗口（内嵌面板）由 `terminal.js` 跟随终端字号；**独立文件窗口固定 15px**（`body.file-window { --file-font-size: 15px }`），不跟随终端设置。**路径行 / 列表表头 / 文件行统一高度 `1.9em`**（内嵌面板随字号）；**独立文件窗口的列表表头 / 文件行 / 目录树行固定 32px**（`body.file-window .fm-list-head, .fm-row, .fm-tree-row { height: 32px }`）；文件行的**文件名 / 体积 / 权限 / 时间同号 `1em`**（体积 / 权限 / 时间用等宽字体），保证中英文观感一致（此前数据列 `0.92em` 会让中文显得更大）。
 - 独立文件窗口 `file-window.html`：**系统原生标题栏 / 红绿灯**（`titleBarStyle: 'default'`，不隐藏系统窗口按钮），顶部 32px 工具栏 `#file-toolbar`（只放 SSH 下拉 `select-compact`，无置顶按钮），主体 `#file-root` 即 `.fm-root`；`alwaysOnTop` **默认关**（`vessel.fileWindow.alwaysOnTop` / `settings.fileWindowAlwaysOnTop`），不再 `setVisibleOnAllWorkspaces` 浮在全屏之上；屏幕 / 位置 / 尺寸记入 `file-window.json`。**拖拽窗口高度后**（resize 停 200ms）按实测余量请求 `file-window:snap-size`，把「文件列表区域」`.fm-list` 收到**文件行的整数倍**（行高固定 32px），底部不再露半行。
 
-### 8.7 更新下载窗口
+### 8.7 更新窗口（应用内提示框 / 下载）
 
-- 尺寸 **380 × 150**（`package.json` 的 `vessel.updateWindow` → `constants.js` 的 `UPDATE_WINDOW`）；**标准窗口 + `titleBarStyle: 'hiddenInset'`**（真正的系统红绿灯，`trafficLightPosition {14,13}`）、不可缩放、**不可关闭**（`closable: false`，系统关闭按钮禁用、Cmd-W 无效，仅应用退出 / `quitAndInstall` 时放行；`close` 事件另有 `preventDefault` 兜底）、置顶（`alwaysOnTop`）并**居中**显示。**可最小化**（`minimizable: true`，系统黄灯生效）；**缩放禁用**（`maximizable: false`）。
+- 尺寸 **380 × 150**（`package.json` 的 `vessel.updateWindow` → `constants.js` 的 `UPDATE_WINDOW`）；**标准窗口 + `titleBarStyle: 'hiddenInset'`**（真正的系统红绿灯，`trafficLightPosition {14,13}`）、不可缩放、**不可关闭**（`closable: false`，系统关闭按钮禁用、Cmd-W 无效，仅应用退出 / `quitAndInstall` / 提示框处理完毕后由主进程关闭时放行；`close` 事件另有 `preventDefault` 兜底）、置顶（`alwaysOnTop`）并**居中**显示。**可最小化**（`minimizable: true`，系统黄灯生效）；**缩放禁用**（`maximizable: false`）。
+- **应用内提示框（替代系统弹窗）**：同一窗口承载所有更新提示 —— 标题（`#update-title`）+ 消息（`#update-message`）+ 按钮（`#update-prompt-actions`），隐藏进度条 / 状态行 / 取消 / 安装按钮。按钮文案与顺序由主进程按当前语言下发（`update:prompt`），首项 / `defaultId` 用强调色；点击或按 `Esc` 经 `update:choice` 回传，主进程据此继续（如下载）或关闭窗口。
 - **标题与红绿灯同一行**：`.update-titlebar`（高 40px、`padding-left: 74px` 避开红绿灯、整行为拖动区）内放标题 `#update-title`。
-- 结构（`update.html`）：红绿灯 → 标题（下载中「正在下载更新 vX」/ 完成「下载完成 vX」）→ **进度条** `update-progress`（宽 = `percent`）→ 状态行（`已下载 / 总量 · 速度`；完成时 macOS 显示「N 秒后自动退出并打开安装器」、Windows 显示「N 秒后自动重启更新」）→ 底部按钮「取消」与**安装按钮**（macOS =「**退出并安装**」/ Windows =「**重启更新**」，文案随状态里的 `mode` 切换；下载期间禁用；**一旦触发安装——点按钮或倒计时到 0——「取消」与安装按钮一并禁用**；两者紧贴状态行、无多余留白）。整窗为拖拽区、红绿灯与按钮为 `no-drag`。
+- 结构（`update.html`）：红绿灯 → 标题（下载中「正在下载更新 vX」/ 完成「下载完成 vX」）→ 提示框模式显示**消息 + 自定义按钮**；下载模式显示 **进度条** `update-progress`（宽 = `percent`）→ 状态行（`已下载 / 总量 · 速度`；完成时 macOS 显示「N 秒后自动退出并打开安装器」、Windows 显示「N 秒后自动重启更新」）→ 底部按钮「取消」与**安装按钮**（macOS =「**退出并安装**」/ Windows =「**重启更新**」，文案随状态里的 `mode` 切换；下载期间禁用；**一旦触发安装——点按钮或倒计时到 0——「取消」与安装按钮一并禁用**；两者紧贴状态行、无多余留白）。整窗为拖拽区、红绿灯与按钮为 `no-drag`。
 - 行为见 §6.6 / §7：进度实时回填；下载完成后安装按钮可用并显示 60 秒倒计时。**macOS**：点安装 / 倒计时到 0 → `open` 打开 PKG 系统安装器后退出本程序；安装完成由 PKG postinstall 自动启动 Vessel。**Windows**：调用 `quitAndInstall()`，6 秒未退出则 `app.relaunch()` + `app.quit()` 兜底。
 
 ---
@@ -807,7 +810,7 @@ flowchart TD
 | 悬浮面板尺寸 | 400 × 500 |
 | 窗口模式主窗口尺寸 | 固定 640 × 480（不可缩放；`vessel.mainWindow`） |
 | 设置窗口尺寸 | 800 × 600 |
-| 更新下载窗口尺寸 | 380 × 150（`vessel.updateWindow`） |
+| 更新窗口尺寸 | 380 × 150（`vessel.updateWindow`） |
 | `--tabbar-height` | 46px |
 | `--footer-height` | 34px |
 | `--term-header-height` | 22px（终端窗口头栏最小高度，刚好放下自绘小红绿灯；实际为 `max(22px, --term-header-font-size + 6px)`） |
@@ -830,7 +833,7 @@ flowchart TD
 - 输入 `field`、按钮 `btn` / `btn-accent`、图标按钮 `icon-btn`、结果行 `row-card`、TAB `tab` / `tab-active`、开关 `switch`、分段控件 `segment`、色块 `swatch`。
 - **分组手风琴** `accordion` / `accordion-item` / `accordion-header`（含 `.accordion-chevron` / `.accordion-name` / `.accordion-count`）/ `accordion-body`：用于 SSH 管理（设置页与主界面工具）按分组折叠展示，**默认全部展开**，点击标题切换、`.accordion-item.collapsed` 时旋转箭头（-90°）并隐藏 `.accordion-body`。
 - **2FA 验证码卡片**（2FA 工具）：顶部为单行 `field` 输入框 + `btn-accent`「添加」按钮；卡片为 `rounded-card` + `border-border` + `bg-surface` 的纵向布局 —— 第一行为**绿色盾牌图标**（`shield`，`--color-success`）+ 标题（`text-[15px]`）+ 副标题（`items-baseline`、超出省略）、右侧**复制** / **删除**图标按钮，第二行为**逐位验证码数字块**（`h-11 w-8`、`text-[22px]` 等宽、每 3/4 位一组留一道间隙）+ 右侧倒计时秒数，底行为 1px 进度条（`rounded-pill`，剩余 ≤5 秒由强调色变 `--color-danger`）；复制成功就地显示 ✓ 反馈，删除走**就地二次确认**（`text-danger` 文案 + ✓ / ✕ 图标按钮）。样式复用中性卡片色，强调色仅用于进度条；卡片内元素纵向间距统一为 `--space-card-gap`（当前 12px，`gap-card`）；输入区与卡片列表也使用同一间距。
-- **更新下载窗口组件**：`.update-shell`（整窗拖拽区 + 纵向布局）/ `.update-title` / `.update-progress` + `.update-progress-fill`（强调色进度条，`transition: width 0.15s linear`）/ `.update-status` / `.update-actions`（`no-drag`，右对齐按钮）。
+- **更新窗口组件**：`.update-shell`（整窗拖拽区 + 纵向布局）/ `.update-title` / `.update-message`（提示消息，12px / 行高 1.6 / 自动换行）/ `.update-progress` + `.update-progress-fill`（强调色进度条，`transition: width 0.15s linear`）/ `.update-status` / `.update-actions`（`no-drag`，右对齐按钮，提示框按钮共用同一样式）。
 - **卡片 / 输入框间距统一 12px**：唯一来源是 `constants.css` 的 `--space-card-gap`（默认 12px）；`.section`（`gap` / `margin-bottom`）、窗口模式工具网格、手风琴、设置卡片、工具列表与输入区块均使用它（Tailwind 暴露为 `gap-card` / `mb-card` / `mt-card`），不再散落 10 / 12 / 16px 的卡片间距；编码转换（6 个连续输入框、二维码 / Data Matrix 分区与标题）与进制转换的 4 个进制输入框使用更紧凑的 8px 间距。
 - **统一标题（滚动联动）**：每个工具的标题由 `app.js` 渲染在内容区上方的固定 `#tool-head-host` 中（标题取 `tools.<id>`、说明取 `toolDesc.<id>`），**永远固定在顶部、不随内容滚动**。常态标题 17px / 700、说明 11px。**仅当内容实际可滚动时**才启用收起行为：内容在最顶部时，先收起标题并**保持内容不动**（滚动输入在收起动画约 190ms 内被锁定），标题缩为 13px / 650、说明变为 10px 并**与标题同一行**（超出省略）；动画完成后继续滚动才滚动内容，标题始终独占一行、内容不会滚到标题下面。滚回顶部后自动恢复（在顶部继续向上滚也会先展开标题）；JSON 等内部滚动区实际产生滚动时同样收起，回到其顶部恢复；内容未填满、无法滚动时（如短 JSON / Hash / 2FA / 剪贴板）滚动不会收起标题。切换 TAB 时内容区自动滚动回顶部并恢复常态。
 - **内容填充（fill）**：工具注册项可设 `fill: true`（当前为 JSON 格式化）；`app.js` 给 `#content` 加 `.tool-fill`，使内容区变为纵向 flex、`.tool-body` 占满剩余高度，JSON 编辑器 / 结构树用 `flex: 1` 铺满剩余高度与整行宽度（不再固定 180px），下方状态行保持贴底；窗口模式下的多列网格也由该规则覆盖为单列纵向布局（并重置 `align-items: stretch`，避免从网格的 `start` 继承导致编辑器宽度塌缩）。

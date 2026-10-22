@@ -25,6 +25,12 @@ function registerUpdateIpc(ipcMain) {
     updater.installNow();
     return { ok: true };
   });
+
+  // 应用内提示框：渲染层回传用户选择的按钮下标。
+  ipcMain.handle(IPC.UPDATE_CHOICE, (event, payload) => {
+    if (!isUpdateWindow(BrowserWindow.fromWebContents(event.sender))) return { ok: false };
+    return updater.answerPrompt(payload && payload.id, payload && payload.index);
+  });
 }
 
 module.exports = { registerUpdateIpc };
