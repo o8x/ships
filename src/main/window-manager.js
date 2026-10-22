@@ -19,6 +19,7 @@ const { TERMINAL_WINDOW_FILE, FILE_WINDOW_FILE, MAIN_WINDOW_FILE } = require('./
 const { readJson, writeJson } = require('./utils/json-store');
 const { clampNumber, displaySignature, displayBySignature, clampBounds } = require('./utils/window-geometry');
 const logger = require('./utils/logger');
+const spaceService = require('./services/space-service');
 
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
 const PRELOAD_DIR = path.join(__dirname, '..', 'preload');
@@ -392,7 +393,7 @@ function toggleTerminalWindow() {
   if (win.isVisible() && win.isFocused()) {
     // 窗口态：收缩成悬浮球（悬浮球关闭时回退为隐藏 / 销毁）。
     if (terminalBallEnabled()) {
-      enterBallMode(win);
+      maybeEnterBall(win);
       return win;
     }
     if (terminalCloseAction() === 'hide') {
@@ -431,12 +432,60 @@ function isBallMode(win) {
   return Boolean(win && !win.isDestroyed() && win.__ballActive);
 }
 
+/* 记录窗口此刻所在的 Space（打开 / 获得焦点 / 从球放大回来时）。读取失败保留旧值。 */
+function rememberTerminalSpace(win) {
+  if (!isTerminalWindow(win)) return;
+  const token = (win.__spaceToken || 0) + 1;
+  win.__spaceToken = token;
+  spaceService.currentSpaces().then((signature) => {
+    if (!signature || !isTerminalWindow(win) || win.__spaceToken !== token) return;
+    win.__spaceId = signature;
+  });
+}
+
+/* 当前 Space 是否已从记录值切走。没记录 / 读取失败时返回 null（保持原有缩球行为）；
+   切走时返回 { from, to }（from = 记录的原桌面，to = 当前桌面），供日志打印。 */
+async function detectSpaceChange(win) {
+  const from = win.__spaceId || '';
+  if (!from) return null;
+  const to = await spaceService.currentSpaces();
+  if (!to || to === from) return null;
+  return { from, to };
+}
+
+function logSpaceChange(win, change) {
+  logger.file(
+    `[terminal] keep window: space changed (${win.id}) from=${change.from || 'unknown'} to=${change.to || 'unknown'}`
+  );
+}
+
+/* 准备缩球：若用户已切到别的 Space（切桌面也会让终端失焦），不缩球、保持终端窗口原样。 */
+async function maybeEnterBall(win) {
+  if (!isTerminalWindow(win) || win.isDestroyed()) return false;
+  const change = await detectSpaceChange(win);
+  if (change) {
+    logSpaceChange(win, change);
+    return false;
+  }
+  if (!isTerminalWindow(win) || win.isDestroyed()) return false;
+  enterBallMode(win);
+  return true;
+}
+
 /* 把终端窗口「收起来」：悬浮球开启时收缩成悬浮球，否则真正隐藏窗口。
-   所有「隐藏终端」的路径（关闭按钮 / 快捷键 / Cmd-W）都走这里，统一成收缩到悬浮球。 */
-function shrinkTerminalToBall(win) {
-  if (!isTerminalWindow(win) || win.isDestroyed()) return;
-  if (terminalBallEnabled()) enterBallMode(win);
-  else win.hide();
+   所有「隐藏终端」的路径（关闭按钮 / 快捷键 / Cmd-W）都走这里，统一成收缩到悬浮球。
+   返回 Promise<boolean>：true = 已收成球 / 隐藏，false = 因切换了 Space（或窗口已失效）保持原样。 */
+async function shrinkTerminalToBall(win) {
+  if (!isTerminalWindow(win) || win.isDestroyed()) return false;
+  if (terminalBallEnabled()) return maybeEnterBall(win);
+  const change = await detectSpaceChange(win);
+  if (change) {
+    logSpaceChange(win, change);
+    return false;
+  }
+  if (!isTerminalWindow(win) || win.isDestroyed()) return false;
+  win.hide();
+  return true;
 }
 
 function clearBallTimer(win) {
@@ -531,6 +580,7 @@ function exitBallMode(win, focus) {
     win.webContents.send(IPC.TERMINAL_BALL, { active: false, size, phase: 'settle' });
     saveTerminalGeometry(win);
     if (focus !== false) win.focus();
+    rememberTerminalSpace(win);
     logger.file(`[terminal] exited ball mode (${win.id})`);
   }, BALL_ANIM_MS);
 }
@@ -1233,6 +1283,8 @@ function openTerminalWindow() {
     // 会重置为默认的「固定在本桌面」）。之后变球时不再动它，避免球跟着切换桌面。
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
     win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
+    // 此刻窗口就在活动桌面上 → 记录它所在的 Space，供失焦时判断用户是否切了桌面。
+    rememberTerminalSpace(win);
   });
   // 失去焦点 → 延迟后缩成圆形悬浮球（延时内焦点回来则取消；DevTools 打开 / iTerm 交接时不动）。
   win.on('blur', () => {
@@ -1244,7 +1296,9 @@ function openTerminalWindow() {
     clearBallTimer(win);
     win.__ballTimer = setTimeout(() => {
       win.__ballTimer = null;
-      if (!win.isDestroyed() && !win.isFocused() && !win.__suppressBall) enterBallMode(win);
+      if (win.isDestroyed() || win.isFocused() || win.__suppressBall) return;
+      // 切 Space 也会触发 blur：若当前 Space 已变，保持终端窗口原样，不缩成球。
+      shrinkTerminalToBall(win);
     }, terminalBallDelayMs());
   });
   win.on('resize', () => scheduleTerminalGeometrySave(win));
@@ -1257,6 +1311,8 @@ function openTerminalWindow() {
   // 实际生效的几何（恢复时可能被夹取过）也记下来，保证记忆与窗口一致。
   scheduleTerminalGeometrySave(win);
   win.once('ready-to-show', () => {
+    // 打开时记录当前 Space（随后的 focus 会再记一次，以最后一次为准）。
+    rememberTerminalSpace(win);
     win.show();
     win.focus();
     win.webContents.send(IPC.TERMINAL_FOCUS_INPUT);
