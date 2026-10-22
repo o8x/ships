@@ -4,7 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { dialog, clipboard } = require('electron');
-const { IPC, DEFAULT_SETTINGS, SSH_EXIT_MARKER_COMMAND } = require('../../shared/constants');
+const { IPC, DEFAULT_SETTINGS } = require('../../shared/constants');
 const terminal = require('../services/terminal-service');
 const settings = require('../services/settings-service');
 const iterm = require('../services/iterm-service');
@@ -85,15 +85,13 @@ function runInTerminal(command, secret, target) {
   }
   overlayLastCommand = command;
   if (!win || win.isDestroyed()) return false;
-  // ssh 退出后由本地 shell 打印一个不可见的 OSC 标记，渲染层据此断开文件面板。
-  const injectCommand = target ? `${command}${SSH_EXIT_MARKER_COMMAND}` : command;
   const ownerId = win.webContents.id;
   const sessionId = sessionByOwner.get(ownerId);
   if (sessionId && terminal.get(sessionId)) {
-    terminal.inject(sessionId, injectCommand, secret);
+    terminal.inject(sessionId, command, secret);
     notifyTarget(win.webContents, sessionId, target);
   } else {
-    pendingByOwner.set(ownerId, { command: injectCommand, secret, target }); // flushed once the window's session reports in
+    pendingByOwner.set(ownerId, { command, secret, target }); // flushed once the window's session reports in
   }
   return true;
 }

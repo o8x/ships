@@ -19,6 +19,7 @@ import sys
 import fcntl
 import pty
 import termios
+import time
 
 
 def set_winsize(fd, cols, rows):
@@ -32,6 +33,9 @@ def main():
     shell = sys.argv[1] if len(sys.argv) > 1 else (os.environ.get("SHELL") or "/bin/sh")
     cols = int(sys.argv[2]) if len(sys.argv) > 2 else 80
     rows = int(sys.argv[3]) if len(sys.argv) > 3 else 24
+    # Optional invisible marker emitted after a foreground command returns to the
+    # shell (used to close the SSH file panel when the ssh process exits).
+    exit_marker = sys.argv[4].encode("utf-8") if len(sys.argv) > 4 and sys.argv[4] else b""
 
     pid, master = pty.fork()
     if pid == 0:  # child: the slave side is already our controlling terminal
@@ -62,10 +66,21 @@ def main():
     for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(sig, shutdown)
 
+    shell_pgid = None
+    try:
+        shell_pgid = os.getpgid(pid)
+    except OSError:
+        pass
+    last_fg = None
+    next_pgrp_check = 0.0
+
     watched = [master, stdin_fd] + ([control_fd] if control_fd is not None else [])
     while True:
         try:
-            ready, _, _ = select.select(watched, [], [])
+            # Polling the foreground process group is a cheap ioctl (no child process):
+            # when it returns to the shell, any foreground command (e.g. ssh) has ended.
+            timeout = 0.15 if exit_marker and shell_pgid else None
+            ready, _, _ = select.select(watched, [], [], timeout)
         except InterruptedError:
             continue
         except OSError:
@@ -98,6 +113,25 @@ def main():
                     set_winsize(master, int(parts[1]), int(parts[2]))
                 except ValueError:
                     pass
+
+        if exit_marker and shell_pgid:
+            now = time.monotonic()
+            if now >= next_pgrp_check:
+                next_pgrp_check = now + 0.15
+                try:
+                    fg = os.tcgetpgrp(master)
+                except OSError:
+                    fg = None
+                if fg is not None:
+                    if last_fg is None:
+                        last_fg = fg
+                    elif fg != last_fg:
+                        if fg == shell_pgid and last_fg != shell_pgid:
+                            try:
+                                os.write(stdout_fd, exit_marker)
+                            except OSError:
+                                pass
+                        last_fg = fg
 
     try:
         _, status = os.waitpid(pid, 0)

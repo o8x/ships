@@ -742,12 +742,8 @@
   const offData = window.ships.terminal.onData((message) => {
     if (!message || message.id !== sessionId || message.type !== 'data') return;
     let data = message.data;
-    // 追加在 ssh 命令后的 printf 片段会被 shell 回显；从显示内容里删掉，只保留 ssh 命令。
-    const sshExitCommand = C.SSH_EXIT_MARKER_COMMAND;
-    if (sshExitCommand && data.includes(sshExitCommand)) {
-      data = data.split(sshExitCommand).join('');
-    }
-    // ssh 进程退出：本地 shell 会输出一个不可见的 OSC 标记 → 清空目标并断开内嵌文件面板。
+    // ssh 进程退出：PTY 桥接检测到前台进程组回到 shell 后输出一个不可见的 OSC 标记
+    // → 清空目标并断开内嵌文件面板。
     const sshExitMarker = C.SSH_EXIT_MARKER;
     if (sshExitMarker && data.includes(sshExitMarker)) {
       data = data.split(sshExitMarker).join('');

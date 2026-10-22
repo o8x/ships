@@ -12,6 +12,7 @@ const path = require('path');
 const sshService = require('./ssh-service');
 const proxyService = require('./proxy-service');
 const logger = require('../utils/logger');
+const { SSH_EXIT_MARKER } = require('../../shared/constants');
 
 /* Packaged builds keep the app source inside app.asar, which is an archive — a
    script inside it cannot be executed. build.asarUnpack extracts this file into
@@ -96,7 +97,7 @@ function start(payload, emit) {
     return { ok: false, id, error: message };
   }
 
-  const child = spawn(python, [BRIDGE, shell, String(cols), String(rows)], {
+  const child = spawn(python, [BRIDGE, shell, String(cols), String(rows), SSH_EXIT_MARKER], {
     cwd: os.homedir(),
     env: childEnv(),
     stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
