@@ -19,6 +19,7 @@
         pinBallOn: '取消固定（失焦会缩成悬浮球）',
         pinBallOff: '固定：本窗口失焦不缩成悬浮球',
         failed: '无法启动终端会话：{error}',
+        restarting: '正在重建终端会话…',
         noTerminal: 'xterm 未能加载，无法显示终端',
       },
     },
@@ -33,6 +34,7 @@
         pinBallOn: 'Unpin (shrink to a ball when unfocused)',
         pinBallOff: 'Pin: keep this window open when it loses focus',
         failed: 'Cannot start the terminal session: {error}',
+        restarting: 'Restarting terminal session…',
         noTerminal: 'xterm failed to load',
       },
     },
@@ -555,6 +557,27 @@
     lastRows = term.rows;
   }
 
+  /* 切换 SSH 前重建 shell：仅当当前已经处在 SSH 会话里（sshTarget 非空）时销毁当前
+     PTY / shell 并重新创建一个登录 shell；仍停留在系统 shell 时保留原会话直接注入命令。 */
+  async function restartSessionForSsh() {
+    if (!term) return false;
+    const oldId = sessionId;
+    sessionId = '';
+    sshTarget = '';
+    if (filesApi) filesApi.setSshTarget('');
+    if (oldId) {
+      try {
+        await window.ships.terminal.kill(oldId);
+      } catch (err) {
+        /* ignore */
+      }
+    }
+    // 不清屏：保留原有输出，只提示一行灰色的重建信息。
+    write(`\r\n${ANSI.meta}${i18n.t('terminalWin.restarting')}${ANSI.reset}\r\n`);
+    await startSession();
+    return Boolean(sessionId);
+  }
+
   function renderHeader() {
     linesBtn.innerHTML = (showLines ? Icons.eyeOff : Icons.eye)(15);
     linesBtn.style.color = showLines ? 'var(--color-accent)' : '';
@@ -604,6 +627,14 @@
 
   async function connectSshHost(alias) {
     if (!alias) return;
+    // 已在 SSH 会话中切换主机：先销毁当前 shell 并重建（旧 ssh 会话不残留、不会嵌套），
+    // 新 shell 就绪后再执行 ssh。仍在系统 shell 时直接注入，不重建。
+    if (sshTarget) {
+      // startSession() 失败时已在终端里显示具体原因；此时不再执行 ssh。
+      const ready = await restartSessionForSsh();
+      if (!ready) return;
+    }
+    if (term) term.focus();
     const result = await window.ships.ssh.connect({ alias, inTerminal: true });
     if (!result || !result.ok) {
       write(`\r\n${ANSI.error}${i18n.t('terminalWin.sshFailed', { error: (result && result.error) || 'error' })}${ANSI.reset}\r\n`);

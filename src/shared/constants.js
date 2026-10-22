@@ -292,8 +292,8 @@ const DEFAULT_SETTINGS = {
   terminalBallTransparent: TERMINAL_WINDOW.ballTransparent !== false,
   // 内置终端文件面板：下载保存目录（默认 ~/Downloads）
   sftpDownloadDir: appConfig.sftpDownloadDir || '~/Downloads',
-  // 独立文件窗口置顶
-  fileWindowAlwaysOnTop: FILE_WINDOW.alwaysOnTop !== false,
+  // 独立文件窗口置顶：默认关（不跟随主界面 / 终端窗口的置顶）。
+  fileWindowAlwaysOnTop: FILE_WINDOW.alwaysOnTop === true,
   // 日志：日志文件保留天数（macOS 下日志写到 ~/Library/Logs/Vessel，Console.app 的
   //「日志报告」会直接收录，无需再做统一日志同步）。
   logRetentionDays: LOG_RETENTION_DAYS,

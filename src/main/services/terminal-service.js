@@ -296,11 +296,12 @@ function interrupt(id) {
   return write(id, '\u0003');
 }
 
-/* Type a command into a session: Ctrl-U clears the input line, CR accepts it so a
-   previous command's unfinished output line cannot be overwritten. */
+/* Type a command into a session: Ctrl-U clears any partially typed input, then the
+   command + CR. No leading CR: an empty CR would submit an empty command first and
+   print an extra blank prompt line (especially right after a fresh session starts). */
 function inject(id, line, secret) {
   if (!line) return false;
-  const ok = write(id, `\u0015\r${line}\r`);
+  const ok = write(id, `\u0015${line}\r`);
   if (ok && secret) armSecret(id, secret);
   return ok;
 }

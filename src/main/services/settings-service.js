@@ -9,6 +9,11 @@ class SettingsService extends EventEmitter {
   constructor() {
     super();
     this.data = Object.assign({}, DEFAULT_SETTINGS, readJson(SETTINGS_FILE, {}));
+    // 独立文件窗口曾默认置顶，且没有界面开关；把旧版本遗留的 true 归一为「不置顶」。
+    if (this.data.fileWindowAlwaysOnTop === true) {
+      this.data.fileWindowAlwaysOnTop = false;
+      writeJson(SETTINGS_FILE, this.data);
+    }
   }
 
   getAll() {

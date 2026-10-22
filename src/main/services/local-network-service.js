@@ -7,16 +7,10 @@ const logger = require('../utils/logger');
 const BROADCAST_PORT = 9;
 const MDNS_ADDRESS = '224.0.0.251';
 const MDNS_PORT = 5353;
-// Keep the triggering socket alive so the system alert is not tied to a very
-// short-lived operation, and retry a few times: macOS may dismiss the alert
-// without recording a decision, in which case a later operation prompts again.
+// 只请求一次，并让触发用的 socket 保持 30 秒，避免系统授权框随操作瞬间结束而消失。
 const SOCKET_HOLD_MS = 30000;
-const RETRY_DELAY_MS = 2500;
-const RETRY_ATTEMPTS = 3;
-// Coalesce requests fired by several window focus / connection events at once.
-const MIN_REQUEST_INTERVAL_MS = 2000;
 
-let lastRequestAt = 0;
+let requested = false;
 
 function ipv4ToInt(ip) {
   return ip.split('.').reduce((value, part) => (value << 8) + (Number(part) & 0xff), 0) >>> 0;
@@ -41,18 +35,26 @@ function broadcastAddresses() {
 }
 
 /* macOS 15+ 的「本地网络」权限只会在应用实际访问局域网时弹出。
-   向各网卡广播地址和 mDNS 组播发送一个空 UDP 包触发系统授权；
-   socket 保持打开一段时间，并在请求时重试几次，避免弹窗因操作过快结束而消失。 */
+   向各网卡广播地址和 mDNS 组播各发一个空 UDP 包触发系统授权，socket 保持 30 秒；
+   成功 / 失败都写一条日志（不再定时重试 / 不再由窗口焦点反复触发）。 */
 function triggerOnce() {
   const targets = broadcastAddresses();
   let socket;
   try {
     socket = dgram.createSocket('udp4');
   } catch (err) {
+    logger.file(`[net] local network access failed: ${err.message}`);
     return;
   }
 
   let closed = false;
+  let reported = false;
+  const report = (ok, detail) => {
+    if (reported) return;
+    reported = true;
+    if (ok) logger.file(`[net] local network access requested (hold=${SOCKET_HOLD_MS}ms, targets=${detail})`);
+    else logger.file(`[net] local network access failed: ${detail}`);
+  };
   const close = () => {
     if (closed) return;
     closed = true;
@@ -63,16 +65,31 @@ function triggerOnce() {
     }
   };
 
-  socket.on('error', close);
+  socket.on('error', (err) => {
+    report(false, err.message);
+    close();
+  });
   socket.bind(() => {
     try {
       socket.setBroadcast(true);
       const packet = Buffer.from([0]);
-      for (const target of targets) socket.send(packet, BROADCAST_PORT, target, () => {});
-      socket.send(packet, MDNS_PORT, MDNS_ADDRESS, () => {});
-      logger.file('[net] requested macOS local network access');
+      const destinations = targets.map((address) => ({ address, port: BROADCAST_PORT }));
+      destinations.push({ address: MDNS_ADDRESS, port: MDNS_PORT });
+      let pending = destinations.length;
+      let firstError = null;
+      for (const destination of destinations) {
+        socket.send(packet, destination.port, destination.address, (err) => {
+          if (err && !firstError) firstError = err;
+          pending -= 1;
+          if (pending === 0) {
+            if (firstError) report(false, firstError.message);
+            else report(true, destinations.length);
+          }
+        });
+      }
     } catch (err) {
-      /* ignore */
+      report(false, err.message);
+      close();
     }
     setTimeout(close, SOCKET_HOLD_MS);
   });
@@ -89,17 +106,14 @@ function activateApp() {
   }
 }
 
-/* 请求本地网络授权。可在启动、窗口获得焦点、发起 SSH / 网络测试时重复调用；
-   短时间内多次调用会合并，不会连续轰炸系统弹窗。 */
+/* 请求本地网络授权：每个进程只执行一次（启动时），之后的所有调用都是空操作。
+   触发用 socket 保持 30 秒；成功 / 失败均写日志。 */
 function requestLocalNetworkAccess() {
   if (process.platform !== 'darwin') return;
-  const now = Date.now();
-  if (now - lastRequestAt < MIN_REQUEST_INTERVAL_MS) return;
-  lastRequestAt = now;
+  if (requested) return;
+  requested = true;
   activateApp();
-  for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
-    setTimeout(triggerOnce, attempt * RETRY_DELAY_MS);
-  }
+  triggerOnce();
 }
 
 module.exports = { requestLocalNetworkAccess };

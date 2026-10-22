@@ -252,6 +252,8 @@
     const onLayout = typeof opts.onLayout === 'function' ? opts.onLayout : () => {};
     const onCd = typeof opts.onCd === 'function' ? opts.onCd : null;
     const onPopOut = typeof opts.onPopOut === 'function' ? opts.onPopOut : null;
+    const onConnectionState =
+      typeof opts.onConnectionState === 'function' ? opts.onConnectionState : () => {};
     const layoutData = Object.assign({}, DEFAULT_LAYOUT, opts.layout || {});
 
     const state = {
@@ -875,6 +877,7 @@
     async function connect() {
       if (!state.target || state.connected || state.connecting) return;
       state.connecting = true;
+      onConnectionState('connecting');
       const connection = state.connection || {};
       // 显式填写了地址时按「用户名@地址:端口」输出，便于直接在日志里看到连接参数。
       const label = connection.host
@@ -890,11 +893,13 @@
       }
       state.connecting = false;
       if (!result || !result.ok) {
+        onConnectionState('failed');
         setStatus(errorText(result), true);
         return;
       }
       state.id = result.id;
       state.connected = true;
+      onConnectionState('connected');
       state.home = result.home || '/';
       state.shellCwd = state.home;
       state.children = new Map();
@@ -941,6 +946,7 @@
       setProgress(null);
       setStatusPath('');
       setStatus('');
+      onConnectionState('idle');
     }
 
     /* ---------------------------- resizing -------------------------------- */

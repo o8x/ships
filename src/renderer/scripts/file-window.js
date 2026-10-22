@@ -59,17 +59,19 @@
   let currentTarget = '';
   let authMode = 'key';
   let filling = false;
+  // 密码 / 密钥互斥：共用同一个输入框，按当前认证方式各自保留草稿。
+  const drafts = { password: '', key: '' };
+  let passwordVisible = false;
+  // 连接按钮状态：连接中禁用；成功后保持禁用，直到用户修改任一字段；失败后恢复可用。
+  let connectionState = 'idle';
+  let dirty = true;
 
   let userInput = null;
   let hostInput = null;
   let portInput = null;
   let authSeg = null;
-  let passwordGroup = null;
-  let passwordInput = null;
-  let eyeBtn = null;
-  let keyGroup = null;
-  let keyInput = null;
-  let keyBtn = null;
+  let credentialInput = null;
+  let credentialBtn = null;
   let connectBtn = null;
 
   function connInput(placeholder, extraClass, attrs) {
@@ -102,6 +104,46 @@
     };
   }
 
+  function updateConnectButton() {
+    if (!connectBtn) return;
+    connectBtn.disabled = connectionState === 'connecting' || (connectionState === 'connected' && !dirty);
+  }
+
+  function markDirty() {
+    if (filling) return;
+    dirty = true;
+    updateConnectButton();
+  }
+
+  function syncCredentialInput() {
+    if (!credentialInput || !credentialBtn) return;
+    if (authMode === 'password') {
+      credentialInput.type = passwordVisible ? 'text' : 'password';
+      credentialInput.placeholder = i18n.t('fileWin.passwordPlaceholder');
+      credentialBtn.innerHTML = (passwordVisible ? Icons.eyeOff : Icons.eye)(13);
+      credentialBtn.setAttribute('data-tip', i18n.t(passwordVisible ? 'fileWin.hidePassword' : 'fileWin.showPassword'));
+    } else {
+      credentialInput.type = 'text';
+      credentialInput.placeholder = i18n.t('fileWin.keyPlaceholder');
+      credentialBtn.innerHTML = Icons.folder(13);
+      credentialBtn.setAttribute('data-tip', i18n.t('fileWin.chooseKey'));
+    }
+  }
+
+  function setAuth(mode) {
+    const next = mode === 'password' ? 'password' : 'key';
+    if (credentialInput && authMode !== next) {
+      drafts[authMode] = credentialInput.value;
+      authMode = next;
+      credentialInput.value = drafts[authMode] || '';
+      passwordVisible = false;
+    } else {
+      authMode = next;
+    }
+    if (authSeg) authSeg.set(authMode);
+    syncCredentialInput();
+  }
+
   function fillFromAlias(alias) {
     const record = hostByAlias(alias);
     const parsed = parseAddress(alias);
@@ -110,29 +152,18 @@
       userInput.value = record.user || '';
       hostInput.value = record.hostName || record.alias || '';
       portInput.value = String(record.port || 22);
-      keyInput.value = record.identityFile || '';
+      drafts.password = '';
+      drafts.key = record.identityFile || '';
     } else if (parsed) {
       userInput.value = parsed.user || '';
       hostInput.value = parsed.host || '';
       portInput.value = '22';
-      keyInput.value = '';
+      drafts.password = '';
+      drafts.key = '';
     }
     setAuth('key');
+    credentialInput.value = drafts.key;
     filling = false;
-  }
-
-  function setAuth(mode) {
-    authMode = mode === 'password' ? 'password' : 'key';
-    if (authSeg) authSeg.set(authMode);
-    if (passwordGroup) passwordGroup.classList.toggle('hidden', authMode !== 'password');
-    if (keyGroup) keyGroup.classList.toggle('hidden', authMode !== 'key');
-  }
-
-  function updateEye() {
-    if (!eyeBtn || !passwordInput) return;
-    const hidden = passwordInput.type === 'password';
-    eyeBtn.innerHTML = hidden ? Icons['eye'](13) : Icons['eye-off'](13);
-    eyeBtn.setAttribute('data-tip', i18n.t(hidden ? 'fileWin.showPassword' : 'fileWin.hidePassword'));
   }
 
   function buildPayload(targetOverride) {
@@ -142,23 +173,27 @@
     const target = String(targetOverride != null ? targetOverride : currentTarget || '').trim();
     const composed = target || (host ? (username ? `${username}@${host}` : host) : '');
     const payload = { target: composed, username, host, port, auth: authMode };
-    if (authMode === 'password') payload.password = passwordInput.value;
-    else payload.identityFile = keyInput.value.trim();
+    if (authMode === 'password') payload.password = credentialInput.value;
+    else payload.identityFile = credentialInput.value.trim();
     return payload;
   }
 
   function connectNow(targetOverride) {
     if (!hostInput.value.trim()) {
       hostInput.focus();
-      return;
+      return false;
     }
+    dirty = false;
+    updateConnectButton();
     if (manager) manager.connectWith(buildPayload(targetOverride));
+    return true;
   }
 
   function clearTargetOnEdit() {
     if (filling) return;
     currentTarget = '';
     if (picker) picker.setValue('');
+    markDirty();
   }
 
   function setupForm() {
@@ -188,30 +223,28 @@
         { value: 'key', label: i18n.t('fileWin.key') },
       ],
       authMode,
-      (value) => setAuth(value),
+      (value) => {
+        setAuth(value);
+        markDirty();
+      },
       { className: 'file-conn-auth' }
     );
 
-    passwordInput = connInput(i18n.t('fileWin.passwordPlaceholder'), 'file-conn-secret', { type: 'password' });
-    eyeBtn = el('button', { class: 'file-conn-icon', type: 'button' });
-    passwordGroup = el('div', { class: 'file-conn-group' });
-    passwordGroup.append(passwordInput, eyeBtn);
-    eyeBtn.addEventListener('click', () => {
-      passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
-      updateEye();
-    });
-
-    keyInput = connInput(i18n.t('fileWin.keyPlaceholder'), 'file-conn-key');
-    keyBtn = el('button', { class: 'file-conn-icon', type: 'button', 'data-tip': i18n.t('fileWin.chooseKey') });
-    keyBtn.innerHTML = Icons.folder(13);
-    keyGroup = el('div', { class: 'file-conn-group' });
-    keyGroup.append(keyInput, keyBtn);
-    keyBtn.addEventListener('click', async () => {
+    credentialInput = connInput(i18n.t('fileWin.keyPlaceholder'), 'file-conn-secret');
+    credentialBtn = el('button', { class: 'file-conn-icon', type: 'button' });
+    credentialBtn.addEventListener('click', async () => {
+      if (authMode === 'password') {
+        passwordVisible = !passwordVisible;
+        syncCredentialInput();
+        return;
+      }
       try {
         const result = await window.ships.openFile();
         if (result && result.path) {
-          keyInput.value = result.tilde || result.path;
+          credentialInput.value = result.tilde || result.path;
+          drafts.key = credentialInput.value;
           clearTargetOnEdit();
+          syncCredentialInput();
         }
       } catch (err) {
         /* ignore picker failures */
@@ -221,7 +254,7 @@
     connectBtn = el('button', { class: 'file-conn-btn', type: 'button' }, i18n.t('fileWin.connect'));
     connectBtn.addEventListener('click', () => connectNow());
 
-    for (const input of [userInput, hostInput, portInput, passwordInput, keyInput]) {
+    for (const input of [userInput, hostInput, portInput, credentialInput]) {
       input.addEventListener('input', clearTargetOnEdit);
       input.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
@@ -231,18 +264,20 @@
       });
     }
 
+    const credentialGroup = el('div', { class: 'file-conn-group' });
+    credentialGroup.append(credentialInput, credentialBtn);
+
     formEl.append(
       picker.el,
       userInput,
       hostInput,
       portInput,
       authSeg.root,
-      passwordGroup,
-      keyGroup,
+      credentialGroup,
       connectBtn
     );
     setAuth(authMode);
-    updateEye();
+    updateConnectButton();
   }
 
   function applyLocale() {
@@ -252,9 +287,6 @@
     if (userInput) userInput.placeholder = i18n.t('fileWin.userPlaceholder');
     if (hostInput) hostInput.placeholder = i18n.t('fileWin.hostPlaceholder');
     if (portInput) portInput.placeholder = i18n.t('fileWin.portPlaceholder');
-    if (passwordInput) passwordInput.placeholder = i18n.t('fileWin.passwordPlaceholder');
-    if (keyInput) keyInput.placeholder = i18n.t('fileWin.keyPlaceholder');
-    if (keyBtn) keyBtn.setAttribute('data-tip', i18n.t('fileWin.chooseKey'));
     if (connectBtn) connectBtn.textContent = i18n.t('fileWin.connect');
     if (authSeg) {
       authSeg.setOptions([
@@ -262,7 +294,7 @@
         { value: 'key', label: i18n.t('fileWin.key') },
       ]);
     }
-    updateEye();
+    syncCredentialInput();
   }
 
   async function refreshPicker() {
@@ -340,6 +372,11 @@
       layout: layout || {},
       active: true,
       onLayout: (patch) => window.ships.filesLayout.set('window', patch),
+      onConnectionState: (state) => {
+        connectionState = state;
+        if (state === 'connecting') dirty = false;
+        updateConnectButton();
+      },
     });
     if (currentTarget) {
       fillFromAlias(currentTarget);

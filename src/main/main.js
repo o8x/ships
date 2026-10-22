@@ -95,14 +95,10 @@ function onReady() {
   wm.setTray(tray);
 
   printStartupInfo();
-  // 提前触发 macOS「本地网络」授权（macOS 15+ 首次访问局域网时才会弹窗）。
+  // 启动时请求一次 macOS「本地网络」授权并保持 socket 30 秒；之后不再重复触发。
   requestLocalNetworkAccess();
   // 系统代理开关（默认关闭）：只在开启时解析 / 使用系统代理。
   proxyService.init();
-
-  // 弹窗可能被忽略 / 自动消失；用户每次切回窗口时再请求一次。
-  app.on('browser-window-focus', () => requestLocalNetworkAccess());
-  app.on('activate', () => requestLocalNetworkAccess());
 }
 
 function printStartupInfo() {

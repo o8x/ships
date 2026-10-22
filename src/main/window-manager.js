@@ -1450,7 +1450,7 @@ function scheduleFileWindowGeometrySave() {
 }
 
 function fileWindowAlwaysOnTop() {
-  return settings.get('fileWindowAlwaysOnTop') !== false;
+  return settings.get('fileWindowAlwaysOnTop') === true;
 }
 
 function applyFileWindowAlwaysOnTop() {
