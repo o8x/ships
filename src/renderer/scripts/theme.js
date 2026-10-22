@@ -20,7 +20,9 @@
   }
 
   function apply() {
-    root.setAttribute('data-theme', effectiveTheme());
+    // data-theme-lock：窗口可固定为浅色 / 深色（独立文件窗口固定浅色、纯白底）。
+    const lock = root.getAttribute('data-theme-lock');
+    root.setAttribute('data-theme', lock === 'light' || lock === 'dark' ? lock : effectiveTheme());
     if (settings.accent) root.style.setProperty('--color-accent', settings.accent);
   }
 

@@ -87,7 +87,12 @@ const api = {
     setBallPin: (value) => ipcRenderer.invoke(IPC.TERMINAL_BALL_PIN, { value }),
   },
   sftp: {
-    connect: (target) => ipcRenderer.invoke(IPC.SFTP_CONNECT, { target }),
+    // target: ssh 目标 token（兼容旧调用）或完整连接参数对象
+    // { target, username, host, port, auth: 'password'|'key', password, identityFile }。
+    connect: (target, extra) => {
+      const payload = target && typeof target === 'object' ? target : { target };
+      return ipcRenderer.invoke(IPC.SFTP_CONNECT, Object.assign({}, payload, extra || {}));
+    },
     list: (id, path) => ipcRenderer.invoke(IPC.SFTP_LIST, { id, path }),
     download: (id, path) => ipcRenderer.invoke(IPC.SFTP_DOWNLOAD, { id, path }),
     open: (id, path) => ipcRenderer.invoke(IPC.SFTP_OPEN, { id, path }),

@@ -57,7 +57,7 @@
         copyFailed: '复制传输命令失败',
         empty: '空目录',
         loading: '加载中…',
-        connecting: '正在连接 SFTP…',
+        connecting: '正在连接 SFTP：{target}…',
         connected: '已连接 {target}',
         connectFailed: '连接失败：{error}',
         notConnected: '未连接 SFTP',
@@ -104,7 +104,7 @@
         copyFailed: 'Failed to copy transfer command',
         empty: 'Empty directory',
         loading: 'Loading…',
-        connecting: 'Connecting SFTP…',
+        connecting: 'Connecting SFTP: {target}…',
         connected: 'Connected to {target}',
         connectFailed: 'Connect failed: {error}',
         notConnected: 'SFTP not connected',
@@ -257,6 +257,8 @@
     const state = {
       id: '',
       target: '',
+      // 连接参数（target + 手动填写的 user/host/port/auth/key/password，见 file-window.js）
+      connection: { target: '' },
       active: Boolean(opts.active),
       connecting: false,
       connected: false,
@@ -873,10 +875,16 @@
     async function connect() {
       if (!state.target || state.connected || state.connecting) return;
       state.connecting = true;
-      setStatus(i18n.t('filesUi.connecting'), false);
+      const connection = state.connection || {};
+      // 显式填写了地址时按「用户名@地址:端口」输出，便于直接在日志里看到连接参数。
+      const label = connection.host
+        ? `${connection.username ? `${connection.username}@` : ''}${connection.host}` +
+          (Number(connection.port) && Number(connection.port) !== 22 ? `:${connection.port}` : '')
+        : connection.target || state.target || '';
+      setStatus(i18n.t('filesUi.connecting', { target: label || '-' }), false);
       let result = null;
       try {
-        result = await window.ships.sftp.connect(state.target);
+        result = await window.ships.sftp.connect(state.connection);
       } catch (err) {
         result = { ok: false, code: 'connect', error: err.message };
       }
@@ -1112,10 +1120,21 @@
     /* ------------------------------- public ------------------------------- */
     function setTarget(target) {
       const next = String(target || '');
-      if (next === state.target) return;
+      if (next === state.target && state.connection && state.connection.target === next) return;
       state.target = next;
+      state.connection = { target: next };
       resetConnection();
       if (state.active && state.target) connect();
+    }
+
+    /* 手动连接：payload = { target, username, host, port, auth, password, identityFile }。
+       即使 target 相同也重新连接（连接按钮 / 下拉重新选择）。 */
+    function connectWith(connection) {
+      const next = typeof connection === 'string' ? { target: connection } : Object.assign({}, connection || {});
+      state.target = String(next.target || '');
+      state.connection = next;
+      resetConnection();
+      if (state.active) connect();
     }
 
     function activate() {
@@ -1190,6 +1209,7 @@
     return {
       element: wrap,
       setTarget,
+      connectWith,
       activate,
       setLayout,
       followCd,

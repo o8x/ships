@@ -13,6 +13,7 @@ const {
   CENTER_SNAP,
   VIBRANCY,
   IPC,
+  SPACE_CONFIRM_DELAY_MS,
 } = require('../shared/constants');
 const settings = require('./services/settings-service');
 const { TERMINAL_WINDOW_FILE, FILE_WINDOW_FILE, MAIN_WINDOW_FILE } = require('./utils/paths');
@@ -372,6 +373,7 @@ function destroyTerminalWindow(target) {
     win.__boundsTimer = null;
   }
   saveTerminalGeometry(win);
+  logTerminalSpace(win, 'close');
   win.destroy();
 }
 
@@ -432,30 +434,78 @@ function isBallMode(win) {
   return Boolean(win && !win.isDestroyed() && win.__ballActive);
 }
 
-/* 记录窗口此刻所在的 Space（打开 / 获得焦点 / 从球放大回来时）。读取失败保留旧值。 */
+/* 记录窗口此刻所在的 Space（打开 / 从球放大回来时）。读取失败保留旧值，并把 Promise 挂在窗口上，
+   供缩球前的检测等待「打开时的那次读取」完成。 */
 function rememberTerminalSpace(win) {
-  if (!isTerminalWindow(win)) return;
+  if (!isTerminalWindow(win)) return Promise.resolve('');
   const token = (win.__spaceToken || 0) + 1;
   win.__spaceToken = token;
-  spaceService.currentSpaces().then((signature) => {
-    if (!signature || !isTerminalWindow(win) || win.__spaceToken !== token) return;
+  const promise = spaceService.currentSpaces().then((signature) => {
+    if (!signature || !isTerminalWindow(win) || win.__spaceToken !== token) return '';
     win.__spaceId = signature;
-  });
+    return signature;
+  }).catch(() => '');
+  win.__spacePromise = promise;
+  return promise;
 }
 
-/* 当前 Space 是否已从记录值切走。没记录 / 读取失败时返回 null（保持原有缩球行为）；
-   切走时返回 { from, to }（from = 记录的原桌面，to = 当前桌面），供日志打印。 */
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/* 当前 Space 是否已从记录值切走。**宁可保守，不确定就不缩球**：
+   - 没有记录 / 读取失败 → 返回 { unknown: true }（调用方保持窗口原样）；
+   - 第一次读到与记录一致后，延迟 SPACE_CONFIRM_DELAY_MS 再读一次做确认——Space 刚切换时
+     `com.apple.spaces` 可能还返回旧值，只读一次会把「切走了」误判成「没切」；
+   - 两次读到相同才返回 null（允许缩球）。 */
 async function detectSpaceChange(win) {
-  const from = win.__spaceId || '';
-  if (!from) return null;
-  const to = await spaceService.currentSpaces();
-  if (!to || to === from) return null;
-  return { from, to };
+  let from = win.__spaceId || '';
+  if (!from && win.__spacePromise) {
+    try {
+      from = (await win.__spacePromise) || '';
+    } catch (err) {
+      from = '';
+    }
+  }
+  if (!from) return { from: '', to: '', unknown: true };
+
+  const first = await spaceService.currentSpaces();
+  if (!first) return { from, to: '', unknown: true };
+  logger.debug(`[space] shrink check (${win.id}) from=${from} first=${first}`);
+  if (first !== from) return { from, to: first };
+
+  await delay(SPACE_CONFIRM_DELAY_MS);
+  if (!isTerminalWindow(win) || win.isDestroyed()) return { from, to: '', unknown: true };
+  const second = await spaceService.currentSpaces();
+  if (!second) return { from, to: '', unknown: true };
+  logger.debug(`[space] shrink check (${win.id}) from=${from} first=${first} second=${second}`);
+  if (second !== from) return { from, to: second };
+  return null;
 }
 
 function logSpaceChange(win, change) {
+  if (change.unknown) {
+    logger.file(
+      `[terminal] keep window: space unknown (${win.id}) from=${change.from || 'unknown'}`
+    );
+    return;
+  }
   logger.file(
     `[terminal] keep window: space changed (${win.id}) from=${change.from || 'unknown'} to=${change.to || 'unknown'}`
+  );
+}
+
+/* 把窗口此刻所在桌面写进日志：终端窗口打开 / 关闭 / 缩成悬浮球 / 从悬浮球展开时各记一次。 */
+function logTerminalSpace(win, action) {
+  if (!win) return;
+  const id = win.id;
+  spaceService.currentSpaces().then(
+    (signature) => {
+      logger.file(`[terminal] ${action} (${id}) space=${signature || 'unknown'}`);
+    },
+    () => {
+      logger.file(`[terminal] ${action} (${id}) space=unknown`);
+    }
   );
 }
 
@@ -485,6 +535,7 @@ async function shrinkTerminalToBall(win) {
   }
   if (!isTerminalWindow(win) || win.isDestroyed()) return false;
   win.hide();
+  logTerminalSpace(win, 'hide');
   return true;
 }
 
@@ -546,6 +597,7 @@ function enterBallMode(win) {
     win.webContents.send(IPC.TERMINAL_BALL, { active: true, size, phase: 'settle' });
   }, Math.round(BALL_ANIM_MS * 0.6));
   logger.file(`[terminal] entered ball mode (${win.id}) size=${size}`);
+  logTerminalSpace(win, 'ball');
 }
 
 function exitBallMode(win, focus) {
@@ -582,6 +634,7 @@ function exitBallMode(win, focus) {
     if (focus !== false) win.focus();
     rememberTerminalSpace(win);
     logger.file(`[terminal] exited ball mode (${win.id})`);
+    logTerminalSpace(win, 'expand');
   }, BALL_ANIM_MS);
 }
 
@@ -1246,6 +1299,9 @@ function openTerminalWindow() {
   });
   terminalWindows.add(win);
   lastTerminalWindow = win;
+  // 创建时（页面还没加载完、窗口尚未 show）就读取并记录所在 Space：读取值代表「打开时」的桌面，
+  // 避免 ready-to-show / focus 时用户已切换桌面，把切换后的桌面误记成原桌面。
+  rememberTerminalSpace(win);
   const ownerId = win.webContents.id;
 
   // Pinching / Cmd+wheel must not scale the page (title bar + icons); the terminal
@@ -1283,8 +1339,9 @@ function openTerminalWindow() {
     // 会重置为默认的「固定在本桌面」）。之后变球时不再动它，避免球跟着切换桌面。
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
     win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
-    // 此刻窗口就在活动桌面上 → 记录它所在的 Space，供失焦时判断用户是否切了桌面。
-    rememberTerminalSpace(win);
+    // 注意：**不要**在这里重新记录 Space。切桌面时窗口可能被系统短暂带到新桌面并重新获得焦点，
+    // 若在 focus 时覆盖记录，检测就会把「已切走」误判成「没切」→ 仍然缩球。
+    // 记录只取窗口创建时那一次（见 openTerminalWindow 中的 rememberTerminalSpace 调用）。
   });
   // 失去焦点 → 延迟后缩成圆形悬浮球（延时内焦点回来则取消；DevTools 打开 / iTerm 交接时不动）。
   win.on('blur', () => {
@@ -1311,8 +1368,8 @@ function openTerminalWindow() {
   // 实际生效的几何（恢复时可能被夹取过）也记下来，保证记忆与窗口一致。
   scheduleTerminalGeometrySave(win);
   win.once('ready-to-show', () => {
-    // 打开时记录当前 Space（随后的 focus 会再记一次，以最后一次为准）。
-    rememberTerminalSpace(win);
+    // Space 已在窗口创建时记录（见 rememberTerminalSpace 调用处），这里只记录打开事件。
+    logTerminalSpace(win, 'open');
     win.show();
     win.focus();
     win.webContents.send(IPC.TERMINAL_FOCUS_INPUT);

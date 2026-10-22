@@ -228,6 +228,11 @@ const CENTER_SNAP = {
   xRelease: 26,
 };
 
+// 缩成悬浮球前二次确认「当前 Space 是否已切换」的等待时间（ms）。
+// 切换 Space 后 `defaults export com.apple.spaces` 可能短暂仍返回旧值，只读一次会把
+// 「刚切走」误判成「没切」；多等一会儿再读一次可避免误缩球。
+const SPACE_CONFIRM_DELAY_MS = 150;
+
 // 日志保留天数（按天写文件，惰性删除更早的日志）。
 const LOG_RETENTION_DAYS = Number.isFinite(appConfig.logRetentionDays) ? appConfig.logRetentionDays : 7;
 
@@ -308,6 +313,7 @@ module.exports = {
   UPDATE_COUNTDOWN_SECONDS,
   SHORTCUT_DOUBLE_TAP_MS,
   CENTER_SNAP,
+  SPACE_CONFIRM_DELAY_MS,
   LOG_RETENTION_DAYS,
   CD_HISTORY_MAX,
   VIBRANCY,

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh" data-theme="light">
+<html lang="zh" data-theme="light" data-theme-lock="light">
   <head>
     <meta charset="utf-8" />
     <meta
@@ -11,13 +11,14 @@
     <link rel="stylesheet" href="./styles/tailwind.build.css" />
   </head>
   <body class="term-window file-window bg-transparent">
-    <div class="flex h-full w-full flex-col overflow-hidden" style="background: var(--color-bg)">
-      <!-- 原生标题栏 / 红绿灯由系统提供；这里只放 SSH 下拉工具栏 -->
+    <div class="flex h-full w-full flex-col overflow-hidden" style="background: var(--file-window-bg)">
+      <!-- 原生标题栏 / 红绿灯由系统提供；左侧是平铺的 SSH 连接表单（保存主机 / 用户名 / 地址 / 端口 / 认证 / 连接） -->
       <header
         id="file-toolbar"
-        class="flex shrink-0 items-center justify-end gap-2 px-3"
-        style="height: 32px; border-bottom: 1px solid var(--color-border)"
+        class="flex shrink-0 items-center gap-2 px-3"
+        style="min-height: 38px; border-bottom: 1px solid var(--color-border)"
       >
+        <div id="file-ssh-form" class="file-conn-form"></div>
         <div id="file-actions" class="flex shrink-0 items-center"></div>
       </header>
       <main id="file-root" class="fm-root min-h-0 flex-1"></main>

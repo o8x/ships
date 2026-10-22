@@ -30,7 +30,7 @@ function registerSftpIpc(ipcMain) {
 
   ipcMain.handle(IPC.SFTP_CONNECT, (event, payload) => {
     if (!isAllowedSender(event)) return { ok: false, error: 'forbidden' };
-    return sftp.connect(payload && payload.target, event.sender.id);
+    return sftp.connect(payload, event.sender.id);
   });
 
   ipcMain.handle(IPC.SFTP_LIST, (event, payload) => {

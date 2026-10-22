@@ -1,13 +1,16 @@
 'use strict';
 
 // 读取 macOS 当前 Space（Mission Control 桌面）。
-// 直接解析 com.apple.spaces（经 cfprefsd 取实时值），把每块显示器上的
-// "Current Space" uuid 排序拼成一个可比较的签名（多显示器时任一屏幕切换都会变）。
+// 优先调用 src/main/scripts/space-bridge.py（Python ctypes → SkyLight 私有 API
+// `CGSCopyManagedDisplaySpaces`），拿到 WindowServer 的实时值；失败时回退到解析
+// com.apple.spaces（`defaults export` 经 cfprefsd，切换 Space 后可能短暂仍是旧值）。
 //
-// 用途（见 window-manager）：终端窗口打开 / 获得焦点时记录当前 Space；
+// 用途（见 window-manager）：终端窗口创建 / 从球展开时记录当前 Space；
 // 失焦准备缩成悬浮球时，若当前 Space 已变（用户切了桌面），就不缩球、保持终端窗口原样。
 
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 const logger = require('../utils/logger');
 
 const SPACES_DOMAIN = 'com.apple.spaces';
@@ -15,8 +18,56 @@ const DEFAULTS_BIN = '/usr/bin/defaults';
 const PLUTIL_BIN = '/usr/bin/plutil';
 // `defaults export` + `plutil` 都是本地小命令，正常几十毫秒；超时按读取失败处理。
 const QUERY_TIMEOUT_MS = 1500;
+// CGS 读取走 python3（与终端 PTY 桥相同的候选路径）；超时同样按失败回退。
+const PYTHON_CANDIDATES = ['/usr/bin/python3', '/opt/homebrew/bin/python3', '/usr/local/bin/python3'];
+
+/* Packaged builds keep the app source inside app.asar; scripts are extracted to
+   app.asar.unpacked (see build.asarUnpack), so rewrite the path when needed. */
+function unpackedPath(file) {
+  const marker = `${path.sep}app.asar${path.sep}`;
+  return file.includes(marker) ? file.replace(marker, `${path.sep}app.asar.unpacked${path.sep}`) : file;
+}
+
+const BRIDGE = unpackedPath(path.join(__dirname, '..', 'scripts', 'space-bridge.py'));
+
+function pythonBinary() {
+  const override = String(process.env.VESSEL_PYTHON || process.env.SHIPS_PYTHON || '').trim();
+  if (override) return override;
+  for (const candidate of PYTHON_CANDIDATES) {
+    try {
+      if (fs.existsSync(candidate)) return candidate;
+    } catch (err) {
+      /* ignore */
+    }
+  }
+  return 'python3';
+}
 
 let inflight = null;
+
+/* Live Space signature straight from WindowServer (immediate after switching). */
+function readCgsSignature() {
+  return new Promise((resolve) => {
+    if (!fs.existsSync(BRIDGE)) {
+      resolve(null);
+      return;
+    }
+    execFile(
+      pythonBinary(),
+      [BRIDGE],
+      { timeout: QUERY_TIMEOUT_MS, maxBuffer: 64 * 1024 },
+      (err, stdout) => {
+        if (err) {
+          logger.file(`[space] cgs bridge failed: ${err.message}`);
+          resolve(null);
+          return;
+        }
+        const signature = String(stdout || '').trim();
+        resolve(signature || null);
+      }
+    );
+  });
+}
 
 /* com.apple.spaces → JSON：`defaults export` 从 cfprefsd 读实时 plist，
    `plutil` 只负责转成 JSON（不在主进程手写 plist 解析）。 */
@@ -99,11 +150,12 @@ function signatureOf(parsed) {
   return uuids.join('|');
 }
 
-/* 当前 Space 签名；读取失败 / 结构异常返回 null。并发调用共用同一次读取。 */
+/* 当前 Space 签名；读取失败 / 结构异常返回 null。并发调用共用同一次读取。
+   先问 WindowServer（实时），失败再退回解析 com.apple.spaces（可能滞后）。 */
 function currentSpaces() {
   if (inflight) return inflight;
-  inflight = readSpacesJson()
-    .then((parsed) => signatureOf(parsed))
+  inflight = readCgsSignature()
+    .then((signature) => (signature ? signature : readSpacesJson().then((parsed) => signatureOf(parsed))))
     .catch(() => null)
     .finally(() => {
       inflight = null;

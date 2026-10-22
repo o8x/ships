@@ -1208,11 +1208,129 @@ body.term-window .select-menu .select-group-title {
   overflow: auto;
   padding: 3px 0;
 }
-/* 独立文件窗口：原生标题栏 / 红绿灯，字号固定 15px、行高 32px，不跟随终端设置。 */
+/* 独立文件窗口：原生标题栏 / 红绿灯，字号固定 15px、行高 32px，不跟随终端设置。
+   内容固定纯白底、浅色主题（window-manager 打开的文件窗口不随主界面明暗切换）。 */
 body.file-window {
   --file-font-size: 15px;
   --term-header-font-size: 15px;
   --term-header-height: 32px;
+  background: var(--file-window-bg);
+  color-scheme: light;
+}
+body.file-window .fm-root,
+body.file-window .fm-status {
+  background: var(--file-window-bg);
+}
+
+/* 顶部 SSH 连接表单：主机下拉 + 用户名 / 地址 / 端口 + 密码 / 密钥 + 连接按钮平铺一行。 */
+#file-toolbar {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.file-conn-form {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.file-conn-form .file-conn-select {
+  width: 170px;
+  min-width: 170px;
+  max-width: 220px;
+  height: 26px;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+.file-conn-input {
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--radius-control-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-control);
+  color: var(--color-fg);
+  font-size: 12px;
+  font-family: var(--font-sans);
+}
+.file-conn-input:hover {
+  border-color: var(--color-border-strong);
+}
+.file-conn-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+.file-conn-user {
+  width: 96px;
+  flex: 0 1 96px;
+}
+.file-conn-host {
+  min-width: 110px;
+  max-width: 260px;
+  flex: 1 1 140px;
+}
+.file-conn-port {
+  width: 64px;
+  flex: 0 0 64px;
+}
+.file-conn-form .file-conn-auth {
+  height: 26px;
+  padding: 1px;
+  flex: 0 0 auto;
+}
+.file-conn-form .file-conn-auth button {
+  padding: 0 8px;
+  border-radius: var(--radius-control-sm);
+  font-size: 11px;
+  line-height: 22px;
+}
+.file-conn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 160px;
+}
+.file-conn-secret,
+.file-conn-key {
+  flex: 1 1 auto;
+  min-width: 100px;
+}
+.file-conn-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-control-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-control);
+  color: var(--color-fg-muted);
+  cursor: pointer;
+}
+.file-conn-icon:hover {
+  border-color: var(--color-accent-line);
+  color: var(--color-accent);
+}
+.file-conn-btn {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 14px;
+  border-radius: var(--radius-control-sm);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  font-size: 12px;
+  cursor: pointer;
+}
+.file-conn-btn:hover {
+  filter: brightness(1.06);
+}
+.file-conn-btn:active {
+  filter: brightness(0.94);
 }
 body.file-window .fm-list-head,
 body.file-window .fm-row,

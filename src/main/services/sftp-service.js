@@ -87,6 +87,49 @@ function resolveTarget(target) {
   };
 }
 
+/* 文件窗口可以手动填「用户名 / 地址 / 端口 / 密码或密钥」。显式字段优先于
+   ssh config；`target` 仍可传别名（保留 ProxyJump 等配置解析）。
+   返回统一结构，供连接与会话标识使用。 */
+function resolveConnection(input) {
+  const request = typeof input === 'string' ? { target: input } : input || {};
+  const token = String(request.target || '').trim();
+
+  let base = {};
+  if (token) {
+    base = resolveTarget(token);
+    if (base.error && !(request.host && request.username)) return base;
+    if (base.error) base = {};
+  }
+
+  const host = stripBrackets(String(request.host || base.host || '').trim());
+  if (!host) return { error: 'no-target', target: token };
+
+  const username = String(request.username || base.username || localUsername()).trim();
+  const port = Number(request.port) || Number(base.port) || 22;
+  const password = typeof request.password === 'string' ? request.password : '';
+  const auth =
+    request.auth === 'password' || request.auth === 'key'
+      ? request.auth
+      : password
+        ? 'password'
+        : '';
+  const identityFile =
+    auth === 'password' ? '' : String(request.identityFile || base.identityFile || DEFAULT_IDENTITY);
+  const target = token || (username ? `${username}@${host}` : host);
+
+  return {
+    target,
+    host,
+    port,
+    username,
+    auth,
+    password: auth === 'password' ? password : '',
+    identityFile,
+    alias: base.alias || '',
+    proxyJump: base.proxyJump || '',
+  };
+}
+
 function connectionOptions(resolved) {
   const options = {
     host: resolved.host,
@@ -98,7 +141,9 @@ function connectionOptions(resolved) {
   };
   const agent = sshService.getAgentSocket();
   if (agent) options.agent = agent;
-  const keyPath = expandHome(resolved.identityFile);
+  if (resolved.password) options.password = resolved.password;
+  // 密码模式不读私钥（避免 ssh2 先尝试密钥）；密钥模式读显式 / config / 默认私钥。
+  const keyPath = resolved.auth === 'password' ? '' : expandHome(resolved.identityFile);
   if (keyPath) {
     try {
       if (fs.existsSync(keyPath)) options.privateKey = fs.readFileSync(keyPath);
@@ -109,8 +154,8 @@ function connectionOptions(resolved) {
   return options;
 }
 
-function connect(target, ownerId) {
-  const resolved = resolveTarget(target);
+function connect(input, ownerId) {
+  const resolved = resolveConnection(input);
   if (resolved.error) return Promise.resolve({ ok: false, error: resolved.error, code: resolved.error });
 
   return new Promise((resolve) => {
@@ -137,7 +182,8 @@ function connect(target, ownerId) {
 
     logger.file(
       `[sftp] connecting ${resolved.target} -> ${options.host}:${options.port} ` +
-        `user=${options.username || '-'} key=${options.privateKey ? 'yes' : 'no'} agent=${options.agent ? 'yes' : 'no'}`
+        `user=${options.username || '-'} auth=${resolved.auth || (options.privateKey ? 'key' : 'auto')} ` +
+        `key=${options.privateKey ? 'yes' : 'no'} agent=${options.agent ? 'yes' : 'no'}`
     );
 
     client.on('ready', () => {
