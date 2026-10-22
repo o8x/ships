@@ -750,9 +750,16 @@ input[type='color'].swatch::-webkit-color-swatch {
   align-items: center;
   justify-content: center;
   line-height: 1;
-  font-family: var(--font-mono);
+  box-sizing: border-box;
+  max-width: 88%;
+  padding: calc(var(--term-ball-size, 90px) * 0.06) calc(var(--term-ball-size, 90px) * 0.12);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-fg);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  font-family: var(--term-font-family, var(--font-mono));
   white-space: nowrap;
-  color: var(--term-ball-border-color);
   user-select: none;
   -webkit-user-select: none;
 }
@@ -855,9 +862,6 @@ input[type='color'].swatch::-webkit-color-swatch {
 }
 :root[data-ball-transparent='on'][data-ball-drag='on'] #term-ball {
   background: var(--ball-drag-bg);
-}
-:root[data-ball-transparent='on'] .term-ball-timer {
-  color: var(--color-fg-muted);
 }
 @keyframes ships-ball-in {
   from {
@@ -1203,6 +1207,17 @@ body.term-window .select-menu .select-group-title {
   min-height: 0;
   overflow: auto;
   padding: 3px 0;
+}
+/* 独立文件窗口：原生标题栏 / 红绿灯，字号固定 15px、行高 32px，不跟随终端设置。 */
+body.file-window {
+  --file-font-size: 15px;
+  --term-header-font-size: 15px;
+  --term-header-height: 32px;
+}
+body.file-window .fm-list-head,
+body.file-window .fm-row,
+body.file-window .fm-tree-row {
+  height: 32px;
 }
 .fm-tree-row {
   display: flex;

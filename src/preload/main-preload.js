@@ -80,6 +80,7 @@ const api = {
     onData: (cb) => on(IPC.TERMINAL_DATA, cb),
     onExit: (cb) => on(IPC.TERMINAL_EXIT, cb),
     onSession: (cb) => on(IPC.TERMINAL_SESSION, cb),
+    setBallActive: (active) => ipcRenderer.send(IPC.TERMINAL_BALL_ACTIVE, { active }),
     onBall: (cb) => on(IPC.TERMINAL_BALL, cb),
     ballDrag: (payload) => ipcRenderer.send(IPC.TERMINAL_BALL_DRAG, payload),
     restoreBall: () => ipcRenderer.invoke(IPC.TERMINAL_BALL_RESTORE),

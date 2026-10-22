@@ -99,6 +99,7 @@
   let filesApi = null;
   // 悬浮球模式（失去焦点缩成圆形小窗；期间不 fit、不把尺寸同步给 PTY）
   let ballMode = false;
+  let commandBusy = false;
   // 「固定」：开启后本窗口失焦不缩成悬浮球（仅当前窗口，默认关，不持久）
   let ballPinned = false;
 
@@ -545,6 +546,8 @@
       return;
     }
     sessionId = result.id;
+    ballElapsedAccum = 0;
+    syncBallClock();
     sshTarget = '';
     if (filesApi) filesApi.setSshTarget('');
     // the PTY was created with the current size: remember it so we do not resize again
@@ -610,6 +613,9 @@
 
   async function refreshSshPicker() {
     if (!sshPicker) return;
+    if (typeof sshPicker.setPlaceholder === 'function') {
+      sshPicker.setPlaceholder(i18n.t('terminalWin.sshPlaceholder'));
+    }
     let hosts = [];
     try {
       const result = await window.ships.ssh.list();
@@ -711,11 +717,14 @@
     if (!message || message.id !== sessionId) return;
     sshTarget = message.target || '';
     if (filesApi) filesApi.setSshTarget(sshTarget);
+    applyCommandBusy(message.busy);
   });
   const offExit = window.ships.terminal.onExit((message) => {
     if (!message || message.id !== sessionId) return;
     sessionId = '';
     sshTarget = '';
+    ballElapsedAccum = 0;
+    syncBallClock();
     if (filesApi) filesApi.setSshTarget('');
     if (message.type === 'error') {
       // 启动失败：留在窗口里显示原因（否则用户看不到是为什么）。
@@ -880,14 +889,15 @@
     return /ms$/.test(raw) ? value : value * 1000;
   }
   let ballBounceOn = false; // 是否正在播放弹跳
-  let ballBounceStartedAt = 0; // 本轮播放起始时间（算相位与累计时长）
+  let ballBounceStartedAt = 0; // 本轮播放起始时间（算相位与当前段时长）
+  let ballElapsedAccum = 0; // 之前各段弹跳累计的毫秒数（跨球/窗口切换保留，会话重启清零）
   let ballIdleTimer = null; // 无输出满 2s 的计时
   let ballSettleTimer = null; // 「走到循环边界再停」的计时
   let ballHovered = false; // 鼠标是否悬停在球上（由 pointerenter/leave 维护，不依赖 :hover 轮询）
   let ballClockRaf = null; // 悬停显示时的刷新帧（只在可见时运行）
-  // 本轮累计跳动时长（自开始跳动起）；停止跳动即清空（见 pauseBallBounce）。
+  // 自本次会话开始的累计活动时长；暂停弹跳 / 打开终端不会清零。
   function ballElapsedMs() {
-    return ballBounceOn ? Math.max(0, performance.now() - ballBounceStartedAt) : 0;
+    return ballElapsedAccum + (ballBounceOn ? Math.max(0, performance.now() - ballBounceStartedAt) : 0);
   }
   // 拆成上行 h/m（非 0 才显示，均不补前导 0）与下行 s（同样不补前导 0：5s 而非 05s）。
   function formatBallClock(ms) {
@@ -904,17 +914,17 @@
       document.documentElement.dataset.ballTimer = next;
     }
   }
-  // 悬停在球上且正在跳动 → 逐帧刷新累计时长；否则隐藏（垃圾桶状态下不显示）。
+  // 悬停在球上 → 显示累计活动时长（即使当前没有跳动也保留累计值）；垃圾桶状态下不显示。
   function tickBallClock() {
     ballClockRaf = null;
-    const show =
-      ballBounceOn && ballHovered && document.documentElement.dataset.ballTrash !== 'on';
+    const show = ballHovered && document.documentElement.dataset.ballTrash !== 'on';
     setBallTimerVisible(show);
     if (!show) return;
     const clock = formatBallClock(ballElapsedMs());
     if (ballTimerHmEl) ballTimerHmEl.textContent = clock.hm;
     if (ballTimerSEl) ballTimerSEl.textContent = clock.s;
-    ballClockRaf = requestAnimationFrame(tickBallClock);
+    // 只有跳动时时间才在增长；停止跳动后只显示静态累计值，不再逐帧刷新。
+    if (ballBounceOn) ballClockRaf = requestAnimationFrame(tickBallClock);
   }
   function syncBallClock() {
     if (ballClockRaf == null) tickBallClock();
@@ -927,16 +937,17 @@
     syncBallClock();
   }
   function pauseBallBounce() {
+    if (ballBounceOn) {
+      ballElapsedAccum += Math.max(0, performance.now() - ballBounceStartedAt);
+    }
     if (ballEl) ballEl.classList.remove('term-ball-bounce');
     ballBounceOn = false;
-    // 停止跳动 → 清空计时器与显示。
     if (ballClockRaf != null) {
       cancelAnimationFrame(ballClockRaf);
       ballClockRaf = null;
     }
-    if (ballTimerHmEl) ballTimerHmEl.textContent = '';
-    if (ballTimerSEl) ballTimerSEl.textContent = '';
-    setBallTimerVisible(false);
+    // 保留累计值；悬停时继续显示静态时间。
+    syncBallClock();
   }
   function pulseBall() {
     if (!ballMode || !ballEl) return;
@@ -952,6 +963,8 @@
   function onBallIdle() {
     ballIdleTimer = null;
     if (!ballBounceOn) return;
+    // 前台命令仍在运行（即使没有输出）→ 继续跳动。
+    if (commandBusy) return;
     // 等当前循环走完（回到 translateY(0)）再停，避免停在半空 / 顶部 / 底部显得「卡」。
     const duration = ballBounceDurationMs();
     const phase = (performance.now() - ballBounceStartedAt) % duration;
@@ -962,6 +975,27 @@
       pauseBallBounce();
     }, wait);
   }
+  function applyCommandBusy(busy) {
+    const next = Boolean(busy);
+    if (next === commandBusy) return;
+    commandBusy = next;
+    if (commandBusy) {
+      if (ballSettleTimer) {
+        clearTimeout(ballSettleTimer);
+        ballSettleTimer = null;
+      }
+      clearTimeout(ballIdleTimer);
+      ballIdleTimer = null;
+      if (ballMode) startBallBounce();
+      return;
+    }
+    // 命令结束：等 2s 无输出再停（若还有输出，pulseBall 会重置计时）。
+    if (ballMode && ballBounceOn) {
+      clearTimeout(ballIdleTimer);
+      ballIdleTimer = setTimeout(onBallIdle, BALL_IDLE_STOP_MS);
+    }
+  }
+
   function stopBallPulse() {
     if (ballIdleTimer) {
       clearTimeout(ballIdleTimer);
@@ -1046,6 +1080,8 @@
   window.ships.terminal.onBall((payload) => {
     const active = Boolean(payload && payload.active);
     const phase = (payload && payload.phase) || 'settle';
+    // 仅球真正显示时启用主进程的前台命令检测。
+    window.ships.terminal.setBallActive(active && phase !== 'enter');
     const size = payload && payload.size;
     const duration = (payload && payload.duration) || 0;
     const scaleX = (payload && payload.scaleX) || 1;
@@ -1061,6 +1097,7 @@
       ballMode = true;
       resetBallShellScale();
       document.documentElement.dataset.ball = 'on';
+      if (commandBusy) startBallBounce();
     } else if (phase === 'grow') {
       // 放大：窗口已还原，终端先按球大小显示，再 CSS 放大到 1。
       ballMode = true;

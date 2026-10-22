@@ -24,17 +24,20 @@ function basename(command) {
   return slash >= 0 ? first.slice(slash + 1) : first;
 }
 
-/* Build a map of parent pid → [{ pid, command }] from `ps -A -o pid=,ppid=,command=`. */
+/* Build a map of parent pid → [{ pid, ppid, pgid, tpgid, command }] from
+   `ps -A -o pid=,ppid=,pgid=,tpgid=,command=`. */
 function buildTree(psOutput) {
   const byParent = new Map();
   for (const line of String(psOutput || '').split('\n')) {
-    const match = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line);
+    const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(-?\d+)\s+(.*)$/.exec(line);
     if (!match) continue;
     const pid = Number(match[1]);
     const ppid = Number(match[2]);
-    const command = match[3];
+    const pgid = Number(match[3]);
+    const tpgid = Number(match[4]);
+    const command = match[5];
     if (!byParent.has(ppid)) byParent.set(ppid, []);
-    byParent.get(ppid).push({ pid, command });
+    byParent.get(ppid).push({ pid, ppid, pgid, tpgid, command });
   }
   return byParent;
 }
@@ -77,4 +80,17 @@ function sshTargetUnder(tree, rootPid) {
   return '';
 }
 
-module.exports = { buildTree, sshDestination, sshTargetUnder, _basename: basename };
+/* Whether the session is running a foreground command. The shell is the root's
+   direct child; when a command runs, the terminal foreground process group (tpgid)
+   differs from the shell's own process group. Background jobs alone don't count. */
+function terminalBusyUnder(tree, rootPid) {
+  const root = Number(rootPid);
+  if (!tree || !Number.isFinite(root)) return false;
+  const shell = (tree.get(root) || [])[0];
+  if (!shell) return false;
+  if (shell.tpgid > 0 && shell.pgid > 0) return shell.tpgid !== shell.pgid;
+  // No controlling-terminal info: fall back to "has a running child".
+  return (tree.get(shell.pid) || []).length > 0;
+}
+
+module.exports = { buildTree, terminalBusyUnder, sshDestination, sshTargetUnder, _basename: basename };

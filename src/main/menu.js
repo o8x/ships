@@ -29,7 +29,8 @@ function applyZoom(direction, contents) {
 
   const fileWin = wm.getFileWindow();
   if (fileWin && fileWin.webContents === target) {
-    target.send(IPC.FILE_WINDOW_ZOOM, direction);
+    // 独立文件窗口不支持 Cmd +/- 缩放（字体 / 窗口均固定）。
+    target.setZoomLevel(0);
     return;
   }
 

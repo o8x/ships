@@ -404,6 +404,10 @@ window.ShipsUI = (function createUI() {
         items = next.slice();
         syncLabel();
       },
+      setPlaceholder(text) {
+        options.placeholder = String(text || '');
+        syncLabel();
+      },
       close,
     };
   }

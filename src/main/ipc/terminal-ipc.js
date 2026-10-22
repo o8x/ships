@@ -98,7 +98,7 @@ function registerTerminalIpc(ipcMain) {
         sessionByOwner.delete(ownerId);
       }
       baseEmit(message);
-    });
+    }, ownerId);
     if (isOverlaySender(event)) {
       sessionByOwner.set(ownerId, started.id);
       const pending = pendingByOwner.get(ownerId);
@@ -146,6 +146,10 @@ function registerTerminalIpc(ipcMain) {
   });
 
   /* 打开内嵌文件面板时把本窗口「只放大不缩小」到至少给定内容尺寸（保证文件管理空间）。 */
+  ipcMain.on(IPC.TERMINAL_BALL_ACTIVE, (event, payload) => {
+    terminal.setBallActive(event.sender.id, Boolean(payload && payload.active));
+  });
+
   ipcMain.handle(IPC.TERMINAL_ENSURE_SIZE, (event, payload) => {
     if (!isOverlaySender(event)) return { ok: false };
     return wm.ensureTerminalContentSize(wm.getTerminalWindowForWebContents(event.sender.id), payload || {});

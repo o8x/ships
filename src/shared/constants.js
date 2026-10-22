@@ -87,6 +87,7 @@ const IPC = {
   TERMINAL_DATA: 'terminal:data',
   TERMINAL_EXIT: 'terminal:exit',
   TERMINAL_SESSION: 'terminal:session',
+  TERMINAL_BALL_ACTIVE: 'terminal:ball-active',
   TERMINAL_COPY_TEXT: 'terminal:copy-text',
   TERMINAL_PASTE_TEXT: 'terminal:paste-text',
   TERMINAL_BALL: 'terminal:ball',
@@ -197,7 +198,7 @@ const FILE_WINDOW = Object.assign(
     height: 600,
     minWidth: 480,
     minHeight: 320,
-    alwaysOnTop: true,
+    alwaysOnTop: false,
   },
   appConfig.fileWindow || {}
 );

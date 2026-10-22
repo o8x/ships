@@ -1132,6 +1132,7 @@
     }
 
     function destroy() {
+      if (offSettings) offSettings();
       if (offProgress) offProgress();
       closeContextMenu();
       closeHistoryMenu();
@@ -1159,7 +1160,44 @@
       applyLayout();
     }
 
-    return { element: wrap, setTarget, activate, setLayout, followCd, openPath, destroy, isConnected: () => state.connected };
+    /* 语言切换时更新静态文案（列头 / 路径占位 / 按钮提示），动态列表内容保持原样。 */
+    let managerLocale = null;
+    function applyLocale() {
+      const setText = (selector, value) => {
+        const node = listHead.querySelector(selector);
+        if (node) node.textContent = value;
+      };
+      setText('.fm-head-name .fm-head-label', i18n.t('filesUi.name'));
+      setText('.fm-head-size .fm-head-label', i18n.t('filesUi.size'));
+      setText('.fm-head-perm .fm-head-label', i18n.t('filesUi.perm'));
+      setText('.fm-head-time .fm-head-time-label', i18n.t('filesUi.time'));
+      pathInput.placeholder = i18n.t('filesUi.pathPlaceholder');
+      refreshBtn.setAttribute('data-tip', i18n.t('filesUi.refresh'));
+      homeBtn.setAttribute('data-tip', i18n.t('filesUi.home'));
+      if (popBtn) popBtn.setAttribute('data-tip', i18n.t('filesUi.popOut'));
+    }
+
+    const offSettings = window.ships.onSettingsChanged
+      ? window.ships.onSettingsChanged((next) => {
+          const locale = (next && next.locale) || 'zh';
+          if (locale === managerLocale) return;
+          managerLocale = locale;
+          i18n.setLocale(locale);
+          applyLocale();
+        })
+      : null;
+
+    return {
+      element: wrap,
+      setTarget,
+      activate,
+      setLayout,
+      followCd,
+      openPath,
+      applyLocale,
+      destroy,
+      isConnected: () => state.connected,
+    };
   }
 
   window.ShipsFileManager = { create, DEFAULT_LAYOUT, _joinPath: joinPath };

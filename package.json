@@ -76,7 +76,7 @@
       "height": 600,
       "minWidth": 480,
       "minHeight": 320,
-      "alwaysOnTop": true
+      "alwaysOnTop": false
     },
     "updateWindow": {
       "width": 380,

@@ -4,7 +4,6 @@
    connection (independent of the terminal window), plus the shared file manager. */
 
 (function bootstrapFileWindow() {
-  const { Icons } = window.ShipsUI;
   const i18n = window.ShipsI18n;
 
   i18n.extend({
@@ -24,57 +23,20 @@
     },
   });
 
-  // 独立文件窗口字号最小值 13px：终端字体更小时不再跟随（需求）。
-  const C = window.ShipsConstants || {};
-  const FONT_DEFAULT = 13;
-  const FONT_MIN = 13;
-  const FONT_MAX = C.TERMINAL_FONT_MAX || 64;
-  const HEADER_FONT_MIN = C.TERMINAL_HEADER_FONT_MIN || 10;
-  const HEADER_FONT_MAX = C.TERMINAL_HEADER_FONT_MAX || 20;
-  const HEADER_HEIGHT_MIN = C.TERMINAL_HEADER_HEIGHT_MIN || 16;
-  const HEADER_HEIGHT_MAX = C.TERMINAL_HEADER_HEIGHT_MAX || 32;
-
-  const lightClose = document.getElementById('light-close');
-  const lightMinimize = document.getElementById('light-minimize');
-  const lightZoom = document.getElementById('light-zoom');
+  // 独立文件窗口使用**原生标题栏 / 红绿灯**（见 window-manager），字号固定 15px，
+  // 不再跟随终端设置，也不支持 Cmd +/- 缩放（字号变量见 styles/tailwind.css 的 body.file-window）。
   const actions = document.getElementById('file-actions');
   const rootEl = document.getElementById('file-root');
 
-  let fontSize = FONT_DEFAULT;
   let manager = null;
   let picker = null;
   let currentTarget = '';
 
-  function applyFontSize(value) {
-    fontSize = Math.max(FONT_MIN, Math.min(FONT_MAX, value));
-    document.documentElement.style.setProperty('--file-font-size', `${fontSize}px`);
-    const headerFont = Math.max(HEADER_FONT_MIN, Math.min(HEADER_FONT_MAX, fontSize));
-    const headerHeight = Math.max(
-      HEADER_HEIGHT_MIN,
-      Math.min(HEADER_HEIGHT_MAX, Math.round(headerFont * 1.6))
-    );
-    document.documentElement.style.setProperty('--term-header-font-size', `${headerFont}px`);
-    document.documentElement.style.setProperty('--term-header-height', `${headerHeight}px`);
-  }
-
-  function zoomFont(direction) {
-    if (direction === 'reset') fontSize = FONT_DEFAULT;
-    else fontSize = Math.max(FONT_MIN, Math.min(FONT_MAX, fontSize + (direction === 'in' ? 1 : -1)));
-    applyFontSize(fontSize);
-  }
-
-  function renderHeader() {
-    lightClose.innerHTML = Icons.trafficClose(6);
-    lightMinimize.innerHTML = Icons.trafficMinimize(6);
-    lightZoom.innerHTML = Icons.trafficZoom(6);
-  }
-
-  function syncWindowFocus() {
-    document.documentElement.dataset.windowFocus = document.hasFocus() ? 'on' : 'off';
-  }
-
   async function refreshPicker() {
     if (!picker) return;
+    if (typeof picker.setPlaceholder === 'function') {
+      picker.setPlaceholder(i18n.t('fileWin.sshPlaceholder'));
+    }
     let hosts = [];
     try {
       const result = await window.ships.ssh.list();
@@ -148,9 +110,6 @@
     const [settings, info] = await Promise.all([window.ships.getSettings(), window.ships.fileWindow.info()]);
     i18n.setLocale((settings && settings.locale) || 'zh');
     window.ShipsTheme.set(settings || {});
-    renderHeader();
-    fontSize = Math.max(FONT_MIN, Math.min(FONT_MAX, (settings && settings.terminalFontSize) || FONT_DEFAULT));
-    applyFontSize(fontSize);
     setupPicker();
     currentTarget = (info && info.target) || '';
     const startPath = (info && info.path) || '';
@@ -173,22 +132,14 @@
       setTarget(next.target || '');
       if (next.path) manager.openPath(next.path);
     });
-    window.ships.fileWindow.onZoom((direction) => zoomFont(direction));
     window.ships.onSettingsChanged((next) => {
       i18n.setLocale((next && next.locale) || 'zh');
       window.ShipsTheme.set(next || {});
-      renderHeader();
       refreshPicker();
     });
     // 设置页增删改 SSH 主机 / 分组后实时刷新下拉。
     window.ships.ssh.onConfigChanged(() => refreshPicker());
   }
-
-  lightClose.addEventListener('click', () => window.ships.windowControl('close'));
-  lightMinimize.addEventListener('click', () => window.ships.windowControl('minimize'));
-  lightZoom.addEventListener('click', () => window.ships.windowControl('zoom'));
-  window.addEventListener('focus', syncWindowFocus);
-  window.addEventListener('blur', syncWindowFocus);
 
   /* 拖拽窗口后把「文件列表区域」高度收到文件行的整数倍（行高随字号），
      松手（resize 停顿 200ms）时执行，避免底部露出半行。 */
@@ -200,8 +151,7 @@
     let rowHeight = row ? row.getBoundingClientRect().height : 0;
     if (!rowHeight) {
       const root = document.getElementById('file-root');
-      const fs = root ? parseFloat(getComputedStyle(root).fontSize) || 12 : 12;
-      rowHeight = 1.9 * fs;
+      rowHeight = 32;
     }
     if (!rowHeight) return;
     const cs = getComputedStyle(listEl);
@@ -218,7 +168,5 @@
     clearTimeout(snapTimer);
     snapTimer = setTimeout(snapListHeight, 200);
   });
-  syncWindowFocus();
-
   boot().catch((err) => console.error(err));
 })();

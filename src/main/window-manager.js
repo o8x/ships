@@ -1368,8 +1368,6 @@ function openFileWindow(target, pathArg) {
     fileWindowPath = pathArg != null ? String(pathArg || '') : '';
   }
   if (fileWindow && !fileWindow.isDestroyed()) {
-    fileWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-    fileWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
     fileWindow.show();
     fileWindow.focus();
     if (target != null) {
@@ -1387,14 +1385,13 @@ function openFileWindow(target, pathArg) {
     minWidth: FILE_WINDOW.minWidth,
     minHeight: FILE_WINDOW.minHeight,
     title: 'Vessel Files',
-    titleBarStyle: 'hiddenInset',
+    titleBarStyle: 'default',
     backgroundColor: themeBackgroundColor(),
     show: false,
     resizable: true,
     minimizable: true,
     maximizable: true,
     fullscreenable: false,
-    alwaysOnTop: true,
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'main-preload.js'),
       contextIsolation: true,
@@ -1413,16 +1410,11 @@ function openFileWindow(target, pathArg) {
       /* ignore */
     }
   });
-  fileWindow.webContents.on('zoom-changed', (event, zoomDirection) => {
+  fileWindow.webContents.on('zoom-changed', (event) => {
     if (typeof event.preventDefault === 'function') event.preventDefault();
     fileWindow.webContents.setZoomLevel(0);
-    fileWindow.webContents.send(IPC.FILE_WINDOW_ZOOM, zoomDirection === 'in' ? 'in' : 'out');
   });
   applyFileWindowAlwaysOnTop();
-  fileWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
-  if (typeof fileWindow.setWindowButtonVisibility === 'function') {
-    fileWindow.setWindowButtonVisibility(false);
-  }
   fileWindow.loadFile(path.join(RENDERER_DIR, 'file-window.html'));
   fileWindow.on('resize', scheduleFileWindowGeometrySave);
   fileWindow.on('move', scheduleFileWindowGeometrySave);
