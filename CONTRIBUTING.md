@@ -30,8 +30,9 @@ pnpm dist:mac
 
 - Keep changes focused; describe the "why" in the PR.
 - Run `node --check` on any JavaScript you touch.
-- Update `docs/PRD.md` alongside any behaviour change — it is the single source
-  of truth for how the app behaves.
+- Update the PRD alongside any behaviour change — `docs/PRD.md` is the index and
+  each top-level chapter lives in `docs/prd/*.md`; together they are the single
+  source of truth for how the app behaves.
 - Match the existing code style (no bundler; plain ES modules in the renderer,
   CommonJS in the main process; Tailwind for styles; no inline SVG in code).
 

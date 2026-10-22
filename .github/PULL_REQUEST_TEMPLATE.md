@@ -12,6 +12,6 @@
 ## Checklist
 
 - [ ] `node --check` passes on the JavaScript I changed
-- [ ] `docs/PRD.md` is updated for any behaviour change
+- [ ] `docs/PRD.md` (index) and the matching `docs/prd/*.md` chapter are updated for any behaviour change
 - [ ] Commits use a `feat` / `fix` / `chore` prefix and are written in English
 - [ ] No new dependency was added without explaining why
