@@ -89,25 +89,28 @@ function file(...args) {
   if (debugEnabled) console.log(line.trimEnd());
 }
 
+/* 控制台与文件统一格式：`<ISO 时间> [级别] 内容`（file() 的流程日志直接是
+   `<ISO 时间> [模块] 内容`），不再出现没有时间戳的 `[vessel] ...` 行。 */
+function emit(level, writeConsole, args) {
+  const line = appendLine([`[${level}]`, ...args]).trimEnd();
+  writeConsole(line);
+}
+
 function debug(...args) {
   if (!debugEnabled) return;
-  console.log('[vessel][debug]', ...args);
-  appendLine(['[debug]', ...args]);
+  emit('debug', (line) => console.log(line), args);
 }
 
 function info(...args) {
-  console.log('[vessel]', ...args);
-  appendLine(['[info]', ...args]);
+  emit('info', (line) => console.log(line), args);
 }
 
 function warn(...args) {
-  console.warn('[vessel][warn]', ...args);
-  appendLine(['[warn]', ...args]);
+  emit('warn', (line) => console.warn(line), args);
 }
 
 function error(...args) {
-  console.error('[vessel][error]', ...args);
-  appendLine(['[error]', ...args]);
+  emit('error', (line) => console.error(line), args);
 }
 
 /* 设置日志保留天数（来自设置 logRetentionDays）。 */
