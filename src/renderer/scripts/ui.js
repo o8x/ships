@@ -466,6 +466,13 @@ window.ShipsUI = (function createUI() {
 
     document.addEventListener('pointerover', onOver);
     document.addEventListener('pointerout', onOut);
+    // 兜底：点击 / 窗口失焦 / 页面隐藏 / 滚动时立即隐藏，避免目标元素被移除后
+    // 收不到 pointerout 而让提示一直挂在屏幕上。
+    document.addEventListener('pointerdown', hide, true);
+    window.addEventListener('blur', hide);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) hide();
+    });
     window.addEventListener(
       'scroll',
       () => {
