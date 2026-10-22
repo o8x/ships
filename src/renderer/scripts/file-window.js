@@ -48,7 +48,7 @@
     },
   });
 
-  // 独立文件窗口使用**原生标题栏 / 红绿灯**，字号固定 15px，
+  // 独立文件窗口使用**原生标题栏 / 红绿灯**，字号固定 14px，
   // 不再跟随终端设置，也不支持 Cmd +/- 缩放（字号变量见 styles/tailwind.css 的 body.file-window）。
   const formEl = document.getElementById('file-ssh-form');
   const rootEl = document.getElementById('file-root');
@@ -399,31 +399,5 @@
     window.ships.ssh.onConfigChanged(() => refreshPicker());
   }
 
-  /* 拖拽窗口后把「文件列表区域」高度收到文件行的整数倍（行高随字号），
-     松手（resize 停顿 200ms）时执行，避免底部露出半行。 */
-  let snapTimer = null;
-  function snapListHeight() {
-    const listEl = document.querySelector('#file-root .fm-list');
-    if (!listEl) return;
-    const row = listEl.querySelector('.fm-row');
-    let rowHeight = row ? row.getBoundingClientRect().height : 0;
-    if (!rowHeight) {
-      rowHeight = 32;
-    }
-    if (!rowHeight) return;
-    const cs = getComputedStyle(listEl);
-    const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-    const usable = listEl.clientHeight - padY;
-    const leftover = usable - Math.floor(usable / rowHeight) * rowHeight;
-    if (leftover <= 1 || leftover >= rowHeight - 1) return;
-    const desired = Math.round(window.innerHeight - leftover);
-    if (window.ships.fileWindow && typeof window.ships.fileWindow.snapSize === 'function') {
-      window.ships.fileWindow.snapSize(desired);
-    }
-  }
-  window.addEventListener('resize', () => {
-    clearTimeout(snapTimer);
-    snapTimer = setTimeout(snapListHeight, 200);
-  });
   boot().catch((err) => console.error(err));
 })();

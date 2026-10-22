@@ -74,8 +74,8 @@
     "fileWindow": {
       "width": 900,
       "height": 600,
-      "minWidth": 480,
-      "minHeight": 320,
+      "minWidth": 900,
+      "minHeight": 600,
       "alwaysOnTop": false
     },
     "updateWindow": {

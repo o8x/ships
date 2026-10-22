@@ -1208,10 +1208,10 @@ body.term-window .select-menu .select-group-title {
   overflow: auto;
   padding: 3px 0;
 }
-/* 独立文件窗口：原生标题栏 / 红绿灯，字号固定 15px、行高 32px，不跟随终端设置。
+/* 独立文件窗口：原生标题栏 / 红绿灯，字号固定 14px、行高 32px，不跟随终端设置。
    内容固定纯白底、浅色主题（window-manager 打开的文件窗口不随主界面明暗切换）。 */
 body.file-window {
-  --file-font-size: 15px;
+  --file-font-size: 14px;
   --term-header-font-size: 15px;
   --term-header-height: 32px;
   background: var(--file-window-bg);
@@ -1332,6 +1332,18 @@ body.file-window .fm-status {
 .file-conn-btn:active {
   filter: brightness(0.94);
 }
+/* 连接中 / 已连接未修改：按钮禁用并存灰底，避免看起来仍可点击。 */
+.file-conn-btn:disabled {
+  background: var(--color-surface-3);
+  color: var(--color-fg-muted);
+  cursor: not-allowed;
+  filter: none;
+}
+.file-conn-btn:disabled:hover,
+.file-conn-btn:disabled:active {
+  filter: none;
+}
+body.file-window .fm-path-row,
 body.file-window .fm-list-head,
 body.file-window .fm-row,
 body.file-window .fm-tree-row {
