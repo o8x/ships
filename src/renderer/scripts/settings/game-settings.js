@@ -34,7 +34,6 @@
         pcPreset: '恢复 PC 风格（鼠标）',
         traditionalPreset: '恢复传统风格（不使用鼠标）',
         presetHint: '未自定义时默认使用 PC 风格',
-        presetApplied: '已恢复预设',
         engineReset: '恢复该引擎默认',
         resetConfirm: '确认恢复默认？',
         conflict: '该按键已被占用',
@@ -81,7 +80,6 @@
         pcPreset: 'PC preset (mouse)',
         traditionalPreset: 'Traditional preset (keyboard only)',
         presetHint: 'PC preset is used until you customize',
-        presetApplied: 'Preset restored',
         engineReset: 'Reset this engine',
         resetConfirm: 'Reset to defaults?',
         conflict: 'That key is already used',
@@ -436,8 +434,7 @@
       pcPresetBtn,
       traditionalPresetBtn
     );
-    const presetNote = el('div', { class: 'game-settings-note' }, '');
-    commonCard.append(presetRow, presetNote);
+    commonCard.appendChild(presetRow);
     wrap.appendChild(commonCard);
 
     pcPresetBtn.addEventListener('click', () => applyPreset('pc'));
@@ -515,16 +512,7 @@
     async function applyPreset(presetKey) {
       const preset = (constants.keyPresets && constants.keyPresets[presetKey]) || constants.keyPresets.pc;
       const result = await games.setAllKeys(preset.common, preset.engines);
-      if (!result || !result.ok) {
-        presetNote.textContent =
-          result && result.error === 'conflict'
-            ? i18n.t('gamesSettings.conflict')
-            : i18n.t('gamesSettings.saveFailed', { error: (result && result.error) || 'error' });
-        presetNote.classList.add('is-danger');
-        return;
-      }
-      presetNote.textContent = i18n.t('gamesSettings.presetApplied');
-      presetNote.classList.remove('is-danger');
+      if (!result || !result.ok) return;
       for (const key of Object.keys(commonKeys)) delete commonKeys[key];
       Object.assign(commonKeys, preset.common);
       for (const action of constants.commonActions) {
