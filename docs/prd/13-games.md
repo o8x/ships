@@ -85,12 +85,15 @@
 
 - **显示名称**：
   - 直接放在引擎目录下的 ROM：文件名去掉最后一个扩展名，保留 Region / 语言括号等原始信息（例：`Super Mario World (USA)`）；
-  - 放在子目录中的 ROM（`roms/<engine>/<name>/xxx.rom`）：使用**最外层子目录名** `<name>` 作为显示名称；运行时仍加载该目录内的 ROM 文件。
+  - 子目录中**只有 1 个**匹配 ROM（`roms/<engine>/<name>/xxx.rom`）：使用**最外层子目录名** `<name>` 作为显示名称；运行时加载该 ROM。
+  - 子目录中**有多个**匹配 ROM（非 ROM 文件如 `.md` 仍被忽略）：该子目录加载为**独立分类**，分类名为 **`<引擎> - <子目录名>`**（例：`GBC - xxxx`），分类内每个 ROM 以**自己的文件名**（去扩展名）作为显示名称；分类显示数量。
+  - 子目录中没有任何匹配 ROM：忽略，不产生分类。
 - **gameId**：由「引擎 + 显示名称」生成稳定、文件系统安全的标识：
   - `slug` = 显示名称转小写，连续非字母数字字符替换为 `-`，去首尾 `-`，最长 48 字符；为空时用 `game`；
   - `shortHash` = `sha1('<engine>/<ROM 相对引擎目录的路径，含扩展名>')` 的前 8 位十六进制；
   - `gameId = '<engine>-<slug>-<shortHash>'`（例：`sfc-super-mario-world-usa-1a2b3c4d`）；
   - 同一引擎下重名的不同 ROM（不同扩展名）因 hash 不同仍可区分。
+  - 多 ROM 子分类的分类 id 为 `<engine>-section-<sha1(engine/section/目录名) 前 8 位>`，与游戏 id 区分。
 - **注意**：重命名 / 移动 ROM 会生成新的 `gameId`，旧存档目录不会自动跟随；PRD 接受该行为，界面可在右键菜单中提示存档目录位置（后续可选）。
 - `EJS_gameID`：取 `sha1(gameId)` 前 8 位十六进制转无符号整数，用于 EmulatorJS 内部隔离；同一 `gameId` 稳定不变。
 
@@ -119,7 +122,8 @@
 - 内容区纵向滚动；**顶部不显示工具栏与工作目录路径**，也不提供「修改 / 刷新」按钮；**工具标题行右侧**（与剪贴板刷新按钮位置相同）为**搜索框**，窗口模式宽 **350px**、高 **26px**、较标题行上移 **4px**（悬浮模式收窄为 200px，窄窗口自动收缩）；下方展示分类与封面。
 - 进入工具页面时自动扫描一次；主窗口重新获得焦点、工作目录变更时也会自动刷新。
 - 按引擎分类展示；分类顺序见 13.3.1。**只展示有游戏的分类**；全部为空时显示空状态，搜索无结果时显示「没有匹配的游戏」。
-- 分类最上方为 **「最近启动」**（`id: recent`，标题按语言显示「最近启动」/「Recently played」）：仅当存在已启动过的游戏时显示，按 `meta.json` 的 `lastPlayedAt` **倒序**取最近 **8** 个（`GAME_RECENT_LIMIT`，见 `src/shared/game-constants.js`）；同一游戏同时保留在其所属引擎分类中。
+- 分类最上方为 **「最近启动」**（`id: recent`，标题按语言显示「最近启动」/「Recently played」）：仅当存在已启动过的游戏时显示，按 `meta.json` 的 `lastPlayedAt` **倒序**取最近 **8** 个（`GAME_RECENT_LIMIT`，见 `src/shared/game-constants.js`）；同一游戏同时保留在其所属引擎分类或多 ROM 子分类中。
+- 各引擎分类之后紧跟该引擎下的多 ROM 子分类（如 `GBC - xxxx`，按分类名自然排序）。
 - 每个分类为**手风琴**：
   - 分类标题（可点击）：左侧 `caret-right` 图标（展开时旋转 90°）+ 引擎显示名 + 游戏数量（例：`FC · 3`）；
   - 点击标题整体折叠 / 展开；折叠后不渲染该分类的卡片（DOM 清空），展开时重新按需渲染；
@@ -440,7 +444,7 @@
 
 | 通道 | 参数 | 返回 | 说明 |
 | --- | --- | --- | --- |
-| `games:scan` | — | `{ ok, workDir, resolvedWorkDir, isDefault, engines, errors? }` | 扫描工作目录。`engines: [{ id, label, games: [{ id, name, engine, label, romRelativePath, size, mtime, played, coverUrl }] }]`；存在已启动过的游戏时，首项为 `id: recent`（`label` 为空，渲染层按语言显示）的「最近启动」分类，按 `lastPlayedAt` 倒序最多 8 个。只接受来自主窗口的请求。 |
+| `games:scan` | — | `{ ok, workDir, resolvedWorkDir, isDefault, engines, errors? }` | 扫描工作目录。`engines: [{ id, label, games: [{ id, name, engine, label, romRelativePath, size, mtime, played, coverUrl }] }]`（引擎分类之后可跟 `<engine>-section-<hash>` 的多 ROM 子分类）；存在已启动过的游戏时，首项为 `id: recent`（`label` 为空，渲染层按语言显示）的「最近启动」分类，按 `lastPlayedAt` 倒序最多 8 个。只接受来自主窗口的请求。 |
 | `games:open` | `{ gameId }` | `{ ok, error? }` | 打开 / 复用游戏窗口并加载游戏，同时更新该游戏 `meta.json` 的 `lastPlayedAt`。`gameId` 必须存在于最近一次扫描结果。只接受来自主窗口的请求。 |
 | `games:window-info` | — | `{ ok, game, settings: { gameCommonKeys, gameKeymaps, gameHotkeys, gameVolume, gameControlsHidden, hasFdsBios } }` | 游戏窗口启动时读取当前游戏与设置；`hasFdsBios` 表示已配置的 FDS BIOS 当前是否有效；只接受来自游戏窗口的请求。 |
 | `games:save-sram` | `{ gameId, data: Uint8Array \| ArrayBuffer }` | `{ ok, error? }` | 写入 `battery.srm`；`gameId` 必须匹配当前窗口游戏。 |
@@ -574,7 +578,7 @@ flowchart TD
 - [ ] 工作目录切换后可创建 `roms/{fc,gbc,gba,n64,sfc}` 与 `profiles/`，失败有明确提示。
 - [ ] 主界面出现「游戏」TAB；窗口模式 8 列、悬浮模式 4 列；分类标题与封面正确。
 - [ ] sidecar 封面命中与占位封面都正常；无游戏时有空状态；主界面不显示「修改 / 刷新」按钮。
-- [ ] `roms/<engine>/<文件夹>/xxx.rom` 以文件夹名展示并加载目录内 ROM；扩展名大小写不敏感，非本引擎扩展名（`.txt` / `.md` / `.xxx`）被忽略。
+- [ ] `roms/<engine>/<文件夹>/xxx.rom` 单 ROM 子目录以文件夹名展示；多 ROM 子目录生成 `<引擎> - <文件夹>` 独立分类（非 ROM 文件忽略）；扩展名大小写不敏感，非本引擎扩展名（`.txt` / `.md` / `.xxx`）被忽略。
 - [ ] 设置 · 游戏选择 `disksys.rom` 后自动复制到 `<workDir>/bios/disksys.rom`（默认未配置、可清除）；配置后 `.fds` 游戏可正常加载 BIOS，未配置时提示加载失败。
 - [ ] 启动过的游戏出现在顶部「最近启动」分类，最近一次启动的排最前（最多 8 个）；其卡片右上角有强调色圆点，未启动过的没有。
 - [ ] 顶部搜索支持大小写不敏感的模糊匹配，`Esc` 可清空；无匹配时显示空状态。

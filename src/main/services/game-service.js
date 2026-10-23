@@ -142,6 +142,10 @@ function makeGameId(engineId, romKey, name) {
   return `${engineId}-${slugify(label)}-${sha1(`${engineId}/${romKey}`).slice(0, 8)}`;
 }
 
+function makeGroupId(engineId, name) {
+  return `${engineId}-section-${sha1(`${engineId}/section/${name}`).slice(0, 8)}`;
+}
+
 function displayName(fileName) {
   return fileName.slice(0, -path.extname(fileName).length);
 }
@@ -288,7 +292,8 @@ function scanWorkDir() {
       logger.warn(`[games] cannot read ${engineDir}:`, err.message);
     }
     const games = [];
-    const addGame = (romPath, name) => {
+    const groups = [];
+    const addGame = (target, romPath, name) => {
       let stat;
       try {
         stat = fs.statSync(romPath);
@@ -312,7 +317,7 @@ function scanWorkDir() {
         played: playedAt.has(id),
         workDir,
       };
-      games.push(game);
+      target.push(game);
       byId.set(id, game);
     };
     for (const name of names) {
@@ -329,14 +334,31 @@ function scanWorkDir() {
         const roms = [];
         collectRomFiles(full, engine.extensions, roms);
         roms.sort();
-        for (const romPath of roms) addGame(romPath, name);
+        if (roms.length > 1) {
+          const groupGames = [];
+          for (const romPath of roms) {
+            addGame(groupGames, romPath, displayName(path.basename(romPath)));
+          }
+          groupGames.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+          groups.push({
+            id: makeGroupId(engine.id, name),
+            label: `${engine.label} - ${name}`,
+            games: groupGames,
+          });
+        } else if (roms.length === 1) {
+          addGame(games, roms[0], name);
+        }
         continue;
       }
       if (!stat.isFile() || !isRomFile(name, engine.extensions)) continue;
-      addGame(full, displayName(name));
+      addGame(games, full, displayName(name));
     }
     games.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
     engines.push({ id: engine.id, label: engine.label, games: games.map(clientGame) });
+    groups.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' }));
+    for (const group of groups) {
+      engines.push({ id: group.id, label: group.label, games: group.games.map(clientGame) });
+    }
   }
 
   const recent = Array.from(byId.values())
