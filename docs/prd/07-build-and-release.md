@@ -14,8 +14,9 @@
 - **打包配置**（`package.json` 的 `build` 段，electron-builder）：
   - `appId = cn.com.stdout.vessel`，`productName = Vessel`；产物目录 `release/`。**appId 是本地网络授权的键**：更换 appId 会得到一条全新的未授权记录；当前正式 appId 保持为 `cn.com.stdout.vessel`，不要随意改（旧 `com.ships.app` 的授权记录仍在系统里，但不影响新 id）。改名 / 改 id 还会触发 Installer 的重定位行为与「运行实例 id 不一致」，处理步骤见 `docs/FAQ.md` §1。
   - `publish`：`[{ provider: 'github', owner: 'o8x', repo: 'vessel' }]`；macOS 检测更新不依赖 `latest-mac.yml`，使用 `package.json` 的 `vessel.updateRepo`（不会被 electron-builder 裁剪）调用 GitHub Releases API。
-  - `files`：`src/**/*`、`assets/**/*`、`package.json`；依赖由 electron-builder 自动收集（`asar: true`）—— 渲染层直接从 `node_modules/@xterm/…` 加载终端资源，因此 `@xterm/xterm` 与 `@xterm/addon-fit` 放在 `dependencies`（不是 devDependencies）；`electron-updater` 同样放在 `dependencies`。
+  - `files`：`src/**/*`、`assets/**/*`、`package.json`，并排除 `assets/games/**`（调试 ROM / 存档不随应用分发）；依赖由 electron-builder 自动收集（`asar: true`）—— 渲染层直接从 `node_modules/@xterm/…` 加载终端资源，因此 `@xterm/xterm` 与 `@xterm/addon-fit` 放在 `dependencies`（不是 devDependencies）；`electron-updater` 同样放在 `dependencies`。
   - **原生依赖 `electron-liquid-glass`**：N-API 预编译（含 `darwin-arm64` / `darwin-x64`），故 `npmRebuild: false` 无需重编；`build.asarUnpack` 把 `**/*.node` 与 `node_modules/electron-liquid-glass/**` 解包到 `app.asar.unpacked` 供加载（Liquid Glass 仅运行时 macOS 26+ 生效，旧系统由主进程回退）。
+  - **`build.asarUnpack` 另含 `assets/emulatorjs/**`**：EmulatorJS 的 WASM / Worker / 核心压缩包需要真实文件路径；游戏页面通过自定义 `game://` 协议读取这些文件。
   - **`build.asarUnpack` 另含 `src/main/scripts/*`**：`pty-bridge.py` / `space-bridge.py` 要作为文件被 `python3` 打开，而 `app.asar` 是归档不是目录（否则打包后报 `can't open file '…/app.asar/src/main/scripts/pty-bridge.py': [Errno 20] Not a directory`），解包后由 `terminal-service` 把路径改写到 `app.asar.unpacked` 再 `spawn`。
   - `npmRebuild: false`（`ssh2` 使用纯 JS 回退，无需重编原生模块）。
   - `compression: 'maximum'`；`electronLanguages: ['en', 'zh_CN']`（仅保留中英文 Electron 语言包，剔除约 220 个语言包、解包体积减少约 48MB）。

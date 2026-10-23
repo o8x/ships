@@ -6,7 +6,7 @@
 
 | 文件 | 位置 | 结构 | 生命周期 |
 | --- | --- | --- | --- |
-| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/vessel/settings.json`） | `{ locale, theme, accent, launchAtLogin, floatMode, pinWindow, vibrancy, glassOpacity, developerMode, clipboardLimit, clipboardPollMs, terminalShell, terminalFontFamily, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, mainWindowHotkey, terminalHotkey, terminalCloseAction, sshBuiltinTerminal, followSystemProxy, sftpDownloadDir, terminalBallEnabled, terminalBallDelayMs, terminalBallSize, terminalBallIcon, terminalBallDark, terminalBallTransparent, fileWindowAlwaysOnTop, logRetentionDays }` | 持久；重启保留 |
+| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/vessel/settings.json`） | `{ locale, theme, accent, launchAtLogin, floatMode, pinWindow, vibrancy, glassOpacity, developerMode, clipboardLimit, clipboardPollMs, terminalShell, terminalFontFamily, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, mainWindowHotkey, terminalHotkey, terminalCloseAction, sshBuiltinTerminal, followSystemProxy, sftpDownloadDir, terminalBallEnabled, terminalBallDelayMs, terminalBallSize, terminalBallIcon, terminalBallDark, terminalBallTransparent, fileWindowAlwaysOnTop, gameWorkDir, gameCommonKeys, gameKeymaps, gameHotkeys, gameVolume, gameControlsHidden, logRetentionDays }` | 持久；重启保留 |
 | `vessel-YYYY-MM-DD.log` | **macOS：`~/Library/Logs/Vessel/`**（Console.app 的「日志报告」会收录该目录，与 JetBrains/CLion 一致，与用户数据目录分离）；其它平台：`app.getPath('userData')` 的 `logs/` 子目录（`src/main/utils/paths.js` 的 `LOG_DIR`，按 `process.platform` 选择） | 按天追加的文本日志（启动信息、SSH 探测 / SFTP / 终端 / 文件管理等）；启动时把数据文件清单也写进去 | 持久；**惰性清理**：每天首次写日志时删除保留期之前的日志文件（保留天数取设置 `logRetentionDays`，默认 **7 天**，来自 `package.json` 的 `vessel.logRetentionDays`） |
 | `ssh-detected.json` | 同上目录 | `{ [alias]: { os, family, label, at } }` | 持久；缓存探测结果 |
 | `ssh-credentials.json` | 同上目录 | `{ entries: { [别名]: { iv, tag, data } } }`（**AES-256-GCM 密文**，全 base64） | 持久；在设置里保存 / 清除 SSH 密码时更新。密钥随机生成、存 `ssh-credentials.key`（0600）；密码明文不落盘，连接时主进程解密后交给内置终端自动输入（见 §3.4） |
@@ -16,6 +16,9 @@
 | `main-window.json` | 同上目录 | `{ x, y }`（**窗口模式**主窗口位置；兼容旧版 `{ bounds: { x, y, width, height } }`，只取 x / y；**不记录桌面 / 屏幕 / 尺寸**） | 持久；拖动后防抖 400ms 与关闭前写入；下次显示应用到当前鼠标所在屏幕并夹回工作区，无记录则居中；「清理数据」可删除 |
 | `terminal-window.json` | 同上目录 | `{ display: { id, scaleFactor, bounds: { x, y, width, height } }, bounds: { x, y, width, height } }`（置顶终端窗口最近一次的所在屏幕 + 位置 + 尺寸） | 持久；打开 / 拖动 / 缩放 / 关闭时写入（含「实际生效」的几何，恢复时被夹取过也记夹取后的值）；同一块屏幕再次打开即沿用，换屏 / 拔屏 / 无记录则改用默认尺寸居中 |
 | `file-window.json` | 同上目录 | 同 `terminal-window.json` 的结构（独立文件窗口的屏幕 + 位置 + 尺寸） | 持久；记忆方式与终端窗口一致 |
+| `game-window.json` | 同上目录 | 同 `terminal-window.json` 的结构（独立游戏窗口的屏幕 + 位置 + 尺寸） | 持久；记忆方式与终端窗口一致 |
+| `<workDir>/roms/{fc,gba,n64,sfc}/` | 游戏工作目录（未打包默认 `assets/games`，打包默认 `应用数据目录/games`；可在设置 → 游戏修改） | 用户 ROM 文件，应用只读；封面为 ROM 同目录同名 `.png/.jpg/.jpeg/.webp` | 用户文件，应用不修改 |
+| `<workDir>/profiles/<gameId>/` | 同上 | `battery.srm`（电池存档）、`state.slot1`（即时存档）、`state.slot1.png`（截图）、`meta.json`（引擎 / ROM 相对路径 / 游玩时间）；每游戏独立目录 | 持久；存档写入为临时文件 + rename；旧目录 `profile/` 兼容读取 |
 | `file-layout.json` | 同上目录 | `{ treeWidth, name, size, perm, time, panelHeight, sortKey, sortDir }`（**内嵌面板**的目录树宽、文件名 / 体积 / 权限 / 时间列宽、面板高度，单位 px；默认 `300 / 160 / 60 / 90 / 130 / 260`；`time` 默认 130 是**默认值**，最小可拖到 60；`sortKey` ∈ `''`（不排序）/`name`/`size`/`time`、`sortDir` ∈ `asc`/`desc`） | 持久；拖动分隔线 / 列宽、点击列头排序时写入；**有记录时不再套用首次的最小布局**（§3.9-10） |
 | `file-window-layout.json` | 同上目录 | 同 `file-layout.json` 结构（**独立文件窗口**自己的布局记录，与内嵌面板**分开保存**） | 持久；独立窗口拖动分隔线 / 列宽时写入 |
 | `nutrient-records.json` | 同上目录 | `{ products: { [name]: { name, energy, protein, fat, carbohydrate, sodium, total, savedAt } }, tdee: { sex, age, height, weight, activity, bmr, tdee, savedAt } 或 null }`（商品名去重、同名覆盖；TDEE 保存输入与计算结果） | 持久；营养成分工具保存商品 / TDEE 变化时写入 |
@@ -40,7 +43,7 @@
 | `app:open-data-folder` | — | `{ ok, error? }` | 打开数据目录 |
 | `app:open-log` | — | `{ ok, error? }` | 打开**日志文件夹**（macOS：`~/Library/Logs/Vessel`；不存在则创建；**只打开文件夹，不打开日志文件**） |
 | `app:open-console` | — | `{ ok, error? }` | 打开 macOS 系统「控制台」App（`/System/Applications/Utilities/Console.app`，缺失时退回 `/Applications/Utilities/Console.app`）；非 macOS 返回 `{ ok: false, error: 'unsupported' }`；由设置 → 日志的「打开控制台 App」按钮调用 |
-| `app:clear-data` | — | `{ ok }` | 一键清理**非业务数据**：删除 `main-window.json`、`terminal-window.json`、`file-window.json`、`file-layout.json`、`file-window-layout.json`、`cd-history.json`（窗口位置 / 尺寸、列宽 / 面板高度、cd 历史）；**不动** `settings.json`、日志与 `~/.ssh/config`；由设置 → 应用 的「清理数据」（二次确认后）调用 |
+| `app:clear-data` | — | `{ ok }` | 一键清理**非业务数据**：删除 `main-window.json`、`terminal-window.json`、`file-window.json`、`game-window.json`、`file-layout.json`、`file-window-layout.json`、`cd-history.json`（窗口位置 / 尺寸、列宽 / 面板高度、cd 历史）；**不动** `settings.json`、日志、`~/.ssh/config` 与游戏 ROM / 存档；由设置 → 应用 的「清理数据」（二次确认后）调用 |
 | `app:open-external` | `url` | `{ ok, error? }` | 仅允许 `http(s)` |
 | `app:open-path` | `target` | `{ ok, error? }` | 终端路径链接：展开 `~`、校验绝对路径且存在，然后 `shell.showItemInFolder` 在 Finder 中定位（不执行文件 / 不启动 .app） |
 | `app:copy-image` | PNG data URL | `{ ok, error? }` | 把 PNG 图片写入系统剪贴板（Electron 44：`new ClipboardItem({ 'image/png': Blob })` + `await clipboard.write([…])`）；仅接受 `data:image/png;base64,` 前缀；编码转换工具的二维码「复制」用 |
@@ -84,6 +87,19 @@
 | `file-window:close` | — | `{ ok }` | 销毁独立文件窗口（自绘红绿灯关闭按钮）；只接受来自该窗口的请求 |
 | `file-window:set-top` | `{ value: boolean }` | `{ ok, alwaysOnTop }` | 独立文件窗口的置顶开关：写 `settings.fileWindowAlwaysOnTop`；**默认关**（普通窗口），持久 |
 | `file-window:snap-size` | `{ height }` | `{ ok, height? }` | 保留兼容：独立文件窗口已**不再自动对齐整行高度**，渲染层不再调用；通道仍按工作区 / 最小高度夹取后设置内容高度；只接受来自该窗口的请求 |
+| `games:scan` | — | `{ ok, workDir, resolvedWorkDir, isDefault, engines }` | 扫描游戏工作目录；`engines[].games[]` 含 `{ id, name, engine, label, core, romRelativePath, size, mtime, coverUrl, romUrl }`；只接受主窗口 / 设置窗口请求 |
+| `games:open` | `{ gameId }` | `{ ok, error? }` | 打开 / 复用游戏窗口并加载游戏；只接受主窗口请求 |
+| `games:window-info` | — | `{ ok, game, emulatorVersion, settings }` | 游戏窗口启动时读取当前游戏与按键 / 音量设置；只接受游戏窗口请求 |
+| `games:load-ready` | `{ gameId }` | `{ ok, error? }` | 切换游戏时渲染层 flush 成功后确认；主进程此时更新当前游戏；只接受游戏窗口请求 |
+| `games:save-sram` / `games:load-sram` | `{ gameId, data? }` / `{ gameId }` | `{ ok, exists?, data?, error? }` | 读写 `profiles/<gameId>/battery.srm`；`gameId` 必须匹配当前窗口游戏 |
+| `games:save-state` / `games:load-state` | `{ gameId, state, screenshot? }` / `{ gameId }` | `{ ok, exists?, state?, screenshot?, error? }` | 读写 `state.slot1` 与 `state.slot1.png`；只接受游戏窗口请求 |
+| `games:touch` | `{ gameId, playSeconds }` | `{ ok, error? }` | 更新 `meta.json` 的 `lastPlayedAt` / `playSeconds` |
+| `games:close-now` | — | `{ ok }` | 游戏窗口 flush 完成后销毁自身；超过 3 秒主进程强制销毁 |
+| `games:select-workdir` / `games:set-workdir` | — / `{ path }` | `{ path }` / `{ ok, workDir, resolvedWorkDir, isDefault, error? }` | 选择 / 校验并写入游戏工作目录；自动创建 `roms/` 与 `profiles/` 骨架 |
+| `games:open-workdir` / `games:open-profile` | — / `{ gameId? }` | `{ ok, path?, error? }` | 在 Finder 打开工作目录 / 指定游戏存档目录 |
+| `games:keymap-set` / `games:hotkey-set` | `{ common }` / `{ engine, maps }` / `{ all }` / `{ common, all }` / `{ maps }` | `{ ok, maps, error? }` | 保存通用按键 / 平台专有按键 / 功能快捷键；冲突（同平台重复、与功能快捷键冲突）或非法键返回错误 |
+| `games:set-controls-hidden` / `games:set-volume` | `{ hidden }` / `{ volume }` | `{ ok, hidden }` / `{ ok, volume }` | 持久化控制区显隐 / 音量（0–1）；只接受游戏窗口请求 |
+| `games:fit-window` | `{ aspect }` | `{ ok, width, height, error? }` | 按游戏宽高比调整游戏窗口尺寸，消除左右黑边；只接受游戏窗口请求 |
 | `files-layout:get` | — | `{ treeWidth, name, size, time, panelHeight }` | 读取文件管理布局（`file-layout.json`） |
 | `files-layout:set` | `{ ...patch }` | 合并后的布局 | 合并写入文件管理布局（拖动分隔线 / 列宽时调用） |
 | `terminal:export` | `{ text, name? }` | `{ ok, path?, canceled?, error? }` | 保存对话框 + 把终端文本写入本地文件 |
@@ -106,7 +122,7 @@
 | `backup:import` | — | `{ ok, settings, added, skipped, passwords?, canceled?, error? }` | 打开对话框选 JSON 并导入：**设置覆盖**当前值、**SSH 主机只新增**（别名已存在则跳过），随新增主机保存其密码；由设置 · 导入 / 导出调用 |
 | `ssh-config:export` | — | `{ ok, path?, canceled?, error? }` | 经保存对话框导出 `~/.ssh/config` 副本 |
 | `geo:lookup` | `ip`（IPv4 字符串） | `{ iso_3166, country, province, city, isp }` 或 `null` | 本地 `assets/geoip.json` 查询；内网返回 `{ isp: '保留地址' }`；**逐级回退**（省 / 市只有中国、台湾有数据，缺失不影响国家级结果；只有 ISP 命中时仅返回 `isp`；都不命中返回 `null`） |
-| `devtools:open` | `'main' \| 'settings' \| 'terminal' \| 'file'` | `{ ok }` | 打开对应窗口的开发者工具（detach 模式；主面板会先显示，`'terminal'` / `'file'` 未打开时先打开对应窗口） |
+| `devtools:open` | `'main' \| 'settings' \| 'terminal' \| 'file' \| 'game'` | `{ ok }` | 打开对应窗口的开发者工具（detach 模式；主面板会先显示，`'terminal'` / `'file'` 未打开时先打开对应窗口） |
 | `clipboard:list` | — | `item[]`（最多 5 条） | 内存历史，含文本 / 图片缩略图 |
 | `clipboard:copy` | `id` | `{ ok, error? }` | 文本用 `writeText`，图片用 `ClipboardItem` 写回 |
 | `clipboard:clear` | — | `{ ok }` | 清空历史（不清空系统剪贴板） |
@@ -153,6 +169,10 @@
 | `terminal:zoom` | `'in' \| 'out' \| 'reset'` | 焦点在终端窗口时 `Cmd +/-/0` 的字号缩放（见 §5.3）；独立文件窗口不支持缩放 |
 | `sftp:progress` | `{ id, direction: 'upload' \| 'download', name, transferred, total }` | SFTP 上传 / 下载进度，只发给发起该操作、拥有该会话的窗口（渲染层在状态栏显示进度条） |
 | `file-window:target` | `{ target, path }` | 独立文件窗口已打开时，`file-window:open` 带目标再次调用 → 请它切换连接并进入 `path` |
+| `games:load` | `{ game }` | 复用游戏窗口时切换游戏；渲染层先 flush 旧游戏再重新加载 |
+| `games:prepare-close` | — | 请求游戏窗口暂停、flush 电池存档后调用 `games:close-now` |
+| `games:workdir-changed` | `{ workDir, resolvedWorkDir }` | 工作目录变更后通知主窗口重新扫描 |
+| `games:fullscreen` | `{ fullscreen }` | 游戏窗口进入 / 退出原生全屏；渲染层隐藏 / 恢复头栏与控制区 |
 | `ssh-config:changed` | `{ hosts }` | SSH 主机 / 分组增删改后广播（`ssh-config:upsert` / `remove` / `rename-group` 触发），终端窗口与独立文件窗口据此**实时刷新 SSH 下拉** |
 | `settings:edit-ssh` | `{ alias }` | 设置窗口的 SSH 分区收到后打开该别名的编辑表单（由 `ssh:edit` 触发；等 hosts 加载完成再打开） |
 | `update:progress` | 状态快照 | 下载进度变化（`percent` / `transferred` / `total` / `bytesPerSecond`），只发给更新窗口 |

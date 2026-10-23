@@ -3,6 +3,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const { IPC } = require('../shared/constants');
 const { loadIcons, loadBallIcons } = require('./icons');
+const gamesApi = require('./games-api');
 
 function on(channel, cb) {
   const listener = (_event, payload) => cb(payload);
@@ -47,6 +48,7 @@ const api = {
     onData: (cb) => on(IPC.TERMINAL_DATA, cb),
     onExit: (cb) => on(IPC.TERMINAL_EXIT, cb),
   },
+  games: gamesApi,
   shortcuts: {
     setHotkey: (target, hotkey) => ipcRenderer.invoke(IPC.SHORTCUT_SET, { target, hotkey }),
   },

@@ -39,8 +39,10 @@
 | --- | --- |
 | 悬浮面板尺寸 | 400 × 500 |
 | 窗口模式主窗口尺寸 | 固定 640 × 480（不可缩放；`vessel.mainWindow`） |
-| 设置窗口尺寸 | 800 × 600 |
+| 设置窗口尺寸 | 800 × 600（固定，不可缩放 / 全屏） |
 | 更新窗口尺寸 | 380 × 150（`vessel.updateWindow`） |
+| 游戏窗口尺寸 | 默认 / 最小 480 × 320；最大 1440 × 900（`vessel.gameWindow`） |
+| 游戏主界面网格 | 窗口模式 8 列 / 悬浮模式 4 列，间距 8px；封面 1:1 |
 | `--tabbar-height` | 46px |
 | `--footer-height` | 34px |
 | `--term-header-height` | 22px（终端窗口头栏最小高度，刚好放下自绘小红绿灯；实际为 `max(22px, --term-header-font-size + 6px)`） |
@@ -63,6 +65,8 @@
 - 输入 `field`、按钮 `btn` / `btn-accent`、图标按钮 `icon-btn`、结果行 `row-card`、TAB `tab` / `tab-active`、开关 `switch`、分段控件 `segment`、色块 `swatch`。
 - **分组手风琴** `accordion` / `accordion-item` / `accordion-header`（含 `.accordion-chevron` / `.accordion-name` / `.accordion-count`）/ `accordion-body`：用于 SSH 管理（设置页与主界面工具）按分组折叠展示，**默认全部展开**，点击标题切换、`.accordion-item.collapsed` 时旋转箭头（-90°）并隐藏 `.accordion-body`。
 - **2FA 验证码卡片**（2FA 工具）：顶部为单行 `field` 输入框 + `btn-accent`「添加」按钮；卡片为 `rounded-card` + `border-border` + `bg-surface` 的纵向布局 —— 第一行为**绿色盾牌图标**（`shield`，`--color-success`）+ 标题（`text-[15px]`）+ 副标题（`items-baseline`、超出省略）、右侧**复制** / **删除**图标按钮，第二行为**逐位验证码数字块**（`h-11 w-8`、`text-[22px]` 等宽、每 3/4 位一组留一道间隙）+ 右侧倒计时秒数，底行为 1px 进度条（`rounded-pill`，剩余 ≤5 秒由强调色变 `--color-danger`）；复制成功就地显示 ✓ 反馈，删除走**就地二次确认**（`text-danger` 文案 + ✓ / ✕ 图标按钮）。样式复用中性卡片色，强调色仅用于进度条；卡片内元素纵向间距统一为 `--space-card-gap`（当前 12px，`gap-card`）；输入区与卡片列表也使用同一间距。
+- **工具标题行操作**：`app.js` 为 `.tool-head` 提供可选 `.tool-head-actions` 插槽；工具可将图标按钮合并到标题行右侧（当前剪贴板的刷新 / 清空按钮使用该插槽，不再单独占一行）。
+- **游戏组件**：`.game-toolbar` / `.game-category` / `.game-grid` / `.game-tile` / `.game-cover` / `.game-cover-placeholder`（占位封面：按 gameId 哈希生成稳定渐变 + 引擎缩写 + 首字母）/ `.game-name`（10px，2 行截断）；`.game-controls` 为绝对定位悬浮层（不占布局高度），全屏时隐藏；设置页 `.game-settings-card` / `.keycap` / `.game-settings-unique`（引擎专属徽标）/ `.game-settings-preset-row`（PC / 传统风格预设）；分区标题与说明上下排列，说明独占一行，重置按钮位于标题行右侧。
 - **更新窗口组件**：`.update-shell`（整窗拖拽区 + 纵向布局）/ `.update-title` / `.update-message`（提示消息，12px / 行高 1.6 / 自动换行）/ `.update-progress` + `.update-progress-fill`（强调色进度条，`transition: width 0.15s linear`）/ `.update-status` / `.update-actions`（`no-drag`，右对齐按钮，提示框按钮共用同一样式）。
 - **卡片 / 输入框间距统一 12px**：唯一来源是 `constants.css` 的 `--space-card-gap`（默认 12px）；`.section`（`gap` / `margin-bottom`）、窗口模式工具网格、手风琴、设置卡片、工具列表与输入区块均使用它（Tailwind 暴露为 `gap-card` / `mb-card` / `mt-card`），不再散落 10 / 12 / 16px 的卡片间距；编码转换（6 个连续输入框、二维码 / Data Matrix 分区与标题）与进制转换的 4 个进制输入框使用更紧凑的 8px 间距。
 - **统一标题（滚动联动）**：每个工具的标题由 `app.js` 渲染在内容区上方的固定 `#tool-head-host` 中（标题取 `tools.<id>`、说明取 `toolDesc.<id>`），**永远固定在顶部、不随内容滚动**。常态标题 17px / 700、说明 11px。**仅当内容实际可滚动时**才启用收起行为：内容在最顶部时，先收起标题并**保持内容不动**（滚动输入在收起动画约 190ms 内被锁定），标题缩为 13px / 650、说明变为 10px 并**与标题同一行**（超出省略）；动画完成后继续滚动才滚动内容，标题始终独占一行、内容不会滚到标题下面。滚回顶部后自动恢复（在顶部继续向上滚也会先展开标题）；JSON 等内部滚动区实际产生滚动时同样收起，回到其顶部恢复；内容未填满、无法滚动时（如短 JSON / Hash / 2FA / 剪贴板）滚动不会收起标题。切换 TAB 时内容区自动滚动回顶部并恢复常态。

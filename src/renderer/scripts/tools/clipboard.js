@@ -46,20 +46,20 @@
     }
   }
 
-  function mount(container) {
+  function mount(container, ctx) {
     const state = { items: [], disposers: [] };
 
-    const header = el('div', { class: 'mb-card flex items-center justify-end gap-2' });
     const actions = el('div', { class: 'flex items-center gap-1' });
     const refreshBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', 'data-tip': i18n.t('ssh.refresh') });
     refreshBtn.innerHTML = Icons.refresh(15);
     const clearBtn = el('button', { class: 'icon-btn h-7 w-7', type: 'button', 'data-tip': i18n.t('clipboard.clear') });
     clearBtn.innerHTML = Icons.trash(15);
     actions.append(refreshBtn, clearBtn);
-    header.appendChild(actions);
+    if (ctx && ctx.headerActions) ctx.headerActions.appendChild(actions);
+    else container.appendChild(actions);
 
     const list = el('div', { class: 'flex flex-col gap-card' });
-    container.append(header, list);
+    container.append(list);
 
     function buildRow(item) {
       const row = el('div', { class: 'row-card' });

@@ -1,6 +1,11 @@
 'use strict';
 
 const pkg = require('../../package.json');
+const {
+  defaultCommonKeys,
+  defaultGameKeymaps,
+  defaultGameHotkeys,
+} = require('./game-constants');
 
 const APP_NAME = 'Vessel';
 const appConfig = pkg.vessel || pkg.ships || {};
@@ -122,6 +127,30 @@ const IPC = {
   FILE_WINDOW_ZOOM: 'file-window:zoom',
   FILE_WINDOW_TARGET: 'file-window:target',
 
+  GAME_SCAN: 'games:scan',
+  GAME_OPEN: 'games:open',
+  GAME_WINDOW_INFO: 'games:window-info',
+  GAME_LOAD: 'games:load',
+  GAME_LOAD_READY: 'games:load-ready',
+  GAME_PREPARE_CLOSE: 'games:prepare-close',
+  GAME_SAVE_SRAM: 'games:save-sram',
+  GAME_LOAD_SRAM: 'games:load-sram',
+  GAME_SAVE_STATE: 'games:save-state',
+  GAME_LOAD_STATE: 'games:load-state',
+  GAME_TOUCH: 'games:touch',
+  GAME_CLOSE_NOW: 'games:close-now',
+  GAME_SELECT_WORKDIR: 'games:select-workdir',
+  GAME_SET_WORKDIR: 'games:set-workdir',
+  GAME_OPEN_WORKDIR: 'games:open-workdir',
+  GAME_OPEN_PROFILE: 'games:open-profile',
+  GAME_KEYMAP_SET: 'games:keymap-set',
+  GAME_HOTKEY_SET: 'games:hotkey-set',
+  GAME_SET_CONTROLS_HIDDEN: 'games:set-controls-hidden',
+  GAME_SET_VOLUME: 'games:set-volume',
+  GAME_FIT_WINDOW: 'games:fit-window',
+  GAME_FULLSCREEN: 'games:fullscreen',
+  GAME_WORKDIR_CHANGED: 'games:workdir-changed',
+
   DIALOG_OPEN_DIR: 'dialog:open-dir',
   DIALOG_OPEN_FILES: 'dialog:open-files',
 
@@ -202,6 +231,19 @@ const FILE_WINDOW = Object.assign(
     alwaysOnTop: false,
   },
   appConfig.fileWindow || {}
+);
+
+// 独立游戏窗口：panel 模式（置顶、可浮在全屏应用之上、不跨桌面），单窗口复用。
+const GAME_WINDOW = Object.assign(
+  {
+    width: 480,
+    height: 320,
+    minWidth: 480,
+    minHeight: 320,
+    maxWidth: 1440,
+    maxHeight: 900,
+  },
+  appConfig.gameWindow || {}
 );
 
 // 更新下载窗口：小、不可关闭、置顶的前台窗口（仅进度 / 取消 / 重启安装）。
@@ -300,6 +342,13 @@ const DEFAULT_SETTINGS = {
   sftpDownloadDir: appConfig.sftpDownloadDir || '~/Downloads',
   // 独立文件窗口置顶：默认关（不跟随主界面 / 终端窗口的置顶）。
   fileWindowAlwaysOnTop: FILE_WINDOW.alwaysOnTop === true,
+  // 游戏工具：工作目录（空 = 默认）、四引擎按键映射、模拟器功能快捷键、音量 / 控制区显隐。
+  gameWorkDir: '',
+  gameCommonKeys: defaultCommonKeys(),
+  gameKeymaps: defaultGameKeymaps(),
+  gameHotkeys: defaultGameHotkeys(),
+  gameVolume: 0.7,
+  gameControlsHidden: false,
   // 日志：日志文件保留天数（macOS 下日志写到 ~/Library/Logs/Vessel，Console.app 的
   //「日志报告」会直接收录，无需再做统一日志同步）。
   logRetentionDays: LOG_RETENTION_DAYS,
@@ -315,6 +364,7 @@ module.exports = {
   SETTINGS_WINDOW,
   TERMINAL_WINDOW,
   FILE_WINDOW,
+  GAME_WINDOW,
   UPDATE_WINDOW,
   UPDATE_COUNTDOWN_SECONDS,
   SHORTCUT_DOUBLE_TAP_MS,

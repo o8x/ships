@@ -6,3 +6,5 @@ node_modules/
 src/renderer/styles/tailwind.build.css
 dist/
 release/
+/assets/games/roms
+/assets/games/profiles

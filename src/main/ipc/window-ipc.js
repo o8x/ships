@@ -20,6 +20,8 @@ const {
   getFileWindow,
   openFileWindow,
   openFontPickerWindow,
+  getGameWindow,
+  isGameWindow,
 } = require('../window-manager');
 
 function registerWindowIpc(ipcMain) {
@@ -43,6 +45,10 @@ function registerWindowIpc(ipcMain) {
       if (isTerminalWindow(win)) return { ok: false, action };
       win.minimize();
       return { ok: true, action };
+    }
+    if (action === 'fullscreen' || (action === 'zoom' && isGameWindow(win))) {
+      win.setFullScreen(!win.isFullScreen());
+      return { ok: true, action, fullscreen: win.isFullScreen() };
     }
     if (action === 'zoom') {
       if (win.isMaximized()) win.unmaximize();
@@ -107,7 +113,9 @@ function registerWindowIpc(ipcMain) {
           ? getTerminalWindow() || openTerminalWindow()
           : target === 'file'
             ? getFileWindow() || openFileWindow()
-            : getMainWindow();
+            : target === 'game'
+              ? getGameWindow()
+              : getMainWindow();
     if (!win) return { ok: false };
     if (target !== 'settings') win.show();
     win.webContents.openDevTools({ mode: 'detach' });

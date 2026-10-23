@@ -3,7 +3,7 @@
   "version": "4.15.0",
   "description": "A macOS menu bar toolbox for developers.",
   "author": "Vessel",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "private": true,
   "main": "src/main/main.js",
   "scripts": {
@@ -78,6 +78,14 @@
       "minHeight": 600,
       "alwaysOnTop": false
     },
+    "gameWindow": {
+      "width": 480,
+      "height": 320,
+      "minWidth": 480,
+      "minHeight": 320,
+      "maxWidth": 1440,
+      "maxHeight": 900
+    },
     "updateWindow": {
       "width": 380,
       "height": 150
@@ -111,12 +119,14 @@
     "files": [
       "src/**/*",
       "assets/**/*",
+      "!assets/games/**",
       "package.json"
     ],
     "asar": true,
     "asarUnpack": [
       "**/*.node",
       "src/main/scripts/*",
+      "assets/emulatorjs/**",
       "node_modules/electron-liquid-glass/**"
     ],
     "npmRebuild": false,

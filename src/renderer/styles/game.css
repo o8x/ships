@@ -1,0 +1,338 @@
+html,
+body.game-window {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+.game-window {
+  color: #f3f5f9;
+  font-family: var(--font-sans);
+  user-select: none;
+}
+
+.game-shell {
+  position: relative;
+  display: flex;
+  height: 100%;
+  width: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-window);
+  background: #050607;
+}
+
+.game-shell.game-fullscreen {
+  border-radius: 0;
+  border: 0;
+}
+
+.game-header {
+  -webkit-app-region: drag;
+  display: flex;
+  height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0d1016;
+}
+
+.game-shell.game-fullscreen .game-header {
+  display: none;
+}
+
+.no-drag,
+.game-traffic,
+.game-traffic-btn,
+.game-controls,
+.game-btn,
+.game-volume,
+.game-restore {
+  -webkit-app-region: no-drag;
+}
+
+.game-traffic {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.game-traffic-btn {
+  display: flex;
+  height: 11px;
+  width: 11px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: rgba(0, 0, 0, 0.55);
+  cursor: default;
+}
+
+.game-traffic-btn svg {
+  height: 6px;
+  width: 6px;
+  opacity: 0;
+}
+
+.game-traffic:hover .game-traffic-btn svg {
+  opacity: 1;
+}
+
+.game-traffic-btn.close {
+  background: var(--traffic-close);
+}
+
+.game-traffic-btn.min {
+  background: var(--traffic-minimize);
+}
+
+.game-traffic-btn.full {
+  background: var(--traffic-zoom);
+}
+
+.game-title-wrap {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.game-engine-badge {
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-xs);
+  padding: 0 5px;
+  color: rgba(243, 245, 249, 0.64);
+  font-size: 9px;
+  line-height: 15px;
+  letter-spacing: 0.04em;
+}
+
+.game-status {
+  min-width: 0;
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(243, 245, 249, 0.6);
+  font-size: 10px;
+}
+
+.game-status.is-danger {
+  color: #ff6369;
+}
+
+.game-stage {
+  position: relative;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  background: #000;
+}
+
+.game-root {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.game-root.ejs_parent {
+  height: 100% !important;
+  width: 100% !important;
+  border-radius: 0 !important;
+}
+
+.game-root canvas {
+  display: block;
+  margin: 0 auto;
+  background: #000;
+}
+
+.game-root .ejs_menu_bar,
+.game-root .ejs_menu_toggle,
+.game-root .ejs_settings_parent,
+.game-root .ejs_context_menu,
+.game-root .ejs_cheat_parent,
+.game-root .ejs_ad_iframe,
+.game-root .ejs_loading_text {
+  display: none !important;
+}
+
+.game-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: radial-gradient(circle at 50% 40%, rgba(28, 38, 58, 0.92), rgba(3, 5, 8, 0.98));
+  text-align: center;
+  z-index: 5;
+}
+
+.game-overlay.hidden,
+.game-restore.hidden,
+.game-controls.hidden {
+  display: none;
+}
+
+.game-overlay-title {
+  max-width: 80%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.game-overlay-hint {
+  max-width: 70%;
+  color: rgba(243, 245, 249, 0.6);
+  font-size: 11px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.game-overlay-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.game-spinner {
+  height: 26px;
+  width: 26px;
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  border-top-color: var(--color-accent);
+  border-radius: 999px;
+  animation: game-spin 0.8s linear infinite;
+}
+
+@keyframes game-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.game-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  height: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  padding: 0 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: linear-gradient(to top, rgba(8, 10, 14, 0.92), rgba(8, 10, 14, 0.66));
+  backdrop-filter: blur(10px);
+}
+
+.controls-hidden .game-controls {
+  display: none;
+}
+
+.game-shell.game-fullscreen .game-controls,
+.game-shell.game-fullscreen .game-restore {
+  display: none !important;
+}
+
+.game-btn {
+  display: inline-flex;
+  height: 28px;
+  min-width: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-control-sm);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0 7px;
+  color: rgba(243, 245, 249, 0.88);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.game-btn:hover {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.game-btn:active,
+.game-btn.active {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+}
+
+.game-btn.is-disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.game-btn svg {
+  display: block;
+}
+
+.game-btn-wide {
+  padding: 0 10px;
+}
+
+.game-volume {
+  height: 3px;
+  width: 64px;
+  flex: 0 1 auto;
+  margin: 0 4px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.game-restore {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 6;
+  display: flex;
+  height: 28px;
+  width: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(13, 16, 22, 0.78);
+  color: rgba(243, 245, 249, 0.78);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.game-restore:hover {
+  color: #fff;
+  background: rgba(13, 16, 22, 0.96);
+}
+
+.game-restore svg {
+  display: block;
+}

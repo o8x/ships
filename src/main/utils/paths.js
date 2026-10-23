@@ -20,6 +20,7 @@ const TOTP_ACCOUNTS_KEY_FILE = path.join(DATA_DIR, 'totp-accounts.key');
 const MAIN_WINDOW_FILE = path.join(DATA_DIR, 'main-window.json');
 const TERMINAL_WINDOW_FILE = path.join(DATA_DIR, 'terminal-window.json');
 const FILE_WINDOW_FILE = path.join(DATA_DIR, 'file-window.json');
+const GAME_WINDOW_FILE = path.join(DATA_DIR, 'game-window.json');
 const FILE_LAYOUT_FILE = path.join(DATA_DIR, 'file-layout.json');
 const FILE_WINDOW_LAYOUT_FILE = path.join(DATA_DIR, 'file-window-layout.json');
 // 文件面板按 ssh 目标（用户名@主机）记录最近 cd 到的目录（见 cd-history-service）。
@@ -58,6 +59,7 @@ const DATA_FILES = [
   MAIN_WINDOW_FILE,
   TERMINAL_WINDOW_FILE,
   FILE_WINDOW_FILE,
+  GAME_WINDOW_FILE,
   FILE_LAYOUT_FILE,
   FILE_WINDOW_LAYOUT_FILE,
   CD_HISTORY_FILE,
@@ -80,6 +82,7 @@ module.exports = {
   MAIN_WINDOW_FILE,
   TERMINAL_WINDOW_FILE,
   FILE_WINDOW_FILE,
+  GAME_WINDOW_FILE,
   FILE_LAYOUT_FILE,
   FILE_WINDOW_LAYOUT_FILE,
   CD_HISTORY_FILE,

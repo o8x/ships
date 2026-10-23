@@ -31,13 +31,13 @@
 
 ### 8.2 设置窗口
 
-- 尺寸：**800 × 600**（`vessel.settingsWindow`），普通窗口，可缩放（最小 560×420），`titleBarStyle: hiddenInset`。
-- 布局：**左右分栏** —— 左侧导航（宽 190px，顺序为：应用、SSH、终端、快捷键、网络测试；导入 / 导出与日志已合并到「应用」分区），右侧内容区。
+- 尺寸：**800 × 600**（`vessel.settingsWindow`），普通窗口，**不可缩放 / 不可最大化 / 不可全屏**，`titleBarStyle: hiddenInset`。
+- 布局：**左右分栏** —— 左侧导航（宽 190px，顺序为：应用、SSH、终端、快捷键、游戏、网络测试；导入 / 导出与日志已合并到「应用」分区），右侧内容区。
 - 顶部 **28px** 为可拖拽区域（`.drag-region`，覆盖系统红绿灯 / 原生标题栏范围）；左侧导航从 **48px**（`padding-top`，为避开系统红绿灯留白）、右侧标题从 12px 起排，`Escape` 关闭窗口。
 
 ### 8.3 图标与资源
 
-- **SVG 图标**：所有界面图标以独立 `.svg` 文件存放于 `assets/icons/`（kebab-case 命名，如 `clock.svg`、`arrow-left.svg`、`arrow-up.svg`、`file.svg`、`doc.svg`、`image.svg`、`archive.svg`、`caret-right.svg`、`home.svg`、`temp-file.svg`、`split.svg`、`shield.svg`（2FA 工具 TAB 图标）、`traffic-close.svg` / `traffic-minimize.svg` / `traffic-zoom.svg`（终端窗口自绘小红绿灯的悬浮符号）），**代码中不硬编码** SVG 标记；由 `src/preload/icons.js` 在启动时读取目录、转成 camelCase 键名并经 `contextBridge` 暴露为 `window.shipsIcons`，渲染层 `ShipsUI.Icons[name](size)` 注入尺寸后使用（会先移除图标根标签上已有的 `width` / `height` 再注入，兼容自带尺寸的品牌图标）。新增 / 修改图标只需增删 / 编辑文件；系统品牌图标（`ubuntu.svg` / `fedora.svg` / `arch.svg` / `centos.svg` / `debian.svg` / `linux.svg` / `mint.svg` / `opensuse.svg` / `RHEL.svg` / `rocky.svg` / `windows.svg` 等）同样放在此处，用于 SSH 探测结果展示。
+- **SVG 图标**：所有界面图标以独立 `.svg` 文件存放于 `assets/icons/`（kebab-case 命名，如 `clock.svg`、`arrow-left.svg`、`arrow-up.svg`、`file.svg`、`doc.svg`、`image.svg`、`archive.svg`、`caret-right.svg`、`home.svg`、`temp-file.svg`、`split.svg`、`shield.svg`（2FA 工具 TAB 图标）、`gamepad.svg`（游戏 TAB / 设置图标）、`fit.svg`（游戏窗口「适配画面」）、`traffic-close.svg` / `traffic-minimize.svg` / `traffic-zoom.svg`（终端窗口自绘小红绿灯的悬浮符号）），**代码中不硬编码** SVG 标记；由 `src/preload/icons.js` 在启动时读取目录、转成 camelCase 键名并经 `contextBridge` 暴露为 `window.shipsIcons`，渲染层 `ShipsUI.Icons[name](size)` 注入尺寸后使用（会先移除图标根标签上已有的 `width` / `height` 再注入，兼容自带尺寸的品牌图标）。新增 / 修改图标只需增删 / 编辑文件；系统品牌图标（`ubuntu.svg` / `fedora.svg` / `arch.svg` / `centos.svg` / `debian.svg` / `linux.svg` / `mint.svg` / `opensuse.svg` / `RHEL.svg` / `rocky.svg` / `windows.svg` 等）同样放在此处，用于 SSH 探测结果展示。
 - **文件类型图标（文件管理）**：按 `src/renderer/scripts/constants.js` 的 `FILE_TYPE_ICONS`（扩展名 → 图标名，92 项）与 `FILE_NAME_ICONS`（无扩展名的文件名，如 `Makefile` / `Dockerfile` / `LICENSE` / `README`）映射到 `code` / `braces` / `terminal` / `doc` / `image` / `play` / `archive`，未命中用 `DEFAULT_FILE_ICON = file`；目录固定 `folder`（目录只出现在左侧目录树）。未引入第三方图标库：远端文件只有文件名，没有类型探测，系统图标类库（读取本地文件图标）在此用不上。
 - 位图资源（应用图标 / 托盘 / 打包）统一放在 `assets/imgs/`；`assets/icons/` 只保留 SVG 图标。
 - **国旗图标**：`assets/flags/<CC>.svg`（长方形）与 `assets/flags/<CC>_1x1.svg`（方形）；由 `src/preload/flags.js` 按需读取并缓存，暴露为 `window.shipsFlags.get(code, shape)`（code 为两位国家码，shape 为 `rect`/`1x1`）。
@@ -83,3 +83,14 @@
 - 行为见 §6.6 / §7：进度实时回填；下载完成后安装按钮可用并显示 60 秒倒计时。**macOS**：点安装 / 倒计时到 0 → `open` 打开 PKG 系统安装器后退出本程序；安装完成由 PKG postinstall 自动启动 Vessel。**Windows**：调用 `quitAndInstall()`，6 秒未退出则 `app.relaunch()` + `app.quit()` 兜底。
 
 ---
+
+
+### 8.8 游戏窗口（EmulatorJS）
+
+- 窗口：**全局唯一、复用**；默认与最小均为 **480 × 320**，最大 **1440 × 900**；可缩放、可最小化、**支持原生全屏**；`frame:false` + `transparent:true` + CSS 自绘圆角，系统红绿灯隐藏，使用自绘头栏（关闭 / 最小化 / 全屏）。屏幕 / 位置 / 尺寸记入 `game-window.json`。
+- 层级：普通窗口层级（**不始终置顶**）；`setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true })`，绑定打开时所在桌面、不跨桌面跟随。
+- 布局：头栏 **34px**（红绿灯 + 游戏名 + 引擎徽标 + 状态提示）；画面区占满剩余空间（黑底、等比居中）；底部控制区为**悬浮层**（绝对定位在画面底部，不占据布局高度），包含确认 / 选择 / 暂停 / 重启 / 保存 / 读取 / 截图 / 快进 / 静音 / 音量 / 适配画面 / 全屏 / 隐藏控制区；窗口窄时可横向滚动；显示 / 隐藏不改变游戏画面尺寸。控制区隐藏时仅隐藏悬浮层，画面尺寸不变；右下角保留 28px 圆形恢复按钮；显隐状态持久化到 `settings.gameControlsHidden`。
+- 全屏：进入原生全屏后自动隐藏头栏与悬浮控制区，画面铺满屏幕；退出后恢复进入前的控制区显隐状态（由 `games:fullscreen` 事件驱动）。`Esc` 优先退出全屏（由 `window:control` 的 `fullscreen` 处理）。
+- 适配画面：控制区「适配画面」按钮按游戏宽高比调整窗口（`games:fit-window`），消除左右黑边，尽量保持窗口中心与屏幕工作区内。
+- 加载 / 错误：画面区覆盖加载遮罩（游戏名 + 引擎 + 动画）；失败显示「重试 / 打开工作目录」，不自动关闭窗口。
+- 游戏主界面：顶部只有「修改 / 刷新」图标按钮（不显示工作目录路径），进入工具页自动扫描；网格窗口模式 **8 列**、悬浮模式 **4 列**，间距 8px；封面 1:1 圆角，名称 10px 最多 2 行；窗口模式封面约 68px，悬浮模式约 86px。

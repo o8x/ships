@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' game: blob: data:; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' game: blob:; style-src 'self' 'unsafe-inline' game: blob:; img-src 'self' game: data: blob:; connect-src 'self' game: data: blob:; worker-src 'self' game: blob:; media-src 'self' game: data: blob:; font-src 'self' game: data: blob:"
+    />
+    <title>Vessel Games</title>
+    <link rel="stylesheet" href="./styles/constants.css" />
+    <link rel="stylesheet" href="./styles/tailwind.build.css" />
+    <link rel="stylesheet" href="./styles/game.css" />
+  </head>
+  <body class="game-window">
+    <div id="game-shell" class="game-shell">
+      <header id="game-header" class="game-header">
+        <div class="game-traffic no-drag">
+          <button id="game-close" class="game-traffic-btn close" type="button"></button>
+          <button id="game-min" class="game-traffic-btn min" type="button"></button>
+          <button id="game-full" class="game-traffic-btn full" type="button"></button>
+        </div>
+        <div class="game-title-wrap">
+          <span id="game-title" class="game-title"></span>
+          <span id="game-engine" class="game-engine-badge"></span>
+        </div>
+        <span id="game-status" class="game-status"></span>
+      </header>
+
+      <main id="game-stage" class="game-stage">
+        <div id="game-root" class="game-root"></div>
+        <div id="game-loading" class="game-overlay">
+          <div class="game-spinner"></div>
+          <div id="game-loading-title" class="game-overlay-title"></div>
+          <div id="game-loading-hint" class="game-overlay-hint"></div>
+        </div>
+        <div id="game-error" class="game-overlay hidden">
+          <div id="game-error-title" class="game-overlay-title"></div>
+          <div id="game-error-message" class="game-overlay-hint"></div>
+          <div class="game-overlay-actions">
+            <button id="game-retry" class="game-btn" type="button"></button>
+            <button id="game-open-folder" class="game-btn" type="button"></button>
+          </div>
+        </div>
+      </main>
+
+      <footer id="game-controls" class="game-controls">
+        <button id="ctl-start" class="game-btn game-btn-wide" type="button"></button>
+        <button id="ctl-select" class="game-btn game-btn-wide" type="button"></button>
+        <button id="ctl-pause" class="game-btn" type="button"></button>
+        <button id="ctl-restart" class="game-btn" type="button"></button>
+        <button id="ctl-save" class="game-btn" type="button"></button>
+        <button id="ctl-load" class="game-btn" type="button"></button>
+        <button id="ctl-shot" class="game-btn" type="button"></button>
+        <button id="ctl-ff" class="game-btn" type="button"></button>
+        <button id="ctl-mute" class="game-btn" type="button"></button>
+        <input id="ctl-volume" class="game-volume" type="range" min="0" max="1" step="0.01" />
+        <button id="ctl-fit" class="game-btn" type="button"></button>
+        <button id="ctl-full" class="game-btn" type="button"></button>
+        <button id="ctl-hide" class="game-btn" type="button"></button>
+      </footer>
+
+      <button id="game-restore" class="game-restore hidden" type="button"></button>
+    </div>
+
+    <script src="./scripts/theme.js"></script>
+    <script src="./scripts/i18n.js"></script>
+    <script src="./scripts/ui.js"></script>
+    <script src="./scripts/game.js"></script>
+  </body>
+</html>

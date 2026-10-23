@@ -13,4 +13,5 @@ window.ShipsToolOrder = [
     "hash", // 哈希计算（MD5 / SHA1 / SHA256）
     "nutrient", // 营养成分
     "clipboard", // 剪贴板
+    "games", // 游戏（EmulatorJS）
 ]

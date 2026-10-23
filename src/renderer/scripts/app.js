@@ -55,13 +55,16 @@
     const header = el('div', { class: 'tool-head' });
     header.appendChild(el('h1', { class: 'tool-head-title' }, i18n.t(`tools.${id}`)));
     header.appendChild(el('div', { class: 'tool-head-desc' }, i18n.t(`toolDesc.${id}`)));
+    const headerActions = el('div', { class: 'tool-head-actions' });
+    header.appendChild(headerActions);
     dom.headerHost.appendChild(header);
 
     const body = el('div', { class: 'tool-body' });
     dom.content.appendChild(body);
 
     try {
-      const dispose = tool.mount(body);
+      const dispose = tool.mount(body, { headerActions });
+      if (headerActions.childElementCount) header.classList.add('has-actions');
       if (typeof dispose === 'function') state.cleanup = dispose;
     } catch (err) {
       console.error(err);

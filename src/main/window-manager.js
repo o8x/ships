@@ -9,6 +9,7 @@ const {
   SETTINGS_WINDOW,
   TERMINAL_WINDOW,
   FILE_WINDOW,
+  GAME_WINDOW,
   UPDATE_WINDOW,
   CENTER_SNAP,
   VIBRANCY,
@@ -16,11 +17,13 @@ const {
   SPACE_CONFIRM_DELAY_MS,
 } = require('../shared/constants');
 const settings = require('./services/settings-service');
-const { TERMINAL_WINDOW_FILE, FILE_WINDOW_FILE, MAIN_WINDOW_FILE } = require('./utils/paths');
+const { TERMINAL_WINDOW_FILE, FILE_WINDOW_FILE, GAME_WINDOW_FILE, MAIN_WINDOW_FILE } = require('./utils/paths');
 const { readJson, writeJson } = require('./utils/json-store');
 const { clampNumber, displaySignature, displayBySignature, clampBounds } = require('./utils/window-geometry');
 const logger = require('./utils/logger');
 const spaceService = require('./services/space-service');
+const gameService = require('./services/game-service');
+const { GAME_CLOSE_TIMEOUT_MS, GAME_HEADER_HEIGHT } = require('../shared/game-constants');
 
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
 const PRELOAD_DIR = path.join(__dirname, '..', 'preload');
@@ -54,18 +57,33 @@ let pinnedPositioned = false;
 let terminalGeometryTimer = null;
 let suppressTerminalSizeSave = false;
 let fileWindowGeometryTimer = null;
+let gameWindow = null;
+let gameWindowGame = null;
+let gameWindowState = readJson(GAME_WINDOW_FILE, null);
+let gameWindowGeometryTimer = null;
+let gameWindowCloseTimer = null;
+let gameWindowClosePending = false;
+let gameQuitFlushDone = false;
 
 // 应用正在退出：此时「关闭即隐藏」不再生效，让窗口正常关闭。
 // 否则终端窗口在 hide 模式下会用 preventDefault() 拦下 close，导致 app.quit() 被中止
 //（表现：点托盘「退出」有时退不掉）。
 let isQuitting = false;
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
   isQuitting = true;
   // macOS：`closable: false` 的窗口会让 app.quit() 卡住（窗口永不被关闭）。
   // 退出时临时放开可关闭，保证更新窗口 / 托盘退出都能真正退掉。
   const win = updateWindow;
   if (win && !win.isDestroyed() && typeof win.setClosable === 'function') {
     win.setClosable(true);
+  }
+  if (gameWindow && !gameWindow.isDestroyed() && !gameQuitFlushDone) {
+    event.preventDefault();
+    gameWindow.webContents.send(IPC.GAME_PREPARE_CLOSE);
+    setTimeout(() => {
+      gameQuitFlushDone = true;
+      app.quit();
+    }, 1500);
   }
 });
 
@@ -1138,7 +1156,7 @@ function openSettingsWindow(section, editSshAlias) {
     minHeight: 420,
     title: 'Vessel',
     show: false,
-    resizable: true,
+    resizable: false,
     minimizable: true,
     maximizable: false,
     fullscreenable: false,
@@ -1209,6 +1227,9 @@ function openFontPickerWindow() {
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 14, y: 16 },
     backgroundColor: themeBackgroundColor(),
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'settings-preload.js'),
       contextIsolation: true,
@@ -1592,6 +1613,269 @@ function forgetFileWindowGeometry() {
   }
 }
 
+/* ------------------------------- 游戏窗口 -------------------------------
+   独立游戏窗口：panel 模式（置顶、可浮在全屏应用之上、不跨桌面），全局复用一扇。
+   关闭 / 切换 / 退出前由渲染层 flush 电池存档（见 game-ipc 与 game.js）。 */
+
+function gameWindowSize() {
+  return {
+    width: clampNumber(GAME_WINDOW.width, GAME_WINDOW.minWidth, GAME_WINDOW.maxWidth, 480),
+    height: clampNumber(GAME_WINDOW.height, GAME_WINDOW.minHeight, GAME_WINDOW.maxHeight, 320),
+  };
+}
+
+function gameWindowBoundsForOpen() {
+  const size = gameWindowSize();
+  const saved = gameWindowState && gameWindowState.bounds ? gameWindowState : null;
+  const min = { width: GAME_WINDOW.minWidth, height: GAME_WINDOW.minHeight };
+  const matched = saved ? displayBySignature(screen.getAllDisplays(), saved.display) : null;
+  const bounds = clampBounds(saved ? saved.bounds : null, matched || anchorDisplay(), size, min);
+  bounds.width = Math.min(bounds.width, GAME_WINDOW.maxWidth);
+  bounds.height = Math.min(bounds.height, GAME_WINDOW.maxHeight);
+  return bounds;
+}
+
+function saveGameWindowGeometry() {
+  const win = getGameWindow();
+  if (!win || win.isMaximized() || win.isFullScreen()) return;
+  const bounds = win.getBounds();
+  const next = {
+    display: displaySignature(screen.getDisplayMatching(bounds)),
+    bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
+  };
+  if (!next.display) return;
+  if (JSON.stringify(next) === JSON.stringify(gameWindowState)) return;
+  gameWindowState = next;
+  writeJson(GAME_WINDOW_FILE, gameWindowState);
+}
+
+function scheduleGameWindowGeometrySave() {
+  if (gameWindowGeometryTimer) clearTimeout(gameWindowGeometryTimer);
+  gameWindowGeometryTimer = setTimeout(() => {
+    gameWindowGeometryTimer = null;
+    saveGameWindowGeometry();
+  }, 400);
+}
+
+function forgetGameWindowGeometry() {
+  gameWindowState = null;
+  if (gameWindowGeometryTimer) {
+    clearTimeout(gameWindowGeometryTimer);
+    gameWindowGeometryTimer = null;
+  }
+  try {
+    fs.rmSync(GAME_WINDOW_FILE, { force: true });
+  } catch (err) {
+    logger.warn('remove game-window.json failed:', err.message);
+  }
+}
+
+function getGameWindow() {
+  if (!gameWindow || gameWindow.isDestroyed()) return null;
+  return gameWindow;
+}
+
+function getGameWindowGame() {
+  return gameWindowGame;
+}
+
+function setGameWindowGame(game) {
+  gameWindowGame = game || null;
+  return gameWindowGame;
+}
+
+function isGameWindow(win) {
+  return Boolean(win) && win === gameWindow && !win.isDestroyed();
+}
+
+function openGameWindow(game) {
+  if (!game) return null;
+  const existing = getGameWindow();
+  if (existing) {
+    if (gameWindowGame && gameWindowGame.id === game.id) {
+      existing.show();
+      existing.focus();
+      return existing;
+    }
+    existing.show();
+    existing.focus();
+    existing.webContents.send(IPC.GAME_LOAD, { game: gameService.clientGame(game) });
+    return existing;
+  }
+
+  const bounds = gameWindowBoundsForOpen();
+  gameWindow = new BrowserWindow({
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    minWidth: GAME_WINDOW.minWidth,
+    minHeight: GAME_WINDOW.minHeight,
+    maxWidth: GAME_WINDOW.maxWidth,
+    maxHeight: GAME_WINDOW.maxHeight,
+    title: 'Vessel Games',
+    frame: false,
+    transparent: true,
+    hasShadow: false,
+    roundedCorners: false,
+    acceptFirstMouse: true,
+    show: false,
+    resizable: true,
+    minimizable: true,
+    maximizable: false,
+    fullscreenable: true,
+    alwaysOnTop: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: path.join(PRELOAD_DIR, 'main-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      spellcheck: false,
+    },
+  });
+  gameWindowGame = game;
+  gameWindowClosePending = false;
+  if (gameWindowCloseTimer) {
+    clearTimeout(gameWindowCloseTimer);
+    gameWindowCloseTimer = null;
+  }
+  const win = gameWindow;
+  win.setAlwaysOnTop(false);
+  win.setVisibleOnAllWorkspaces(false, {
+    visibleOnFullScreen: true,
+    skipTransformProcessType: true,
+  });
+  win.webContents.setVisualZoomLevelLimits(1, 1);
+  win.webContents.setZoomFactor(1);
+  win.webContents.on('did-finish-load', () => {
+    try {
+      win.webContents.setZoomFactor(1);
+    } catch (err) {
+      /* ignore */
+    }
+  });
+  win.webContents.on('zoom-changed', (event) => {
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+    win.webContents.setZoomLevel(0);
+  });
+  win.loadURL('game://app/src/renderer/game.html');
+  win.on('resize', () => {
+    if (!win.isFullScreen()) {
+      const [width, height] = win.getSize();
+      const maxWidth = clampNumber(GAME_WINDOW.maxWidth, GAME_WINDOW.minWidth, 10000, 1440);
+      const maxHeight = clampNumber(GAME_WINDOW.maxHeight, GAME_WINDOW.minHeight, 10000, 900);
+      if (width > maxWidth || height > maxHeight) {
+        win.setSize(Math.min(width, maxWidth), Math.min(height, maxHeight));
+      }
+    }
+    scheduleGameWindowGeometrySave();
+  });
+  win.on('move', scheduleGameWindowGeometrySave);
+  scheduleGameWindowGeometrySave();
+  win.on('focus', () => {
+    win.setVisibleOnAllWorkspaces(true, {
+      visibleOnFullScreen: true,
+      skipTransformProcessType: true,
+    });
+    win.setVisibleOnAllWorkspaces(false, {
+      visibleOnFullScreen: true,
+      skipTransformProcessType: true,
+    });
+  });
+  win.once('ready-to-show', () => {
+    win.show();
+    win.focus();
+  });
+  win.on('close', (event) => {
+    if (isQuitting || win.__allowClose) {
+      saveGameWindowGeometry();
+      return;
+    }
+    event.preventDefault();
+    if (gameWindowClosePending) return;
+    gameWindowClosePending = true;
+    win.webContents.send(IPC.GAME_PREPARE_CLOSE);
+    gameWindowCloseTimer = setTimeout(() => {
+      gameWindowCloseTimer = null;
+      closeGameWindowNow();
+    }, GAME_CLOSE_TIMEOUT_MS);
+  });
+  win.on('enter-full-screen', () => {
+    if (!win.isDestroyed()) win.webContents.send(IPC.GAME_FULLSCREEN, { fullscreen: true });
+  });
+  win.on('leave-full-screen', () => {
+    if (!win.isDestroyed()) win.webContents.send(IPC.GAME_FULLSCREEN, { fullscreen: false });
+  });
+  win.on('closed', () => {
+    if (gameWindowCloseTimer) {
+      clearTimeout(gameWindowCloseTimer);
+      gameWindowCloseTimer = null;
+    }
+    gameWindowClosePending = false;
+    gameWindow = null;
+    gameWindowGame = null;
+    if (gameWindowGeometryTimer) {
+      clearTimeout(gameWindowGeometryTimer);
+      gameWindowGeometryTimer = null;
+    }
+  });
+  return gameWindow;
+}
+
+function fitGameWindow(aspect) {
+  const win = getGameWindow();
+  if (!win) return { ok: false, error: 'not-open' };
+  const ratio = Number(aspect);
+  if (!Number.isFinite(ratio) || ratio <= 0) return { ok: false, error: 'invalid-aspect' };
+  const display = screen.getDisplayMatching(win.getBounds());
+  const area = display.workArea;
+  const maxWidth = Math.min(GAME_WINDOW.maxWidth, area.width);
+  const maxHeight = Math.min(GAME_WINDOW.maxHeight, area.height);
+  const minWidth = Math.min(GAME_WINDOW.minWidth, maxWidth);
+  const minHeight = Math.min(GAME_WINDOW.minHeight, maxHeight);
+  const header = GAME_HEADER_HEIGHT;
+  const current = win.getBounds();
+  let stageHeight = Math.max(minHeight - header, Math.min(current.height - header, maxHeight - header));
+  let width = Math.round(stageHeight * ratio);
+  if (width > maxWidth) {
+    width = maxWidth;
+    stageHeight = Math.round(width / ratio);
+  }
+  if (width < minWidth) {
+    width = minWidth;
+    stageHeight = Math.round(width / ratio);
+  }
+  let height = stageHeight + header;
+  if (height > maxHeight) {
+    height = maxHeight;
+    stageHeight = Math.max(1, height - header);
+    width = Math.round(stageHeight * ratio);
+  }
+  width = Math.max(minWidth, Math.min(width, maxWidth));
+  height = Math.max(minHeight, Math.min(height, maxHeight));
+  const centerX = current.x + current.width / 2;
+  const centerY = current.y + current.height / 2;
+  const x = Math.round(Math.max(area.x, Math.min(centerX - width / 2, area.x + area.width - width)));
+  const y = Math.round(Math.max(area.y, Math.min(centerY - height / 2, area.y + area.height - height)));
+  win.setBounds({ x, y, width, height });
+  scheduleGameWindowGeometrySave();
+  return { ok: true, width, height };
+}
+
+function closeGameWindowNow() {
+  if (gameWindowCloseTimer) {
+    clearTimeout(gameWindowCloseTimer);
+    gameWindowCloseTimer = null;
+  }
+  gameWindowClosePending = false;
+  const win = getGameWindow();
+  if (!win) return;
+  saveGameWindowGeometry();
+  win.__allowClose = true;
+  win.destroy();
+}
+
 function closeSettingsWindow() {
   if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.close();
 }
@@ -1697,7 +1981,7 @@ function sendToUpdateWindow(channel, payload) {
 function broadcast(channel, payload) {
   // The always-on-top terminal windows mirror settings too (font size / scrollback /
   // theme / locale); every open terminal window gets the broadcast.
-  const wins = [getMainWindow(), getSettingsWindow(), getFileWindow(), ...terminalWindowsList()];
+  const wins = [getMainWindow(), getSettingsWindow(), getFileWindow(), getGameWindow(), ...terminalWindowsList()];
   for (const win of wins) {
     if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
   }
@@ -1764,6 +2048,14 @@ module.exports = {
   shrinkTerminalToBall,
   startBallDrag,
   stopBallDrag,
+  openGameWindow,
+  getGameWindow,
+  getGameWindowGame,
+  setGameWindowGame,
+  isGameWindow,
+  closeGameWindowNow,
+  fitGameWindow,
+  forgetGameWindowGeometry,
   openFileWindow,
   getFileWindow,
   getFileWindowTarget,

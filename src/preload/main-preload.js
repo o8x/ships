@@ -3,6 +3,7 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 const { IPC } = require('../shared/constants');
 const { loadIcons, loadBallIcons } = require('./icons');
+const gamesApi = require('./games-api');
 const { get: getFlag } = require('./flags');
 
 function on(channel, cb) {
@@ -111,6 +112,7 @@ const api = {
     get: (scope) => ipcRenderer.invoke(IPC.FILES_LAYOUT_GET, { scope }),
     set: (scope, patch) => ipcRenderer.invoke(IPC.FILES_LAYOUT_SET, { scope, patch }),
   },
+  games: gamesApi,
   fileWindow: {
     open: (target, path) => ipcRenderer.invoke(IPC.FILE_WINDOW_OPEN, { target, path }),
     info: () => ipcRenderer.invoke(IPC.FILE_WINDOW_INFO),

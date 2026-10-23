@@ -4,8 +4,9 @@
 | --- | --- |
 | 产品名称 | Vessel |
 | 产品定位 | 面向开发者的 macOS 菜单栏（Tray）工具箱，点击托盘图标在下方展开轻量面板 |
-| 技术栈 | Electron 44（主进程）+ Tailwind CSS 3（界面样式）+ 原生 JavaScript（渲染层，无打包器）+ ssh2（SSH 探测）+ qrcode-generator（二维码生成）+ bwip-js（Data Matrix 生成）+ electron-liquid-glass（macOS 26+ 原生 Liquid Glass，可选）+ electron-updater（自动更新）+ @xterm/xterm 与 @xterm/addon-fit（设置页内嵌终端）+ python3（PTY 桥接脚本）+ 本地 geoip.json（IP 归属地） |
+| 技术栈 | Electron 44（主进程）+ Tailwind CSS 3（界面样式）+ 原生 JavaScript（渲染层，无打包器）+ ssh2（SSH 探测）+ qrcode-generator（二维码生成）+ bwip-js（Data Matrix 生成）+ electron-liquid-glass（macOS 26+ 原生 Liquid Glass，可选）+ electron-updater（自动更新）+ @xterm/xterm 与 @xterm/addon-fit（设置页内嵌终端）+ python3（PTY 桥接脚本）+ 本地 geoip.json（IP 归属地）+ EmulatorJS 4.2.3（离线内置，游戏工具） |
 | 支持平台 | macOS（arm64 / x64；当前主要面向 arm64） |
+| 开源许可 | **GPL-3.0-only**（见仓库根目录 `LICENSE`；第三方组件见 `THIRD_PARTY_NOTICES.md`） |
 | 当前版本 | 4.15.0 |
 | 发布方式 | 本地/CI 通过 `electron-builder` 打包 macOS arm64 **PKG**（`pnpm dist:mac`），安装完成后由 postinstall 自动启动；打 `v*` tag 时发布到 GitHub Releases；macOS 更新用 GitHub Releases API 检测并下载 PKG 打开安装器，Windows 走 `electron-updater` 自动安装（见 `prd/07-build-and-release.md`）；暂未签名 / 公证 |
 
@@ -32,6 +33,7 @@
 | [`prd/10-connection-test.md`](./prd/10-connection-test.md) | §10 连接测试 | 改动连通性测试步骤、请求、成功判定、超时 / 失败处理之前 |
 | [`prd/11-gui-spec.md`](./prd/11-gui-spec.md) | §11 GUI 与布局规范（字体 / 基础色 / 强调色、窗口层级、主壳数值、弹窗组件、平台差异） | 改动颜色、圆角、阴影、间距、字号、控件外观、动画、层级与平台差异之前 |
 | [`prd/12-other.md`](./prd/12-other.md) | §12 其余要点 | 改动下载、本地数据位置、协议 / 端口提示等零散行为之前 |
+| [`prd/13-games.md`](./prd/13-games.md) | §13 游戏工具（EmulatorJS） | 改动游戏工作目录、ROM 扫描 / 封面、按键映射、游戏窗口、EmulatorJS 加载与存档之前 |
 
 > 若项目内嵌 Webview，额外维护 `docs/prd/webview.md`（注入 API、模态 / 子窗口集成）；本项目当前不使用 Webview。
 
@@ -42,6 +44,7 @@
 - **改接口 / 数据结构**：本索引 → `05` → `02`（安全模型）→ 对应流程（`03` / `06`）。
 - **改构建 / 发版**：本索引 → `07` → `11`（平台差异）。
 - **改样式 / 布局**：本索引 → `11` → `08`；颜色 / 间距常量在 `src/renderer/styles/constants.css`。
+- **改游戏工具**：本索引 → `13` → `04`（工具清单）→ `05`（IPC / 数据）→ `08` / `11`（窗口与视觉）。
 
 ---
 
@@ -71,3 +74,5 @@
 | 修改 GeoIP / 国旗 | `prd/02-overview.md`（项目结构）、`prd/05-data-and-api.md`（`geo:lookup`）、`prd/08-layout.md`、`assets/geoip.json` / `assets/flags/` |
 | 修改构建 / 脚本 / 依赖 / CI | `prd/07-build-and-release.md`、`package.json`、`pnpm-lock.yaml`、`.github/workflows/*.yml` |
 | 修改 appId / 本地网络权限 / 安装位置 | `prd/03-flows.md`（§3.1 / §3.5）、`prd/07-build-and-release.md`、`docs/FAQ.md` §1 |
+| 新增 / 修改游戏工具（工作目录 / 扫描 / 按键 / 窗口 / 存档 / EmulatorJS） | `prd/13-games.md`、`prd/04-feature-list.md`、`prd/05-data-and-api.md`、`prd/08-layout.md`、`prd/11-gui-spec.md`、`package.json` 的 `vessel.gameWindow` |
+| 新增 / 修改 EmulatorJS 运行时 / 版本 | `prd/13-games.md`（§13.7 / §13.11）、`prd/07-build-and-release.md`、`assets/emulatorjs/` |

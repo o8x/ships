@@ -43,14 +43,18 @@ const { registerTerminalIpc } = require('./ipc/terminal-ipc');
 const { registerShortcutIpc } = require('./ipc/shortcut-ipc');
 const { registerSftpIpc } = require('./ipc/sftp-ipc');
 const { registerFileWindowIpc } = require('./ipc/file-window-ipc');
+const { registerGameIpc } = require('./ipc/game-ipc');
 const { registerUpdateIpc } = require('./ipc/update-ipc');
 const { registerBackupIpc } = require('./ipc/backup-ipc');
 const { installApplicationMenu } = require('./menu');
 const { requestLocalNetworkAccess } = require('./services/local-network-service');
 const proxyService = require('./services/proxy-service');
 const logger = require('./utils/logger');
+const gameService = require('./services/game-service');
 const { DATA_FILES } = require('./utils/paths');
 const { APP_NAME, VERSION, appConfig } = require('../shared/constants');
+
+gameService.registerGameScheme();
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -79,7 +83,9 @@ function onReady() {
   registerShortcutIpc(ipcMain);
   registerSftpIpc(ipcMain);
   registerFileWindowIpc(ipcMain);
+  registerGameIpc(ipcMain);
   registerUpdateIpc(ipcMain);
+  gameService.registerGameProtocol();
   registerBackupIpc(ipcMain);
 
   installApplicationMenu();
@@ -105,6 +111,7 @@ function printStartupInfo() {
   logger.info(`${APP_NAME} v${VERSION} (${process.platform}/${process.arch})`);
   logger.info('data files:');
   for (const file of DATA_FILES) logger.info(`  - ${file}`);
+  logger.info(`games workdir: ${gameService.configuredWorkDir()}`);
 }
 
 app.on('window-all-closed', () => {
