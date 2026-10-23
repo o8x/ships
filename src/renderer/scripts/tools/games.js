@@ -40,9 +40,21 @@
     },
   });
 
-  function initialOf(name) {
-    const trimmed = String(name || '').trim();
-    return trimmed ? Array.from(trimmed)[0].toUpperCase() : '?';
+  function coverLabel(name) {
+    const text = String(name || '').trim();
+    if (!text) return '?';
+    const words = text.split(/[\s()（）]+/).filter(Boolean).slice(0, constants.GAME_COVER_LABEL_WORDS || 2);
+    const full = words.join(' ');
+    if (!full) return '?';
+    let label = '';
+    let units = 0;
+    for (const char of Array.from(full)) {
+      const width = /\p{Script=Han}/u.test(char) ? constants.GAME_COVER_HAN_UNITS || 2 : 1;
+      if (units + width > (constants.GAME_COVER_LABEL_MAX_UNITS || 16)) break;
+      label += char;
+      units += width;
+    }
+    return label.trim() || '?';
   }
 
   function fuzzyMatch(text, query) {
@@ -140,8 +152,7 @@
       }
     }
 
-    function tile(game, engineLabel) {
-      const label = game.label || engineLabel;
+    function tile(game) {
       const button = el('button', {
         class: 'game-tile',
         type: 'button',
@@ -159,11 +170,11 @@
           loading: 'lazy',
         });
         cover.addEventListener('error', () => {
-          const fallback = placeholder(game, label);
+          const fallback = placeholder(game);
           if (cover.parentNode) cover.parentNode.replaceChild(fallback, cover);
         });
       } else {
-        cover = placeholder(game, label);
+        cover = placeholder(game);
       }
       const name = el('span', { class: 'game-name' }, game.name);
       button.append(cover, name);
@@ -172,12 +183,9 @@
       return button;
     }
 
-    function placeholder(game, engineLabel) {
+    function placeholder(game) {
       const node = el('div', { class: 'game-cover game-cover-placeholder' });
-      node.append(
-        el('span', { class: 'game-cover-engine' }, engineLabel),
-        el('span', { class: 'game-cover-initial' }, initialOf(game.name))
-      );
+      node.append(el('span', { class: 'game-cover-label' }, coverLabel(game.name)));
       return node;
     }
 
@@ -190,7 +198,7 @@
       const end = Math.min(category.rendered + CHUNK_SIZE, category.games.length);
       const fragment = document.createDocumentFragment();
       for (let i = category.rendered; i < end; i += 1) {
-        fragment.appendChild(tile(category.games[i], category.label));
+        fragment.appendChild(tile(category.games[i]));
       }
       category.grid.appendChild(fragment);
       category.rendered = end;

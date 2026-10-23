@@ -2257,21 +2257,16 @@ html[data-window-mode='window'] .game-grid {
   box-shadow: 0 0 0 1px var(--color-accent);
 }
 .game-cover-placeholder {
-  flex-direction: column;
-  gap: 2px;
-  color: var(--color-fg-muted);
-}
-.game-cover-engine {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  opacity: 0.72;
-}
-.game-cover-initial {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1;
+  padding: 2px;
   color: var(--color-fg);
+}
+.game-cover-label {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
 }
 .game-name {
   display: -webkit-box;
