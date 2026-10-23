@@ -2143,6 +2143,24 @@ body.file-window .fm-tree-row {
 }
 
 /* ------------------------------- 游戏工具 -------------------------------- */
+.game-head-actions {
+  top: -4px;
+  width: 350px;
+  max-width: calc(100vw - 120px);
+}
+.game-head-actions .game-search {
+  width: 100%;
+  margin-bottom: 0;
+}
+.tool-head.game-head {
+  padding-right: calc(min(350px, 100vw - 120px) + 10px);
+}
+[data-window-mode='float'] .game-head-actions {
+  width: 200px;
+}
+[data-window-mode='float'] .tool-head.game-head {
+  padding-right: 210px;
+}
 .game-search {
   position: relative;
   margin-bottom: 8px;
@@ -2157,7 +2175,10 @@ body.file-window .fm-tree-row {
   pointer-events: none;
 }
 .game-search-input {
-  padding-left: 30px;
+  height: 26px;
+  padding: 0 10px 0 28px;
+  font-size: 12px;
+  line-height: 1;
 }
 .game-status {
   margin-bottom: 8px;
@@ -2224,6 +2245,7 @@ html[data-window-mode='window'] .game-grid {
   grid-template-columns: repeat(8, minmax(0, 1fr));
 }
 .game-tile {
+  position: relative;
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -2247,6 +2269,17 @@ html[data-window-mode='window'] .game-grid {
   background: var(--color-surface-2);
   object-fit: cover;
   transition: border-color 0.12s ease, transform 0.12s ease;
+}
+.game-played-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-surface);
+  pointer-events: none;
 }
 .game-tile:hover .game-cover {
   border-color: var(--color-border-strong);

@@ -46,7 +46,8 @@ window.ShipsConstants = {
   DEBOUNCE_MS: 120,
   // 游戏列表分批渲染：每批 tile 数量（几千个 ROM 时避免一次性建满 DOM）。
   GAME_TILE_CHUNK_SIZE: 120,
-  // 占位封面文字：取前两个词；按宽度截断（汉字按 2 个单位），上限 16 个单位（= 8 个汉字）。
+  // 占位封面文字：忽略括号内容，取前两个有效单词；连接字符不计入长度；
+  // 汉字按 2 个单位、其它字母 / 数字按 1 个单位，上限 16 个单位（= 8 个汉字）。
   GAME_COVER_LABEL_WORDS: 2,
   GAME_COVER_LABEL_MAX_UNITS: 16,
   GAME_COVER_HAN_UNITS: 2,

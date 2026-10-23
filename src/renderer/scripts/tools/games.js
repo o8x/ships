@@ -41,15 +41,25 @@
   });
 
   function coverLabel(name) {
-    const text = String(name || '').trim();
+    const text = String(name || '')
+      .replace(/\([^()]*\)|（[^（）]*）/g, ' ')
+      .trim();
     if (!text) return '?';
-    const words = text.split(/[\s()（）]+/).filter(Boolean).slice(0, constants.GAME_COVER_LABEL_WORDS || 2);
+    const words = (text.match(/[\p{L}\p{N}]+/gu) || []).slice(
+      0,
+      constants.GAME_COVER_LABEL_WORDS || 2
+    );
     const full = words.join(' ');
     if (!full) return '?';
     let label = '';
     let units = 0;
     for (const char of Array.from(full)) {
-      const width = /\p{Script=Han}/u.test(char) ? constants.GAME_COVER_HAN_UNITS || 2 : 1;
+      const wordChar = /[\p{L}\p{N}]/u.test(char);
+      const width = !wordChar
+        ? 0
+        : /\p{Script=Han}/u.test(char)
+          ? constants.GAME_COVER_HAN_UNITS || 2
+          : 1;
       if (units + width > (constants.GAME_COVER_LABEL_MAX_UNITS || 16)) break;
       label += char;
       units += width;
@@ -78,7 +88,7 @@
     return index;
   }
 
-  function mount(body) {
+  function mount(body, ctx) {
     const state = {
       data: null,
       selectedId: '',
@@ -136,8 +146,9 @@
       status.classList.toggle('text-danger', Boolean(danger));
     }
 
-    function select(id) {
+    function select(id, name) {
       state.selectedId = id;
+      if (name) searchInput.placeholder = name;
       for (const node of list.querySelectorAll('.game-tile')) {
         node.classList.toggle('selected', node.dataset.id === id);
       }
@@ -160,6 +171,10 @@
         'data-tip': game.name,
       });
       if (game.id === state.selectedId) button.classList.add('selected');
+      if (game.played) {
+        button.classList.add('played');
+        button.appendChild(el('span', { class: 'game-played-dot', 'aria-hidden': 'true' }));
+      }
       let cover;
       if (game.coverUrl) {
         cover = el('img', {
@@ -178,7 +193,7 @@
       }
       const name = el('span', { class: 'game-name' }, game.name);
       button.append(cover, name);
-      button.addEventListener('click', () => select(game.id));
+      button.addEventListener('click', () => select(game.id, game.name));
       button.addEventListener('dblclick', () => openGame(game.id));
       return button;
     }
@@ -388,7 +403,14 @@
     window.addEventListener('focus', scheduleRefresh);
     document.addEventListener('keydown', onKeydown);
 
-    body.append(searchWrap, status, list);
+    if (ctx && ctx.headerActions) {
+      ctx.headerActions.classList.add('game-head-actions');
+      if (ctx.headerActions.parentElement) ctx.headerActions.parentElement.classList.add('game-head');
+      ctx.headerActions.appendChild(searchWrap);
+    } else {
+      body.appendChild(searchWrap);
+    }
+    body.append(status, list);
     refresh();
 
     state.cleanup = () => {

@@ -249,6 +249,7 @@ function clientGame(game) {
     romRelativePath: game.romRelativePath,
     size: game.size,
     mtime: game.mtime,
+    played: Boolean(game.played),
     coverUrl: game.coverPath ? `game://cover/${encodeURIComponent(game.id)}` : '',
     romUrl: `game://rom/${encodeURIComponent(game.id)}`,
   };
@@ -276,6 +277,7 @@ function scanWorkDir() {
   const workDir = ensureSkeleton(configuredWorkDir());
   const engines = [];
   const byId = new Map();
+  const playedAt = readPlayedAtMap(workDir);
 
   for (const engine of GAME_ENGINES) {
     const engineDir = path.join(workDir, GAME_ROM_DIR, engine.id);
@@ -307,6 +309,7 @@ function scanWorkDir() {
         coverPath: coverFor(romPath),
         size: stat.size,
         mtime: stat.mtimeMs,
+        played: playedAt.has(id),
         workDir,
       };
       games.push(game);
@@ -336,7 +339,6 @@ function scanWorkDir() {
     engines.push({ id: engine.id, label: engine.label, games: games.map(clientGame) });
   }
 
-  const playedAt = readPlayedAtMap(workDir);
   const recent = Array.from(byId.values())
     .map((game) => ({ game, lastPlayedAt: playedAt.get(game.id) || 0 }))
     .filter((entry) => entry.lastPlayedAt > 0)
