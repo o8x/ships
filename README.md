@@ -18,7 +18,7 @@ Vessel is a lightweight macOS menu bar toolbox for developers. It stays in the t
 - **Hash** — MD5 / SHA1 / SHA256 for text or large local files.
 - **Nutrition** — per-100g nutrition, salt / kcal / kJ conversion, TDEE calculator and saved products.
 - **Clipboard** — recent text, image and SVG clipboard history with one-click copy or clear.
-- **Games** — FC / GBA / N64 / SFC library with covers, fuzzy search, collapsible categories, saves and FDS BIOS support.
+- **Games** — FC / GBC / GBA / N64 / SFC library with covers, fuzzy search, collapsible categories, saves and FDS BIOS support.
 
 ## More
 

@@ -4,13 +4,13 @@
 
 ### 13.1 范围与术语
 
-- 本工具在 Vessel 内接入 **EmulatorJS**，支持 4 个引擎：**FC / GBA / N64 / SFC**。
+- 本工具在 Vessel 内接入 **EmulatorJS**，支持 5 个引擎：**FC / GBC / GBA / N64 / SFC**。
 - EmulatorJS 运行时**离线内置**到仓库，固定版本（当前规划 **v4.2.3**），不依赖 CDN、不联网。
 - 功能范围：游戏设置（工作目录 / 按键映射）、主界面游戏库（分类 + 封面）、独立游戏窗口（模拟器 + 控制区 + 存档）。
 - 非目标：联机对战、金手指管理、RomM / 在线刮削、多游戏窗口并行、成就系统。
 - 术语：
   - **工作目录**：用户指定的游戏根目录，固定包含 `roms/` 与 `profiles/`。
-  - **引擎**：`fc` / `gba` / `n64` / `sfc` 四个分类，对应 EmulatorJS 的 core。
+  - **引擎**：`fc` / `gbc` / `gba` / `n64` / `sfc` 五个分类，对应 EmulatorJS 的 core。
   - **游戏**：某个引擎目录下的一个 ROM 文件。
   - **即时存档**：EmulatorJS save state（单个槽位）。
   - **电池存档**：游戏自身写出的 SRAM / save RAM。
@@ -36,6 +36,7 @@
 <workDir>/
   roms/
     fc/        # FC / Famicom / NES ROM
+    gbc/       # Game Boy Color ROM
     gba/       # Game Boy Advance ROM
     n64/       # Nintendo 64 ROM
     sfc/       # Super Famicom / SNES ROM
@@ -50,17 +51,17 @@
 ```
 
 - 正式目录名为 **`profiles`**（复数）；兼容读取旧目录 `profile`（单数）：仅当 `profiles/` 不存在且 `profile/` 存在时，读取 / 写入 `profile/`，不主动迁移。
-- 未打包运行时仓库内已有 `assets/games/roms/{fc,gba,n64,sfc}` 与 `assets/games/profiles/`，可直接用于调试。
+- 未打包运行时仓库内已有 `assets/games/roms/{fc,gbc,gba,n64,sfc}` 与 `assets/games/profiles/`，可直接用于调试。
 - ROM 可放在引擎目录的**直接子文件**，也可放在**子目录**中（如 `roms/fc/name/xxx.nes`）：子目录内（含更深层）的 ROM 以**最外层子目录名**作为显示名称；隐藏文件 / 目录（`.` 开头）与符号链接跳过。
 - 封面图允许与 ROM 同目录、同基名的 sidecar 文件（见 13.3.3）。
 
 #### 13.2.3 目录初始化
 
-- 首次扫描 / 首次打开工作目录时，若 `roms/`、`profiles/`、`bios/` 或四个引擎子目录缺失，则自动创建。
+- 首次扫描 / 首次打开工作目录时，若 `roms/`、`profiles/`、`bios/` 或五个引擎子目录缺失，则自动创建。
 - 保存新的自定义工作目录时：
   1. 展开 `~` 并转为绝对路径；
   2. 不可写则返回错误，设置不变；
-  3. 可写则创建 `roms/{fc,gba,n64,sfc}`、`bios/` 与 `profiles/`；
+  3. 可写则创建 `roms/{fc,gbc,gba,n64,sfc}`、`bios/` 与 `profiles/`；
   4. 写入 `settings.gameWorkDir` 并广播设置变更。
 - 创建失败不删除用户已有文件，只返回错误并在界面就地提示。
 
@@ -71,11 +72,12 @@
 | 引擎 | 目录 | 显示名 | EmulatorJS core | 接受的扩展名（不区分大小写） |
 | --- | --- | --- | --- | --- |
 | `fc` | `roms/fc/` | FC | `fceumm` | `.nes` `.fds` `.unf` `.unif` |
+| `gbc` | `roms/gbc/` | GBC | `gambatte` | `.gbc` |
 | `gba` | `roms/gba/` | GBA | `mgba` | `.gba` |
 | `n64` | `roms/n64/` | N64 | `mupen64plus_next` | `.z64` `.n64` `.v64` |
 | `sfc` | `roms/sfc/` | SFC | `snes9x` | `.sfc` `.smc` `.fig` |
 
-- 分类顺序固定为 `fc → gba → n64 → sfc`。
+- 分类顺序固定为 `fc → gbc → gba → n64 → sfc`。
 - 扩展名匹配**不区分大小写**（`.NES` / `.Z64` 等同样接受）；扩展名不在表中的文件（如 `.txt` / `.md` / `.xxx`）忽略；sidecar 封面图不作为游戏。
 - 每个分类内按显示名称做自然排序（`Intl.Collator`，数字按数值比较，忽略大小写）。
 
@@ -174,12 +176,12 @@
 
 #### 13.5.4 通用按键与平台专有按键
 
-- **通用按键**：`settings.gameCommonKeys`，四个平台共用：上 / 下 / 左 / 右、A、B、X、Y、L、R。
-  - 方向键在 FC / GBA / SFC 上映射到十字键；在 N64 上映射到**摇杆**。
+- **通用按键**：`settings.gameCommonKeys`，各平台按需共用：上 / 下 / 左 / 右、A、B、X、Y、L / R（GBC 仅使用方向键与 A / B）。
+  - 方向键在 FC / GBC / GBA / SFC 上映射到十字键；在 N64 上映射到**摇杆**。
   - X / Y 仅 SFC 实际使用；L / R 除 FC 外使用；界面仍统一展示，绑定额外键不会造成影响。
 - **平台专有按键**：`settings.gameKeymaps`，只保存该平台独有的动作；当前仅 N64：
   - 十字键（`dpadUp/down/left/right`）、Z、C 上 / 下 / 左 / 右。
-  - FC / GBA / SFC 没有专有按键，不显示专有按键卡片。
+  - FC / GBC / GBA / SFC 没有专有按键，不显示专有按键卡片。
 - 绑定值统一使用 **`KeyboardEvent.code`**（如 `KeyW` / `Space` / `ShiftLeft` / `ArrowUp` / `F5`）或鼠标按钮 **`Mouse0` / `Mouse1` / `Mouse2`**；空字符串表示未绑定。
 - 点击键帽进入捕获态：按键 / 鼠标按钮即绑定；`Esc` 取消；`Backspace` / `Delete` 清除；只允许单键，不支持组合键。
 - 冲突检测：同一平台内（通用动作 + 专有动作）不允许重复；与功能快捷键不允许重复。冲突时红字提示且拒绝保存。
@@ -225,7 +227,7 @@
 
 #### 13.5.5 功能快捷键（全局）
 
-- 存储键：`settings.gameHotkeys`；对四个平台共用，包含 **Start / Select** 与模拟器功能：
+- 存储键：`settings.gameHotkeys`；对五个平台共用，包含 **Start / Select** 与模拟器功能：
 
 | 功能 | 默认绑定 | 行为 |
 | --- | --- | --- |
@@ -344,6 +346,7 @@
     version.json
     cores/
       fceumm/…
+      gambatte/…
       mgba/…
       mupen64plus_next/…
       snes9x/…
@@ -568,7 +571,7 @@ flowchart TD
 ### 13.12 验收清单
 
 - [ ] 设置中出现「游戏」分区；工作目录默认值在打包 / 未打包两种场景正确。
-- [ ] 工作目录切换后可创建 `roms/{fc,gba,n64,sfc}` 与 `profiles/`，失败有明确提示。
+- [ ] 工作目录切换后可创建 `roms/{fc,gbc,gba,n64,sfc}` 与 `profiles/`，失败有明确提示。
 - [ ] 主界面出现「游戏」TAB；窗口模式 8 列、悬浮模式 4 列；分类标题与封面正确。
 - [ ] sidecar 封面命中与占位封面都正常；无游戏时有空状态；主界面不显示「修改 / 刷新」按钮。
 - [ ] `roms/<engine>/<文件夹>/xxx.rom` 以文件夹名展示并加载目录内 ROM；扩展名大小写不敏感，非本引擎扩展名（`.txt` / `.md` / `.xxx`）被忽略。
@@ -582,7 +585,7 @@ flowchart TD
 - [ ] 游戏窗口失去焦点时自动暂停并 flush 电池存档；重新聚焦时仅对「自动暂停」自动继续，手动暂停不自动继续。
 - [ ] 控制区悬浮在画面上，显示 / 隐藏不改变游戏画面尺寸；包含确认 / 选择 / 暂停 / 重启 / 保存 / 读取 / 截图 / 快进 / 静音 / 音量 / 适配画面 / 全屏 / 隐藏。
 - [ ] 适配画面后窗口左右无黑边；全屏为真全屏且自动隐藏标题栏与控制区，退出后恢复。
-- [ ] 四个引擎均能加载并进入游戏；通用方向键在 N64 映射到摇杆；N64 专有键标注「N64 模拟器专用」；Start / Select 在功能快捷键中可绑定；鼠标左 / 右键可映射。
+- [ ] 五个引擎均能加载并进入游戏（GBC 使用 `gambatte` 核心与 `.gbc` ROM）；通用方向键在 N64 映射到摇杆；N64 专有键标注「N64 模拟器专用」；Start / Select 在功能快捷键中可绑定；鼠标左 / 右键可映射。
 - [ ] 按键冲突被阻止；设置重启后保留。
 - [ ] 电池存档每 15 秒 / 暂停 / 关闭时写入 `profiles/<gameId>/battery.srm`；下次启动自动读取。
 - [ ] 即时存档保存 / 读取成功，生成 `state.slot1` 与 `state.slot1.png`。

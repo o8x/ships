@@ -36,8 +36,8 @@ Vessel/
 │   │   ├── app.png              # 应用图标（512，README 引用）
 │   │   └── icon.icns            # 打包用 macOS 图标
 │   ├── flags/                   # 国旗图标（`<CC>.svg` 长方形 / `<CC>_1x1.svg` 方形）
-│   ├── emulatorjs/              # EmulatorJS 4.2.3 离线运行时（loader / emulator / 四个 core / compression）
-│   ├── games/                   # 未打包调试用游戏工作目录（`roms/{fc,gba,n64,sfc}` + `profiles/`，不打包）
+│   ├── emulatorjs/              # EmulatorJS 4.2.3 离线运行时（loader / emulator / 五个 core / compression）
+│   ├── games/                   # 未打包调试用游戏工作目录（`roms/{fc,gbc,gba,n64,sfc}` + `profiles/`，不打包）
 │   └── geoip.json               # IP 归属地数据库（单行大文件，由 geo-service `require`）
 ├── .github/workflows/build-mac.yml  # CI：构建 macOS arm64 PKG
 ├── scripts/                     # 构建 / 工具脚本（不打包进产物）

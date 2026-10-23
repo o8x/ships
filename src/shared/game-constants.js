@@ -53,6 +53,14 @@ const GAME_ENGINES = [
     actions: [],
   },
   {
+    id: 'gbc',
+    label: 'GBC',
+    core: 'gambatte',
+    extensions: ['.gbc'],
+    commonActions: ['up', 'down', 'left', 'right', 'a', 'b'],
+    actions: [],
+  },
+  {
     id: 'gba',
     label: 'GBA',
     core: 'mgba',
