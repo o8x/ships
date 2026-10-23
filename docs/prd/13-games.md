@@ -39,6 +39,8 @@
     gba/       # Game Boy Advance ROM
     n64/       # Nintendo 64 ROM
     sfc/       # Super Famicom / SNES ROM
+  bios/
+    disksys.rom  # FDS BIOS（用户选择后自动复制到此，未配置时不存在）
   profiles/
     <gameId>/  # 每个游戏一个独立目录
       battery.srm
@@ -49,16 +51,16 @@
 
 - 正式目录名为 **`profiles`**（复数）；兼容读取旧目录 `profile`（单数）：仅当 `profiles/` 不存在且 `profile/` 存在时，读取 / 写入 `profile/`，不主动迁移。
 - 未打包运行时仓库内已有 `assets/games/roms/{fc,gba,n64,sfc}` 与 `assets/games/profiles/`，可直接用于调试。
-- ROM 只扫描引擎目录的**直接子文件**，不递归子目录；隐藏文件（`.` 开头）与符号链接跳过。
+- ROM 可放在引擎目录的**直接子文件**，也可放在**子目录**中（如 `roms/fc/name/xxx.nes`）：子目录内（含更深层）的 ROM 以**最外层子目录名**作为显示名称；隐藏文件 / 目录（`.` 开头）与符号链接跳过。
 - 封面图允许与 ROM 同目录、同基名的 sidecar 文件（见 13.3.3）。
 
 #### 13.2.3 目录初始化
 
-- 首次扫描 / 首次打开工作目录时，若 `roms/`、`profiles/` 或四个引擎子目录缺失，则自动创建。
+- 首次扫描 / 首次打开工作目录时，若 `roms/`、`profiles/`、`bios/` 或四个引擎子目录缺失，则自动创建。
 - 保存新的自定义工作目录时：
   1. 展开 `~` 并转为绝对路径；
   2. 不可写则返回错误，设置不变；
-  3. 可写则创建 `roms/{fc,gba,n64,sfc}` 与 `profiles/`；
+  3. 可写则创建 `roms/{fc,gba,n64,sfc}`、`bios/` 与 `profiles/`；
   4. 写入 `settings.gameWorkDir` 并广播设置变更。
 - 创建失败不删除用户已有文件，只返回错误并在界面就地提示。
 
@@ -74,15 +76,17 @@
 | `sfc` | `roms/sfc/` | SFC | `snes9x` | `.sfc` `.smc` `.fig` |
 
 - 分类顺序固定为 `fc → gba → n64 → sfc`。
-- 扩展名不在表中的文件忽略；sidecar 封面图不作为游戏。
+- 扩展名匹配**不区分大小写**（`.NES` / `.Z64` 等同样接受）；扩展名不在表中的文件（如 `.txt` / `.md` / `.xxx`）忽略；sidecar 封面图不作为游戏。
 - 每个分类内按显示名称做自然排序（`Intl.Collator`，数字按数值比较，忽略大小写）。
 
 #### 13.3.2 显示名称与 gameId
 
-- **显示名称**：ROM 文件名去掉最后一个扩展名，保留 Region / 语言括号等原始信息（例：`Super Mario World (USA)`）。
+- **显示名称**：
+  - 直接放在引擎目录下的 ROM：文件名去掉最后一个扩展名，保留 Region / 语言括号等原始信息（例：`Super Mario World (USA)`）；
+  - 放在子目录中的 ROM（`roms/<engine>/<name>/xxx.rom`）：使用**最外层子目录名** `<name>` 作为显示名称；运行时仍加载该目录内的 ROM 文件。
 - **gameId**：由「引擎 + 显示名称」生成稳定、文件系统安全的标识：
   - `slug` = 显示名称转小写，连续非字母数字字符替换为 `-`，去首尾 `-`，最长 48 字符；为空时用 `game`；
-  - `shortHash` = `sha1('<engine>/<显示名称>')` 的前 8 位十六进制；
+  - `shortHash` = `sha1('<engine>/<ROM 相对引擎目录的路径，含扩展名>')` 的前 8 位十六进制；
   - `gameId = '<engine>-<slug>-<shortHash>'`（例：`sfc-super-mario-world-usa-1a2b3c4d`）；
   - 同一引擎下重名的不同 ROM（不同扩展名）因 hash 不同仍可区分。
 - **注意**：重命名 / 移动 ROM 会生成新的 `gameId`，旧存档目录不会自动跟随；PRD 接受该行为，界面可在右键菜单中提示存档目录位置（后续可选）。
@@ -97,7 +101,7 @@
   4. `<base>.webp`
 - 命中多个时按上述优先级取第一个；文件名大小写不敏感；封面文件本身不参与 ROM 扫描。
 - 封面通过只读协议 `game://cover/<gameId>` 提供给渲染层，不直接暴露 `file://` 路径。
-- 未命中时使用**占位封面**：渲染层按 `gameId` 哈希生成稳定色相，显示引擎缩写 + 名称首字符；不生成 / 不写入任何文件。
+- 未命中时使用**占位封面**：使用主题中性色（`--color-surface-2` 底色 + `--color-fg` / `--color-fg-muted` 文字），不使用彩色渐变；显示引擎缩写 + 名称首字符；不生成 / 不写入任何文件。
 - 封面图片按容器等比裁切（`object-fit: cover`），圆角 `--radius-card`，不拉伸。
 
 ### 13.4 主界面「游戏」工具
@@ -110,11 +114,13 @@
 
 #### 13.4.2 布局
 
-- 内容区纵向滚动；顶部右侧为一排图标按钮：**修改**（打开设置 → 游戏）与**刷新**；不再显示工作目录路径。
-- 进入工具页面时自动扫描一次；主窗口重新获得焦点、工作目录变更时也会刷新。
-- 按引擎分类展示；分类顺序见 13.3.1。**只展示有游戏的分类**；全部为空时显示空状态。
-- 每个分类：
-  - 分类标题：引擎显示名 + 游戏数量（例：`FC · 3`）；
+- 内容区纵向滚动；**顶部不显示工具栏与工作目录路径**，也不提供「修改 / 刷新」按钮；顶部为**搜索框**，下方展示分类与封面。
+- 进入工具页面时自动扫描一次；主窗口重新获得焦点、工作目录变更时也会自动刷新。
+- 按引擎分类展示；分类顺序见 13.3.1。**只展示有游戏的分类**；全部为空时显示空状态，搜索无结果时显示「没有匹配的游戏」。
+- 分类最上方为 **「最近启动」**（`id: recent`，标题按语言显示「最近启动」/「Recently played」）：仅当存在已启动过的游戏时显示，按 `meta.json` 的 `lastPlayedAt` **倒序**取最近 **8** 个（`GAME_RECENT_LIMIT`，见 `src/shared/game-constants.js`）；同一游戏同时保留在其所属引擎分类中。
+- 每个分类为**手风琴**：
+  - 分类标题（可点击）：左侧 `caret-right` 图标（展开时旋转 90°）+ 引擎显示名 + 游戏数量（例：`FC · 3`）；
+  - 点击标题整体折叠 / 展开；折叠后不渲染该分类的卡片（DOM 清空），展开时重新按需渲染；
   - 下方为封面网格。
 - 网格列数：
   - 主界面**窗口模式**（640px 宽）：**固定 8 列**；
@@ -125,13 +131,16 @@
   - 封面下方为名称，字号 11px、最多 2 行、超出省略；完整名称通过悬浮提示展示；
   - 悬浮时封面轻微提亮 / 描边强调色；键盘选中或单击选中时使用强调色描边；
   - 卡片可不显示单独引擎徽标（分类标题已表达）。
-- 空状态：显示「工作目录中未找到游戏」与提示；顶部仍可用「修改 / 刷新」。
+- 空状态：无任何游戏时显示「工作目录中未找到游戏」与提示；搜索无结果时只显示「没有匹配的游戏」。
+- **性能（几千个 ROM）**：卡片**分批渲染**（每批 `GAME_TILE_CHUNK_SIZE` = **120** 个，见 `src/renderer/scripts/constants.js`），由 `IntersectionObserver`（根为 `#content`，`rootMargin: 300px`）在分类 / 列表接近视口时加载下一批；未展开的分类不渲染卡片；搜索输入防抖 `DEBOUNCE_MS` = 120ms。
 
 #### 13.4.3 交互
 
+- **搜索**：顶部单行搜索框，输入后按名称**模糊匹配**（忽略大小写；优先子串匹配，其次允许按字符顺序跳字匹配），经 120ms 防抖后过滤；`Enter` 立即应用，`Esc` 清空。过滤结果仍按分类展示，分类计数为匹配数量。
 - **单击**卡片：选中（仅视觉选中，不启动）。
 - **双击**卡片：调用 `games:open` 打开 / 复用游戏窗口并加载该游戏。
 - 选中卡片后按 `Enter`：等同于双击。
+- **启动即记录**：双击 / `Enter` 启动游戏时，主进程立即把该游戏的 `meta.json` 的 `lastPlayedAt` 更新为当前时间；返回游戏工具（重新聚焦）后「最近启动」自动按最新顺序排列。
 - **刷新时机**：工具挂载时、主窗口重新获得焦点时（节流 500ms）、`settings:changed` 中的工作目录 / 按键映射变化后。
 - 扫描进行中显示轻量加载态，不阻塞其它工具；扫描失败显示错误。
 - 右键菜单（可选，首版可不做）：在 Finder 中显示 ROM、打开该游戏存档目录。
@@ -141,7 +150,7 @@
 #### 13.5.1 分区注册
 
 - 设置分区 id：`games`；导航标签「游戏」；图标 `gamepad`；位置在「快捷键」之后、「网络测试」之前。
-- 分区内容分为三块：**工作目录**、**通用按键 + 平台专有按键**、**功能快捷键**。
+- 分区内容分为四块：**工作目录**、**FDS BIOS**、**通用按键 + 平台专有按键**、**功能快捷键**。
 
 #### 13.5.2 工作目录
 
@@ -153,7 +162,17 @@
 - 选择目录后立即尝试保存；成功后就地刷新显示与实际扫描列表；失败时红字提示且保持旧值。
 - 默认路径来源见 13.2.1；界面注明当前是「默认」还是「自定义」。目录输入框与按钮同一行、间距 6px，不展示逐目录解析说明。
 
-#### 13.5.3 通用按键与平台专有按键
+#### 13.5.3 FDS BIOS
+
+- 设置键：`settings.gameFdsBios`（字符串路径，默认 `''` = 未配置，**无默认值**）。
+- 用于运行 `.fds`（Famicom Disk System）游戏所需的 `disksys.rom`；文件由用户自行准备。
+- 控件：当前路径（只读文本，单行省略，悬浮显示完整路径）；「选择文件」按钮（系统文件选择框，筛选 `.rom`，默认定位到当前已选文件）；「清除」按钮（写回空字符串，未配置时禁用）。
+- **选择后自动复制**：校验所选文件存在且为普通文件后，复制为 `<workDir>/bios/disksys.rom`（目录不存在时自动创建），再把该**副本路径**写入 `settings.gameFdsBios`；若所选文件已是该副本路径则不重复复制。
+- 复制成功后更新界面；失败（如工作目录不可写）红字提示且保持旧值。「清除」只清空配置，不删除已复制的文件。
+- 界面以徽标显示「已配置 / 未配置」。
+- 仅在打开 `.fds` 游戏且已配置时，游戏窗口设置 `EJS_biosUrl = 'game://bios/disksys.rom'`；协议从该配置路径读取文件。其它引擎 / 后缀不加载 BIOS。
+
+#### 13.5.4 通用按键与平台专有按键
 
 - **通用按键**：`settings.gameCommonKeys`，四个平台共用：上 / 下 / 左 / 右、A、B、X、Y、L、R。
   - 方向键在 FC / GBA / SFC 上映射到十字键；在 N64 上映射到**摇杆**。
@@ -165,7 +184,7 @@
 - 点击键帽进入捕获态：按键 / 鼠标按钮即绑定；`Esc` 取消；`Backspace` / `Delete` 清除；只允许单键，不支持组合键。
 - 冲突检测：同一平台内（通用动作 + 专有动作）不允许重复；与功能快捷键不允许重复。冲突时红字提示且拒绝保存。
 - 平台专有动作显示徽标「`<引擎> 模拟器专用`」。
-- 提供「恢复该平台默认」与「全部恢复默认」，均需二次确认。
+- 平台专有按键提供「恢复该平台默认」，需二次确认；不提供「全部恢复默认」。
 - 通用按键提供两个预设按钮：**恢复 PC 风格（鼠标）** 与 **恢复传统风格（不使用鼠标）**；预设同时重置 N64 专有按键（传统风格把 N64 Z 设为 `KeyR`，保证全程不使用鼠标）。未自定义时默认 PC 风格。
 
 **默认值**
@@ -204,7 +223,7 @@
 
 - 鼠标绑定由输入桥转换为对应动作；点击控制区按钮不触发游戏输入。
 
-#### 13.5.4 功能快捷键（全局）
+#### 13.5.5 功能快捷键（全局）
 
 - 存储键：`settings.gameHotkeys`；对四个平台共用，包含 **Start / Select** 与模拟器功能：
 
@@ -360,6 +379,7 @@
   - `EJS_pathtodata = 'game://app/assets/emulatorjs/4.2.3/'`；
   - `EJS_startOnLoaded = true`；
   - `EJS_volume` = `settings.gameVolume`；
+  - `EJS_biosUrl`：仅 `.fds` 游戏且 `settings.gameFdsBios` 已配置时为 `game://bios/disksys.rom`（Famicom Disk System BIOS），其余情况不设置 / 为空；
   - `EJS_disableLocalStorage = true`；`EJS_cacheConfig = { enabled: false }`（避免在 IndexedDB 留下 ROM 副本）；
   - `EJS_language = 'en-US'`、`EJS_disableAutoLang = false`（固定语言，避免向不存在的 `localization/<系统语言>.json` 发请求）；
   - 不设置 `EJS_defaultControls`：游戏输入统一由输入桥调用 `EJS_emulator.gameManager.simulateInput(player, index, value)` 注入；启动后清空 EmulatorJS 自身的键盘映射，避免物理按键被处理两次；
@@ -398,7 +418,7 @@
 }
 ```
 
-- `lastPlayedAt` / `playSeconds` 在暂停、关闭、切换游戏时更新；非机密，明文 JSON。
+- `lastPlayedAt` 在启动、暂停、关闭、切换游戏时更新；`playSeconds` 在暂停、关闭、切换游戏时更新；非机密，明文 JSON。
 - 文件不存在时自动创建；损坏时覆盖写回最小结构。
 
 #### 13.7.6 输入桥
@@ -417,9 +437,9 @@
 
 | 通道 | 参数 | 返回 | 说明 |
 | --- | --- | --- | --- |
-| `games:scan` | — | `{ ok, workDir, resolvedWorkDir, isDefault, engines, errors? }` | 扫描工作目录。`engines: [{ id, label, games: [{ id, name, engine, romRelativePath, size, mtime, coverUrl }] }]`。只接受来自主窗口的请求。 |
-| `games:open` | `{ gameId }` | `{ ok, error? }` | 打开 / 复用游戏窗口并加载游戏。`gameId` 必须存在于最近一次扫描结果。只接受来自主窗口的请求。 |
-| `games:window-info` | — | `{ ok, game, settings: { gameCommonKeys, gameKeymaps, gameHotkeys, gameVolume, gameControlsHidden } }` | 游戏窗口启动时读取当前游戏与设置；只接受来自游戏窗口的请求。 |
+| `games:scan` | — | `{ ok, workDir, resolvedWorkDir, isDefault, engines, errors? }` | 扫描工作目录。`engines: [{ id, label, games: [{ id, name, engine, label, romRelativePath, size, mtime, coverUrl }] }]`；存在已启动过的游戏时，首项为 `id: recent`（`label` 为空，渲染层按语言显示）的「最近启动」分类，按 `lastPlayedAt` 倒序最多 8 个。只接受来自主窗口的请求。 |
+| `games:open` | `{ gameId }` | `{ ok, error? }` | 打开 / 复用游戏窗口并加载游戏，同时更新该游戏 `meta.json` 的 `lastPlayedAt`。`gameId` 必须存在于最近一次扫描结果。只接受来自主窗口的请求。 |
+| `games:window-info` | — | `{ ok, game, settings: { gameCommonKeys, gameKeymaps, gameHotkeys, gameVolume, gameControlsHidden, hasFdsBios } }` | 游戏窗口启动时读取当前游戏与设置；`hasFdsBios` 表示已配置的 FDS BIOS 当前是否有效；只接受来自游戏窗口的请求。 |
 | `games:save-sram` | `{ gameId, data: Uint8Array \| ArrayBuffer }` | `{ ok, error? }` | 写入 `battery.srm`；`gameId` 必须匹配当前窗口游戏。 |
 | `games:load-sram` | `{ gameId }` | `{ ok, data?: Uint8Array, exists, error? }` | 读取 `battery.srm`；不存在返回 `exists: false`。 |
 | `games:save-state` | `{ gameId, state: Uint8Array \| ArrayBuffer, screenshot?: Uint8Array \| ArrayBuffer }` | `{ ok, error? }` | 写入 `state.slot1` 与可选 `state.slot1.png`。 |
@@ -429,6 +449,8 @@
 | `games:close-now` | — | `{ ok }` | 强制销毁游戏窗口；只接受来自游戏窗口的请求。 |
 | `games:select-workdir` | — | `{ path }` 或 `null` | 系统目录选择对话框；取消返回 `null`。 |
 | `games:set-workdir` | `{ path: string }` | `{ ok, workDir, resolvedWorkDir, isDefault, error? }` | 校验 / 创建目录结构并写入 `settings.gameWorkDir`；空字符串表示恢复默认。 |
+| `games:select-bios` | — | `{ path }` 或 `null` | 选择 FDS BIOS（`disksys.rom`）文件的系统对话框；取消返回 `null`。只接受主窗口 / 设置窗口请求。 |
+| `games:set-bios` | `{ path: string }` | `{ ok, path?, error? }` | 校验文件存在且为普通文件后复制为 `<workDir>/bios/disksys.rom`，并把副本路径写入 `settings.gameFdsBios`；空字符串清除配置（不删除文件）。只接受主窗口 / 设置窗口请求。 |
 | `games:open-workdir` | — | `{ ok, error? }` | 在系统文件管理器中打开当前解析后的工作目录。 |
 | `games:open-profile` | `{ gameId? }` | `{ ok, path?, error? }` | 打开指定游戏（缺省为当前窗口游戏）的存档目录；不存在则创建。 |
 | `games:keymap-set` | `{ common }` / `{ engine: 'n64', maps }` / `{ all }` / `{ common, all }` | `{ ok, maps, error? }` | 保存通用按键 / 平台专有按键；校验同平台重复、与功能快捷键冲突、非法键。 |
@@ -458,9 +480,10 @@
 
 | 数据 | 位置 | 结构 / 说明 | 持久性 |
 | --- | --- | --- | --- |
-| 游戏设置 | `settings.json` | `gameWorkDir`、`gameCommonKeys`、`gameKeymaps`、`gameHotkeys`、`gameVolume`、`gameControlsHidden` | 持久；重启保留 |
+| 游戏设置 | `settings.json` | `gameWorkDir`、`gameFdsBios`、`gameCommonKeys`、`gameKeymaps`、`gameHotkeys`、`gameVolume`、`gameControlsHidden` | 持久；重启保留（`gameFdsBios` 指向 `<workDir>/bios/disksys.rom` 副本） |
 | 游戏窗口几何 | `game-window.json`（数据目录） | 同 `terminal-window.json`：`{ display, bounds }` | 持久；窗口移动 / 缩放 / 关闭时写入 |
 | ROM | `<workDir>/roms/<engine>/` | 用户文件，应用只读 | 持久 |
+| FDS BIOS | `<workDir>/bios/disksys.rom` | 选择文件后自动复制到此；`settings.gameFdsBios` 指向该副本 | 持久；清除配置不删除文件 |
 | 存档 | `<workDir>/profiles/<gameId>/` | `battery.srm`、`state.slot1`、`state.slot1.png`、`meta.json` | 持久 |
 | 封面 | ROM 同目录 | `<base>.png/.jpg/.jpeg/.webp` | 用户文件，应用只读 |
 
@@ -547,7 +570,13 @@ flowchart TD
 - [ ] 设置中出现「游戏」分区；工作目录默认值在打包 / 未打包两种场景正确。
 - [ ] 工作目录切换后可创建 `roms/{fc,gba,n64,sfc}` 与 `profiles/`，失败有明确提示。
 - [ ] 主界面出现「游戏」TAB；窗口模式 8 列、悬浮模式 4 列；分类标题与封面正确。
-- [ ] sidecar 封面命中与占位封面都正常；无游戏时有空状态，顶部「修改 / 刷新」可用。
+- [ ] sidecar 封面命中与占位封面都正常；无游戏时有空状态；主界面不显示「修改 / 刷新」按钮。
+- [ ] `roms/<engine>/<文件夹>/xxx.rom` 以文件夹名展示并加载目录内 ROM；扩展名大小写不敏感，非本引擎扩展名（`.txt` / `.md` / `.xxx`）被忽略。
+- [ ] 设置 · 游戏选择 `disksys.rom` 后自动复制到 `<workDir>/bios/disksys.rom`（默认未配置、可清除）；配置后 `.fds` 游戏可正常加载 BIOS，未配置时提示加载失败。
+- [ ] 启动过的游戏出现在顶部「最近启动」分类，最近一次启动的排最前（最多 8 个）。
+- [ ] 顶部搜索支持大小写不敏感的模糊匹配，`Esc` 可清空；无匹配时显示空状态。
+- [ ] 分类标题可点击折叠 / 展开；折叠的分类不渲染卡片。
+- [ ] 占位封面使用主题中性色（无彩色渐变）；几千个 ROM 时分批渲染、滚动基本流畅。
 - [ ] 双击封面打开游戏窗口并加载对应引擎；再次双击其它游戏复用同一窗口。
 - [ ] 游戏窗口默认 / 最小 480×320、最大 1440×900、可全屏、不始终置顶、不跨桌面跟随；拖拽后尺寸 / 位置可恢复。
 - [ ] 游戏窗口失去焦点时自动暂停并 flush 电池存档；重新聚焦时仅对「自动暂停」自动继续，手动暂停不自动继续。

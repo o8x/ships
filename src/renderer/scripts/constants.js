@@ -44,6 +44,8 @@ window.ShipsConstants = {
     'ttf', 'otf', 'woff', 'woff2', 'eot',
   ],
   DEBOUNCE_MS: 120,
+  // 游戏列表分批渲染：每批 tile 数量（几千个 ROM 时避免一次性建满 DOM）。
+  GAME_TILE_CHUNK_SIZE: 120,
   ACCENT_PRESETS: ['#2e6bfc', '#7c3aed', '#e5484d', '#f59e0b', '#10b981', '#0ea5e9', '#ec4899'],
   JSON_HIGHLIGHT_MAX_BYTES: 1024 * 1024,
   LANGUAGES: [

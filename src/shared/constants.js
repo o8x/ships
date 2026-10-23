@@ -142,6 +142,8 @@ const IPC = {
   GAME_SELECT_WORKDIR: 'games:select-workdir',
   GAME_SET_WORKDIR: 'games:set-workdir',
   GAME_OPEN_WORKDIR: 'games:open-workdir',
+  GAME_SELECT_BIOS: 'games:select-bios',
+  GAME_SET_BIOS: 'games:set-bios',
   GAME_OPEN_PROFILE: 'games:open-profile',
   GAME_KEYMAP_SET: 'games:keymap-set',
   GAME_HOTKEY_SET: 'games:hotkey-set',
@@ -344,6 +346,8 @@ const DEFAULT_SETTINGS = {
   fileWindowAlwaysOnTop: FILE_WINDOW.alwaysOnTop === true,
   // 游戏工具：工作目录（空 = 默认）、四引擎按键映射、模拟器功能快捷键、音量 / 控制区显隐。
   gameWorkDir: '',
+  // FDS（Famicom Disk System）BIOS（disksys.rom）路径；空 = 未配置，无默认值。
+  gameFdsBios: '',
   gameCommonKeys: defaultCommonKeys(),
   gameKeymaps: defaultGameKeymaps(),
   gameHotkeys: defaultGameHotkeys(),

@@ -47,6 +47,7 @@ function gameSettingsPayload() {
     gameHotkeys: settings.get('gameHotkeys') || defaultGameHotkeys(),
     gameVolume: Number(settings.get('gameVolume')),
     gameControlsHidden: Boolean(settings.get('gameControlsHidden')),
+    hasFdsBios: Boolean(games.fdsBiosPath()),
     locale: settings.get('locale') || 'zh',
     theme: settings.get('theme') || 'system',
     accent: settings.get('accent') || '#2e6bfc',
@@ -184,6 +185,11 @@ function registerGameIpc(ipcMain) {
     const game = games.findGame(payload && payload.gameId);
     if (!game) return { ok: false, error: 'not-found' };
     try {
+      try {
+        games.touchGame(game);
+      } catch (err) {
+        void err;
+      }
       wm.openGameWindow(game);
       return { ok: true };
     } catch (err) {
@@ -308,6 +314,35 @@ function registerGameIpc(ipcMain) {
         resolvedWorkDir: resolved,
         isDefault: !raw,
       };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle(IPC.GAME_SELECT_BIOS, async (event) => {
+    if (!isMainSender(event) && !isSettingsSender(event)) return null;
+    const win = wm.getSettingsWindow() || wm.getMainWindow();
+    const current = games.fdsBiosPath();
+    const options = {
+      title: 'disksys.rom',
+      properties: ['openFile'],
+      filters: [{ name: 'FDS BIOS', extensions: ['rom'] }],
+    };
+    if (current) options.defaultPath = current;
+    const result = win
+      ? await dialog.showOpenDialog(win, options)
+      : await dialog.showOpenDialog(options);
+    if (result.canceled || !result.filePaths.length) return null;
+    return { path: result.filePaths[0] };
+  });
+
+  ipcMain.handle(IPC.GAME_SET_BIOS, (event, payload) => {
+    if (!isMainSender(event) && !isSettingsSender(event)) return { ok: false, error: 'forbidden' };
+    const raw = String((payload && payload.path) || '').trim();
+    try {
+      const resolved = raw ? games.importFdsBios(raw) : '';
+      settings.set({ gameFdsBios: resolved });
+      return { ok: true, path: resolved };
     } catch (err) {
       return { ok: false, error: err.message };
     }

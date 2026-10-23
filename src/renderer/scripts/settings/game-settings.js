@@ -20,6 +20,14 @@
         open: '打开目录',
         workdirFailed: '无法使用该目录：{error}',
         workdirSaved: '工作目录已更新',
+        bios: 'FDS BIOS（disksys.rom）',
+        biosHint: '运行 .fds 游戏需要该文件；默认未配置',
+        biosChoose: '选择文件',
+        biosClear: '清除',
+        biosUnset: '未配置',
+        biosSet: '已配置',
+        biosSaved: 'FDS BIOS 已更新',
+        biosFailed: '无法使用该文件：{error}',
         keys: '通用按键',
         keysHint: '四个平台共用（X/Y 仅 SFC、L/R 除 FC）；方向键在 N64 映射到摇杆。点击键帽后按新键，Esc 取消，Backspace 清除',
         platformKeys: '平台专有按键',
@@ -28,7 +36,6 @@
         presetHint: '未自定义时默认使用 PC 风格',
         presetApplied: '已恢复预设',
         engineReset: '恢复该引擎默认',
-        allReset: '全部恢复默认',
         resetConfirm: '确认恢复默认？',
         conflict: '该按键已被占用',
         invalid: '不支持这个按键',
@@ -60,6 +67,14 @@
         open: 'Open folder',
         workdirFailed: 'Cannot use this folder: {error}',
         workdirSaved: 'Working folder updated',
+        bios: 'FDS BIOS (disksys.rom)',
+        biosHint: 'Required for .fds games; not configured by default',
+        biosChoose: 'Choose file',
+        biosClear: 'Clear',
+        biosUnset: 'Not configured',
+        biosSet: 'Configured',
+        biosSaved: 'FDS BIOS updated',
+        biosFailed: 'Cannot use this file: {error}',
         keys: 'Shared keys',
         keysHint: 'Shared by all platforms (X/Y only on SFC; L/R except FC); directions map to the analog stick on N64. Click a key cap, then press a key. Esc cancels, Backspace clears',
         platformKeys: 'Platform-specific keys',
@@ -68,7 +83,6 @@
         presetHint: 'PC preset is used until you customize',
         presetApplied: 'Preset restored',
         engineReset: 'Reset this engine',
-        allReset: 'Reset all',
         resetConfirm: 'Reset to defaults?',
         conflict: 'That key is already used',
         invalid: 'Unsupported key',
@@ -317,11 +331,64 @@
     openBtn.addEventListener('click', () => games.openWorkdir());
     refreshWorkdir();
 
+    /* ------------------------------ FDS BIOS ------------------------------ */
+    const biosCard = el('div', { class: 'game-settings-card' });
+    const biosHead = el('div', { class: 'flex items-center justify-between gap-3' });
+    const biosText = el('div', { class: 'min-w-0 flex-1' });
+    biosText.append(
+      el('div', { class: 'text-[13px] font-medium text-fg' }, i18n.t('gamesSettings.bios')),
+      el('div', { class: 'mt-0.5 text-[10px] text-fg-muted' }, i18n.t('gamesSettings.biosHint'))
+    );
+    const biosBadge = el('span', { class: 'game-settings-badge' }, '');
+    biosHead.append(biosText, biosBadge);
+
+    const biosRow = el('div', { class: 'game-settings-path-row' });
+    const biosPathLine = el('div', { class: 'game-settings-path font-mono', title: '' });
+    const biosChooseBtn = el('button', { class: 'btn shrink-0 px-2 py-1.5 text-[12px]', type: 'button' }, i18n.t('gamesSettings.biosChoose'));
+    const biosClearBtn = el('button', { class: 'btn shrink-0 px-2 py-1.5 text-[12px]', type: 'button' }, i18n.t('gamesSettings.biosClear'));
+    biosRow.append(biosPathLine, biosChooseBtn, biosClearBtn);
+    const biosNote = el('div', { class: 'game-settings-note' }, '');
+    biosCard.append(biosHead, biosRow, biosNote);
+    wrap.appendChild(biosCard);
+
+    let biosPath = ctx.settings.gameFdsBios || '';
+
+    function renderBios() {
+      biosPathLine.textContent = biosPath || i18n.t('gamesSettings.biosUnset');
+      biosPathLine.title = biosPath || '';
+      biosBadge.textContent = biosPath ? i18n.t('gamesSettings.biosSet') : i18n.t('gamesSettings.biosUnset');
+      biosClearBtn.disabled = !biosPath;
+      biosClearBtn.classList.toggle('opacity-50', !biosPath);
+    }
+
+    function applyBiosResult(result) {
+      if (!result || !result.ok) {
+        biosNote.textContent = i18n.t('gamesSettings.biosFailed', {
+          error: (result && result.error) || 'error',
+        });
+        biosNote.classList.add('is-danger');
+        return;
+      }
+      biosPath = result.path || '';
+      biosNote.textContent = i18n.t('gamesSettings.biosSaved');
+      biosNote.classList.remove('is-danger');
+      renderBios();
+    }
+
+    biosChooseBtn.addEventListener('click', async () => {
+      const choice = await games.selectBios();
+      if (!choice || !choice.path) return;
+      applyBiosResult(await games.setBios(choice.path));
+    });
+    biosClearBtn.addEventListener('click', async () => {
+      applyBiosResult(await games.setBios(''));
+    });
+    renderBios();
+
     /* ------------------------------ 通用按键 ------------------------------ */
     const keysTitle = el('div', { class: 'game-settings-section-head' });
     const keysTop = el('div', { class: 'game-settings-section-top' });
-    const resetAllBtn = el('button', { class: 'btn shrink-0 px-2 py-1 text-[11px]', type: 'button' }, i18n.t('gamesSettings.allReset'));
-    keysTop.append(el('div', { class: 'game-settings-section-title' }, i18n.t('gamesSettings.keys')), resetAllBtn);
+    keysTop.append(el('div', { class: 'game-settings-section-title' }, i18n.t('gamesSettings.keys')));
     keysTitle.append(
       keysTop,
       el('div', { class: 'game-settings-section-hint' }, i18n.t('gamesSettings.keysHint'))
@@ -472,27 +539,6 @@
         for (const rowItem of item.rows) rowItem.control.setValue(map[rowItem.action] || '');
       }
     }
-
-    resetAllBtn.addEventListener('click', async () => {
-      if (!window.confirm(i18n.t('gamesSettings.resetConfirm'))) return;
-      const commonDefaults = Object.assign({}, constants.defaultCommonKeys);
-      const defaults = {};
-      for (const engine of constants.engines) defaults[engine.id] = Object.assign({}, constants.defaultKeymaps[engine.id] || {});
-      const result = await games.setAllKeys(commonDefaults, defaults);
-      if (!result || !result.ok) return;
-      for (const key of Object.keys(commonKeys)) delete commonKeys[key];
-      Object.assign(commonKeys, result.common || commonDefaults);
-      for (const engine of constants.engines) keymaps[engine.id] = Object.assign({}, defaults[engine.id] || {});
-      for (const action of constants.commonActions) {
-        const control = commonControlMap[action];
-        if (control) control.setValue(commonDefaults[action] || '');
-      }
-      for (const item of engineControls) {
-        for (const rowItem of item.rows) {
-          rowItem.control.setValue((defaults[item.engine.id] || {})[rowItem.action] || '');
-        }
-      }
-    });
 
     /* --------------------------- 功能快捷键 --------------------------- */
     const hotTitle = el('div', { class: 'game-settings-section-head' });

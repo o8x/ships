@@ -10,11 +10,14 @@ const {
   GAME_EMULATOR_DIR,
   GAME_ROM_DIR,
   GAME_PROFILE_DIR,
+  GAME_BIOS_DIR,
+  GAME_FDS_BIOS_FILE,
   GAME_LEGACY_PROFILE_DIR,
   GAME_COVER_EXTENSIONS,
   GAME_SAVE_FILE,
   GAME_STATE_FILE,
   GAME_STATE_PREVIEW_FILE,
+  GAME_RECENT_LIMIT,
   GAME_ENGINES,
 } = require('../../shared/game-constants');
 const { readJson, writeJson } = require('../utils/json-store');
@@ -84,6 +87,7 @@ function ensureSkeleton(workDir) {
   if (stat && !stat.isDirectory()) throw new Error('not-a-directory');
   ensureDir(root);
   ensureDir(path.join(root, GAME_ROM_DIR));
+  ensureDir(path.join(root, GAME_BIOS_DIR));
   const profileDir = path.join(root, GAME_PROFILE_DIR);
   const legacyProfileDir = path.join(root, GAME_LEGACY_PROFILE_DIR);
   if (!fs.existsSync(profileDir) && !fs.existsSync(legacyProfileDir)) ensureDir(profileDir);
@@ -97,6 +101,26 @@ function validateWorkDir(input) {
   ensureSkeleton(dir);
   fs.accessSync(dir, fs.constants.W_OK);
   return dir;
+}
+
+function fdsBiosPath() {
+  const raw = expandHome(settings.get('gameFdsBios'));
+  if (!raw) return '';
+  const file = path.resolve(raw);
+  const stat = fs.statSync(file, { throwIfNoEntry: false });
+  return stat && stat.isFile() ? file : '';
+}
+
+function importFdsBios(input) {
+  const raw = expandHome(input);
+  if (!raw) return '';
+  const source = path.resolve(raw);
+  const stat = fs.statSync(source, { throwIfNoEntry: false });
+  if (!stat || !stat.isFile()) throw new Error('not-a-file');
+  const workDir = ensureSkeleton(configuredWorkDir());
+  const dest = path.join(workDir, GAME_BIOS_DIR, GAME_FDS_BIOS_FILE);
+  if (source !== dest) fs.copyFileSync(source, dest);
+  return dest;
 }
 
 function sha1(value) {
@@ -113,13 +137,39 @@ function slugify(value) {
   return slug || 'game';
 }
 
-function makeGameId(engineId, fileName) {
-  const displayName = fileName.slice(0, -path.extname(fileName).length);
-  return `${engineId}-${slugify(displayName)}-${sha1(`${engineId}/${fileName}`).slice(0, 8)}`;
+function makeGameId(engineId, romKey, name) {
+  const label = name || romKey.slice(0, -path.extname(romKey).length);
+  return `${engineId}-${slugify(label)}-${sha1(`${engineId}/${romKey}`).slice(0, 8)}`;
 }
 
 function displayName(fileName) {
   return fileName.slice(0, -path.extname(fileName).length);
+}
+
+function extensionOf(fileName) {
+  return path.extname(fileName).toLowerCase();
+}
+
+function isRomFile(fileName, extensions) {
+  return extensions.includes(extensionOf(fileName));
+}
+
+function collectRomFiles(dir, extensions, out) {
+  let entries = [];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (err) {
+    return;
+  }
+  for (const entry of entries) {
+    if (isHidden(entry.name) || entry.isSymbolicLink()) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      collectRomFiles(full, extensions, out);
+    } else if (entry.isFile() && isRomFile(entry.name, extensions)) {
+      out.push(full);
+    }
+  }
 }
 
 function profileRoot(workDir) {
@@ -204,6 +254,24 @@ function clientGame(game) {
   };
 }
 
+function readPlayedAtMap(workDir) {
+  const map = new Map();
+  const dir = profileRoot(workDir);
+  let entries = [];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (err) {
+    return map;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const meta = readJson(path.join(dir, entry.name, 'meta.json'), null);
+    const value = meta ? Number(meta.lastPlayedAt) : 0;
+    if (Number.isFinite(value) && value > 0) map.set(entry.name, value);
+  }
+  return map;
+}
+
 function scanWorkDir() {
   const workDir = ensureSkeleton(configuredWorkDir());
   const engines = [];
@@ -218,38 +286,65 @@ function scanWorkDir() {
       logger.warn(`[games] cannot read ${engineDir}:`, err.message);
     }
     const games = [];
-    for (const name of names) {
-      if (isHidden(name)) continue;
-      const full = path.join(engineDir, name);
-      if (isSymbolicLink(full)) continue;
-      const ext = path.extname(name).toLowerCase();
-      if (!engine.extensions.includes(ext)) continue;
+    const addGame = (romPath, name) => {
       let stat;
       try {
-        stat = fs.statSync(full);
+        stat = fs.statSync(romPath);
       } catch (err) {
-        continue;
+        return;
       }
-      if (!stat.isFile()) continue;
-      const id = makeGameId(engine.id, name);
+      if (!stat.isFile()) return;
+      const romKey = path.relative(engineDir, romPath);
+      const id = makeGameId(engine.id, romKey, name);
       const game = {
         id,
-        name: displayName(name),
+        name,
         engine: engine.id,
         label: engine.label,
         core: engine.core,
-        romPath: full,
-        romRelativePath: path.join(GAME_ROM_DIR, engine.id, name),
-        coverPath: coverFor(full),
+        romPath,
+        romRelativePath: path.join(GAME_ROM_DIR, engine.id, romKey),
+        coverPath: coverFor(romPath),
         size: stat.size,
         mtime: stat.mtimeMs,
         workDir,
       };
       games.push(game);
       byId.set(id, game);
+    };
+    for (const name of names) {
+      if (isHidden(name)) continue;
+      const full = path.join(engineDir, name);
+      if (isSymbolicLink(full)) continue;
+      let stat;
+      try {
+        stat = fs.statSync(full);
+      } catch (err) {
+        continue;
+      }
+      if (stat.isDirectory()) {
+        const roms = [];
+        collectRomFiles(full, engine.extensions, roms);
+        roms.sort();
+        for (const romPath of roms) addGame(romPath, name);
+        continue;
+      }
+      if (!stat.isFile() || !isRomFile(name, engine.extensions)) continue;
+      addGame(full, displayName(name));
     }
     games.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
     engines.push({ id: engine.id, label: engine.label, games: games.map(clientGame) });
+  }
+
+  const playedAt = readPlayedAtMap(workDir);
+  const recent = Array.from(byId.values())
+    .map((game) => ({ game, lastPlayedAt: playedAt.get(game.id) || 0 }))
+    .filter((entry) => entry.lastPlayedAt > 0)
+    .sort((a, b) => b.lastPlayedAt - a.lastPlayedAt)
+    .slice(0, GAME_RECENT_LIMIT)
+    .map((entry) => clientGame(entry.game));
+  if (recent.length) {
+    engines.unshift({ id: 'recent', label: '', games: recent });
   }
 
   scanCache = { workDir, byId, at: Date.now() };
@@ -477,6 +572,11 @@ function registerGameProtocol() {
       if (!file) return new Response('Not Found', { status: 404 });
       return fileResponse(request, file);
     }
+    if (host === 'bios') {
+      const file = fdsBiosPath();
+      if (!file) return new Response('Not Found', { status: 404 });
+      return fileResponse(request, file);
+    }
     return new Response('Not Found', { status: 404 });
   });
 }
@@ -488,6 +588,8 @@ module.exports = {
   isDefaultWorkDir,
   ensureSkeleton,
   validateWorkDir,
+  fdsBiosPath,
+  importFdsBios,
   scanWorkDir,
   clientGame,
   findGame,

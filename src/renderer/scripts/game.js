@@ -131,6 +131,7 @@
     closing: false,
     muted: false,
     volume: 0.7,
+    hasFdsBios: false,
     controlsHidden: false,
     controlsBeforeFullscreen: null,
     fullscreen: false,
@@ -910,6 +911,7 @@
       state.commonKeys = next.gameCommonKeys || state.commonKeys;
       state.keymaps = next.gameKeymaps || state.keymaps;
       state.hotkeys = next.gameHotkeys || state.hotkeys;
+      state.hasFdsBios = Boolean(next.gameFdsBios);
       buildInputMaps();
       if (typeof next.gameVolume === 'number' && !state.muted) {
         state.volume = next.gameVolume;
@@ -955,6 +957,8 @@
     window.EJS_gameUrl = game.romUrl;
     window.EJS_gameName = game.name;
     window.EJS_gameID = numericGameId(game.id);
+    window.EJS_biosUrl =
+      /\.fds$/i.test(game.romRelativePath || '') && state.hasFdsBios ? 'game://bios/disksys.rom' : '';
     window.EJS_startOnLoaded = true;
     window.EJS_volume = state.volume;
     window.EJS_disableLocalStorage = true;
@@ -1012,6 +1016,7 @@
     state.keymaps = info.settings.gameKeymaps || games.constants.defaultKeymaps;
     state.hotkeys = info.settings.gameHotkeys || games.constants.defaultHotkeys;
     state.volume = Number.isFinite(info.settings.gameVolume) ? info.settings.gameVolume : 0.7;
+    state.hasFdsBios = Boolean(info.settings.hasFdsBios);
     state.controlsHidden = Boolean(info.settings.gameControlsHidden);
     buildInputMaps();
     applyLabels();

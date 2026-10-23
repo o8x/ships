@@ -4,6 +4,8 @@ const GAME_EMULATOR_VERSION = '4.2.3';
 const GAME_EMULATOR_DIR = `assets/emulatorjs/${GAME_EMULATOR_VERSION}`;
 const GAME_ROM_DIR = 'roms';
 const GAME_PROFILE_DIR = 'profiles';
+const GAME_BIOS_DIR = 'bios';
+const GAME_FDS_BIOS_FILE = 'disksys.rom';
 const GAME_LEGACY_PROFILE_DIR = 'profile';
 const GAME_SAVE_INTERVAL_MS = 15000;
 const GAME_CLOSE_TIMEOUT_MS = 3000;
@@ -13,6 +15,7 @@ const GAME_SAVE_FILE = 'battery.srm';
 const GAME_STATE_FILE = 'state.slot1';
 const GAME_STATE_PREVIEW_FILE = 'state.slot1.png';
 const GAME_HEADER_HEIGHT = 34;
+const GAME_RECENT_LIMIT = 8;
 
 const COMMON_ACTIONS = ['up', 'down', 'left', 'right', 'a', 'b', 'x', 'y', 'l', 'r'];
 
@@ -207,6 +210,8 @@ module.exports = {
   GAME_EMULATOR_DIR,
   GAME_ROM_DIR,
   GAME_PROFILE_DIR,
+  GAME_BIOS_DIR,
+  GAME_FDS_BIOS_FILE,
   GAME_LEGACY_PROFILE_DIR,
   GAME_SAVE_INTERVAL_MS,
   GAME_CLOSE_TIMEOUT_MS,
@@ -216,6 +221,7 @@ module.exports = {
   GAME_STATE_FILE,
   GAME_STATE_PREVIEW_FILE,
   GAME_HEADER_HEIGHT,
+  GAME_RECENT_LIMIT,
   COMMON_ACTIONS,
   ACTION_DEFS,
   ACTION_LABELS,

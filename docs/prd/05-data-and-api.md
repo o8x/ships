@@ -6,7 +6,7 @@
 
 | 文件 | 位置 | 结构 | 生命周期 |
 | --- | --- | --- | --- |
-| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/vessel/settings.json`） | `{ locale, theme, accent, launchAtLogin, floatMode, pinWindow, vibrancy, glassOpacity, developerMode, clipboardLimit, clipboardPollMs, terminalShell, terminalFontFamily, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, mainWindowHotkey, terminalHotkey, terminalCloseAction, sshBuiltinTerminal, followSystemProxy, sftpDownloadDir, terminalBallEnabled, terminalBallDelayMs, terminalBallSize, terminalBallIcon, terminalBallDark, terminalBallTransparent, fileWindowAlwaysOnTop, gameWorkDir, gameCommonKeys, gameKeymaps, gameHotkeys, gameVolume, gameControlsHidden, logRetentionDays }` | 持久；重启保留 |
+| `settings.json` | `app.getPath('userData')`（macOS：`~/Library/Application Support/vessel/settings.json`） | `{ locale, theme, accent, launchAtLogin, floatMode, pinWindow, vibrancy, glassOpacity, developerMode, clipboardLimit, clipboardPollMs, terminalShell, terminalFontFamily, terminalFontSize, terminalWindowWidth, terminalWindowHeight, terminalAlwaysOnTop, terminalScrollback, mainWindowHotkey, terminalHotkey, terminalCloseAction, sshBuiltinTerminal, followSystemProxy, sftpDownloadDir, terminalBallEnabled, terminalBallDelayMs, terminalBallSize, terminalBallIcon, terminalBallDark, terminalBallTransparent, fileWindowAlwaysOnTop, gameWorkDir, gameFdsBios, gameCommonKeys, gameKeymaps, gameHotkeys, gameVolume, gameControlsHidden, logRetentionDays }` | 持久；重启保留 |
 | `vessel-YYYY-MM-DD.log` | **macOS：`~/Library/Logs/Vessel/`**（Console.app 的「日志报告」会收录该目录，与 JetBrains/CLion 一致，与用户数据目录分离）；其它平台：`app.getPath('userData')` 的 `logs/` 子目录（`src/main/utils/paths.js` 的 `LOG_DIR`，按 `process.platform` 选择） | 按天追加的文本日志（启动信息、SSH 探测 / SFTP / 终端 / 文件管理等）；启动时把数据文件清单也写进去 | 持久；**惰性清理**：每天首次写日志时删除保留期之前的日志文件（保留天数取设置 `logRetentionDays`，默认 **7 天**，来自 `package.json` 的 `vessel.logRetentionDays`） |
 | `ssh-detected.json` | 同上目录 | `{ [alias]: { os, family, label, at } }` | 持久；缓存探测结果 |
 | `ssh-credentials.json` | 同上目录 | `{ entries: { [别名]: { iv, tag, data } } }`（**AES-256-GCM 密文**，全 base64） | 持久；在设置里保存 / 清除 SSH 密码时更新。密钥随机生成、存 `ssh-credentials.key`（0600）；密码明文不落盘，连接时主进程解密后交给内置终端自动输入（见 §3.4） |
@@ -18,6 +18,7 @@
 | `file-window.json` | 同上目录 | 同 `terminal-window.json` 的结构（独立文件窗口的屏幕 + 位置 + 尺寸） | 持久；记忆方式与终端窗口一致 |
 | `game-window.json` | 同上目录 | 同 `terminal-window.json` 的结构（独立游戏窗口的屏幕 + 位置 + 尺寸） | 持久；记忆方式与终端窗口一致 |
 | `<workDir>/roms/{fc,gba,n64,sfc}/` | 游戏工作目录（未打包默认 `assets/games`，打包默认 `应用数据目录/games`；可在设置 → 游戏修改） | 用户 ROM 文件，应用只读；封面为 ROM 同目录同名 `.png/.jpg/.jpeg/.webp` | 用户文件，应用不修改 |
+| `<workDir>/bios/disksys.rom` | 同上 | 用户选择的 FDS BIOS 副本（见 `games:set-bios`） | 持久；清除配置不删除文件 |
 | `<workDir>/profiles/<gameId>/` | 同上 | `battery.srm`（电池存档）、`state.slot1`（即时存档）、`state.slot1.png`（截图）、`meta.json`（引擎 / ROM 相对路径 / 游玩时间）；每游戏独立目录 | 持久；存档写入为临时文件 + rename；旧目录 `profile/` 兼容读取 |
 | `file-layout.json` | 同上目录 | `{ treeWidth, name, size, perm, time, panelHeight, sortKey, sortDir }`（**内嵌面板**的目录树宽、文件名 / 体积 / 权限 / 时间列宽、面板高度，单位 px；默认 `300 / 160 / 60 / 90 / 130 / 260`；`time` 默认 130 是**默认值**，最小可拖到 60；`sortKey` ∈ `''`（不排序）/`name`/`size`/`time`、`sortDir` ∈ `asc`/`desc`） | 持久；拖动分隔线 / 列宽、点击列头排序时写入；**有记录时不再套用首次的最小布局**（§3.9-10） |
 | `file-window-layout.json` | 同上目录 | 同 `file-layout.json` 结构（**独立文件窗口**自己的布局记录，与内嵌面板**分开保存**） | 持久；独立窗口拖动分隔线 / 列宽时写入 |
@@ -87,15 +88,16 @@
 | `file-window:close` | — | `{ ok }` | 销毁独立文件窗口（自绘红绿灯关闭按钮）；只接受来自该窗口的请求 |
 | `file-window:set-top` | `{ value: boolean }` | `{ ok, alwaysOnTop }` | 独立文件窗口的置顶开关：写 `settings.fileWindowAlwaysOnTop`；**默认关**（普通窗口），持久 |
 | `file-window:snap-size` | `{ height }` | `{ ok, height? }` | 保留兼容：独立文件窗口已**不再自动对齐整行高度**，渲染层不再调用；通道仍按工作区 / 最小高度夹取后设置内容高度；只接受来自该窗口的请求 |
-| `games:scan` | — | `{ ok, workDir, resolvedWorkDir, isDefault, engines }` | 扫描游戏工作目录；`engines[].games[]` 含 `{ id, name, engine, label, core, romRelativePath, size, mtime, coverUrl, romUrl }`；只接受主窗口 / 设置窗口请求 |
-| `games:open` | `{ gameId }` | `{ ok, error? }` | 打开 / 复用游戏窗口并加载游戏；只接受主窗口请求 |
-| `games:window-info` | — | `{ ok, game, emulatorVersion, settings }` | 游戏窗口启动时读取当前游戏与按键 / 音量设置；只接受游戏窗口请求 |
+| `games:scan` | — | `{ ok, workDir, resolvedWorkDir, isDefault, engines }` | 扫描游戏工作目录；`engines[].games[]` 含 `{ id, name, engine, label, core, romRelativePath, size, mtime, coverUrl, romUrl }`；支持 `roms/<engine>/<文件夹>/xxx.rom`（以文件夹名为游戏名），扩展名匹配不区分大小写；已启动过的游戏会以 `id: recent` 的「最近启动」分类置顶（按 `lastPlayedAt` 倒序最多 8 个）；只接受主窗口 / 设置窗口请求 |
+| `games:open` | `{ gameId }` | `{ ok, error? }` | 打开 / 复用游戏窗口并加载游戏，同时更新 `meta.json` 的 `lastPlayedAt`；只接受主窗口请求 |
+| `games:window-info` | — | `{ ok, game, emulatorVersion, settings }` | 游戏窗口启动时读取当前游戏与按键 / 音量 / `hasFdsBios` 设置；只接受游戏窗口请求 |
 | `games:load-ready` | `{ gameId }` | `{ ok, error? }` | 切换游戏时渲染层 flush 成功后确认；主进程此时更新当前游戏；只接受游戏窗口请求 |
 | `games:save-sram` / `games:load-sram` | `{ gameId, data? }` / `{ gameId }` | `{ ok, exists?, data?, error? }` | 读写 `profiles/<gameId>/battery.srm`；`gameId` 必须匹配当前窗口游戏 |
 | `games:save-state` / `games:load-state` | `{ gameId, state, screenshot? }` / `{ gameId }` | `{ ok, exists?, state?, screenshot?, error? }` | 读写 `state.slot1` 与 `state.slot1.png`；只接受游戏窗口请求 |
 | `games:touch` | `{ gameId, playSeconds }` | `{ ok, error? }` | 更新 `meta.json` 的 `lastPlayedAt` / `playSeconds` |
 | `games:close-now` | — | `{ ok }` | 游戏窗口 flush 完成后销毁自身；超过 3 秒主进程强制销毁 |
-| `games:select-workdir` / `games:set-workdir` | — / `{ path }` | `{ path }` / `{ ok, workDir, resolvedWorkDir, isDefault, error? }` | 选择 / 校验并写入游戏工作目录；自动创建 `roms/` 与 `profiles/` 骨架 |
+| `games:select-workdir` / `games:set-workdir` | — / `{ path }` | `{ path }` / `{ ok, workDir, resolvedWorkDir, isDefault, error? }` | 选择 / 校验并写入游戏工作目录；自动创建 `roms/`、`bios/` 与 `profiles/` 骨架 |
+| `games:select-bios` / `games:set-bios` | — / `{ path }` | `{ path }` / `{ ok, path?, error? }` | 选择 / 校验 FDS BIOS（`disksys.rom`）并复制到 `<workDir>/bios/disksys.rom`，把副本路径写入 `settings.gameFdsBios`；空字符串清除；默认未配置 |
 | `games:open-workdir` / `games:open-profile` | — / `{ gameId? }` | `{ ok, path?, error? }` | 在 Finder 打开工作目录 / 指定游戏存档目录 |
 | `games:keymap-set` / `games:hotkey-set` | `{ common }` / `{ engine, maps }` / `{ all }` / `{ common, all }` / `{ maps }` | `{ ok, maps, error? }` | 保存通用按键 / 平台专有按键 / 功能快捷键；冲突（同平台重复、与功能快捷键冲突）或非法键返回错误 |
 | `games:set-controls-hidden` / `games:set-volume` | `{ hidden }` / `{ volume }` | `{ ok, hidden }` / `{ ok, volume }` | 持久化控制区显隐 / 音量（0–1）；只接受游戏窗口请求 |
